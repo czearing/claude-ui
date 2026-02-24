@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type Session = {
   id: string;
@@ -32,11 +32,7 @@ function nextInstanceName(sessions: Session[]): string {
 }
 
 export function useSessionStore() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-
-  useEffect(() => {
-    setSessions(loadSessions());
-  }, []);
+  const [sessions, setSessions] = useState<Session[]>(loadSessions);
 
   function addSession(): Session {
     const current = loadSessions();

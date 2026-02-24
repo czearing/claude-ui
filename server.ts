@@ -87,7 +87,7 @@ function extractTextFromLexical(specJson: string): string {
       if (typeof node !== "object" || node === null) return;
       const n = node as Record<string, unknown>;
       if (n["type"] === "text" && typeof n["text"] === "string") {
-        texts.push(n["text"] as string);
+        texts.push(n["text"]);
       }
       if (Array.isArray(n["children"])) {
         (n["children"] as unknown[]).forEach(walk);
@@ -146,11 +146,11 @@ app
           const now = new Date().toISOString();
           const task: Task = {
             id: generateTaskId(tasks),
-            title: String(body["title"] ?? ""),
+            title: typeof body["title"] === "string" ? body["title"] : "",
             type: (body["type"] as TaskType) ?? "Spec",
             status: (body["status"] as TaskStatus) ?? "Backlog",
             priority: (body["priority"] as Priority) ?? "Medium",
-            spec: String(body["spec"] ?? ""),
+            spec: typeof body["spec"] === "string" ? body["spec"] : "",
             createdAt: now,
             updatedAt: now,
           };
@@ -178,7 +178,7 @@ app
             return;
           }
           tasks[idx] = {
-            ...tasks[idx]!,
+            ...tasks[idx],
             ...body,
             id,
             updatedAt: new Date().toISOString(),
@@ -221,7 +221,7 @@ app
             res.end();
             return;
           }
-          const task = tasks[idx]!;
+          const task = tasks[idx];
           const sessionId = randomUUID();
           const specText = extractTextFromLexical(task.spec);
 
@@ -282,10 +282,10 @@ app
               );
               if (
                 taskIdx !== -1 &&
-                current[taskIdx]!.status === "In Progress"
+                current[taskIdx].status === "In Progress"
               ) {
                 current[taskIdx] = {
-                  ...current[taskIdx]!,
+                  ...current[taskIdx],
                   status: "Review",
                   updatedAt: new Date().toISOString(),
                 };
