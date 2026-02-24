@@ -2,6 +2,14 @@ import next from "next";
 import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
 
+
+import {
+  addBoardClient,
+  broadcast,
+} from "./src/utils/boardBroadcast.server.js";
+import { getAllTasks, loadTasks } from "./src/utils/tasks.server.js";
+import { handleTasksRoute } from "./src/utils/tasksHandler.server.js";
+
 import { createServer } from "node:http";
 import { parse } from "node:url";
 
@@ -32,13 +40,16 @@ function appendToBuffer(entry: SessionEntry, chunk: Buffer): void {
   }
 }
 
+loadTasks();
+
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);
+    const pathname = parsedUrl.pathname ?? "";
 
     // Handle DELETE /api/sessions/:id — kill the pty and remove from registry
-    if (req.method === "DELETE" && parsedUrl.pathname?.startsWith("/api/sessions/")) {
-      const id = parsedUrl.pathname.slice("/api/sessions/".length);
+    if (req.method === "DELETE" && pathname.startsWith("/api/sessions/")) {
+      const id = pathname.slice("/api/sessions/".length);
       const entry = sessions.get(id);
       if (entry) {
         entry.activeWs = null;
@@ -50,10 +61,26 @@ app.prepare().then(() => {
       return;
     }
 
+    // Handle /api/tasks routes
+    if (pathname.startsWith("/api/tasks")) {
+      void handleTasksRoute(req, res, pathname).then((handled) => {
+        if (!handled) {
+          void handle(req, res, parsedUrl);
+        }
+      });
+      return;
+    }
+
     void handle(req, res, parsedUrl);
   });
 
   const wss = new WebSocketServer({ server, path: "/ws/terminal" });
+  const boardWss = new WebSocketServer({ server, path: "/ws/board" });
+
+  boardWss.on("connection", (ws) => {
+    addBoardClient(ws);
+    broadcast({ type: "snapshot", tasks: getAllTasks() });
+  });
 
   wss.on("connection", (ws, req) => {
     const url = parse(req.url ?? "", true);
@@ -115,7 +142,9 @@ app.prepare().then(() => {
 
     ws.on("message", (data, isBinary) => {
       const e = sessions.get(sessionId);
-      if (!e) return;
+      if (!e) {
+        return;
+      }
       if (isBinary) {
         e.pty.write(Buffer.from(data as ArrayBuffer).toString());
       } else {
