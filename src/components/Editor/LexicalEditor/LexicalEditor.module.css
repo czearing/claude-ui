@@ -1,0 +1,21 @@
+.wrapper {
+  position: relative;
+}
+
+.editorContent {
+  outline: none;
+  min-height: 200px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
