@@ -12,68 +12,133 @@ const handle = app.getRequestHandler();
 
 const command = process.platform === "win32" ? "claude.cmd" : "claude";
 
+const BUFFER_CAP = 500 * 1024; // 500 KB rolling buffer per session
+
+type SessionEntry = {
+  pty: pty.IPty;
+  outputBuffer: Buffer[];
+  bufferSize: number;
+  activeWs: WebSocket | null;
+};
+
+const sessions = new Map<string, SessionEntry>();
+
+function appendToBuffer(entry: SessionEntry, chunk: Buffer): void {
+  entry.outputBuffer.push(chunk);
+  entry.bufferSize += chunk.byteLength;
+  while (entry.bufferSize > BUFFER_CAP && entry.outputBuffer.length > 1) {
+    const removed = entry.outputBuffer.shift()!;
+    entry.bufferSize -= removed.byteLength;
+  }
+}
+
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);
+
+    // Handle DELETE /api/sessions/:id — kill the pty and remove from registry
+    if (req.method === "DELETE" && parsedUrl.pathname?.startsWith("/api/sessions/")) {
+      const id = parsedUrl.pathname.slice("/api/sessions/".length);
+      const entry = sessions.get(id);
+      if (entry) {
+        entry.activeWs = null;
+        entry.pty.kill();
+        sessions.delete(id);
+      }
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     void handle(req, res, parsedUrl);
   });
 
   const wss = new WebSocketServer({ server, path: "/ws/terminal" });
 
-  wss.on("connection", (ws) => {
-    let ptyProcess: pty.IPty | null = null;
+  wss.on("connection", (ws, req) => {
+    const url = parse(req.url ?? "", true);
+    const sessionId = url.query["sessionId"] as string | undefined;
 
-    try {
-      ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
-        name: "xterm-color",
-        cols: 80,
-        rows: 24,
-        cwd: process.cwd(),
-        env: process.env as Record<string, string>,
-      });
-    } catch (err) {
-      ws.send(JSON.stringify({ type: "error", message: String(err) }));
+    if (!sessionId) {
+      ws.send(JSON.stringify({ type: "error", message: "Missing sessionId" }));
       ws.close();
       return;
     }
 
-    ptyProcess.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(Buffer.from(data));
-      }
-    });
+    let entry = sessions.get(sessionId);
 
-    ptyProcess.onExit(({ exitCode }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "exit", code: exitCode }));
+    if (entry) {
+      // Reconnect: attach this WS, replay buffer
+      entry.activeWs = ws;
+      if (entry.outputBuffer.length > 0) {
+        const replay = Buffer.concat(entry.outputBuffer);
+        ws.send(JSON.stringify({ type: "replay", data: replay.toString("base64") }));
+      }
+    } else {
+      // New session: spawn pty
+      let ptyProcess: pty.IPty;
+      try {
+        ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
+          name: "xterm-color",
+          cols: 80,
+          rows: 24,
+          cwd: process.cwd(),
+          env: process.env as Record<string, string>,
+        });
+      } catch (err) {
+        ws.send(JSON.stringify({ type: "error", message: String(err) }));
         ws.close();
-      }
-    });
-
-    ws.on("message", (data, isBinary) => {
-      if (!ptyProcess) {
         return;
       }
+
+      entry = { pty: ptyProcess, outputBuffer: [], bufferSize: 0, activeWs: ws };
+      sessions.set(sessionId, entry);
+
+      ptyProcess.onData((data) => {
+        const chunk = Buffer.from(data);
+        const e = sessions.get(sessionId)!;
+        appendToBuffer(e, chunk);
+        if (e.activeWs?.readyState === WebSocket.OPEN) {
+          e.activeWs.send(chunk);
+        }
+      });
+
+      ptyProcess.onExit(({ exitCode }) => {
+        const e = sessions.get(sessionId);
+        if (e?.activeWs?.readyState === WebSocket.OPEN) {
+          e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+          e.activeWs.close();
+        }
+        sessions.delete(sessionId);
+      });
+    }
+
+    ws.on("message", (data, isBinary) => {
+      const e = sessions.get(sessionId);
+      if (!e) return;
       if (isBinary) {
-        ptyProcess.write(Buffer.from(data as ArrayBuffer).toString());
+        e.pty.write(Buffer.from(data as ArrayBuffer).toString());
       } else {
         const text = (data as Buffer).toString("utf8");
         try {
           const msg = JSON.parse(text) as { type: string; cols?: number; rows?: number };
           if (msg.type === "resize" && msg.cols && msg.rows) {
-            ptyProcess.resize(msg.cols, msg.rows);
+            e.pty.resize(msg.cols, msg.rows);
             return;
           }
         } catch {
           // not JSON — write raw to PTY
         }
-        ptyProcess.write(text);
+        e.pty.write(text);
       }
     });
 
     ws.on("close", () => {
-      ptyProcess?.kill();
-      ptyProcess = null;
+      const e = sessions.get(sessionId);
+      if (e) {
+        e.activeWs = null;
+        // Do NOT kill pty — session stays alive
+      }
     });
   });
 
