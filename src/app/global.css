@@ -1,3 +1,4 @@
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -42,4 +43,94 @@ h6 {
 #root,
 #__next {
   isolation: isolate;
+}
+
+/* ─── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --color-bg: #121214;
+  --color-surface: #1e1e21;
+  --color-border: #2e2e32;
+  --color-text: #ededef;
+  --color-text-muted: #a0a0a5;
+  --color-agent: #7c3aed;
+  --color-agent-light: rgba(124, 58, 237, 0.2);
+
+  --font-sans: var(--font-inter, ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--font-jetbrains-mono, ui-monospace, 'Cascadia Code', monospace);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+
+  /* Typography scale */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+.glass-panel {
+  background: rgba(30, 30, 33, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+@keyframes agentPulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--color-agent-light);
+    border-color: var(--color-agent);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+    border-color: var(--color-border);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    border-color: var(--color-border);
+  }
+}
+
+.agent-active {
+  animation: agentPulse 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
