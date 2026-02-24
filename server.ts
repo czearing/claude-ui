@@ -1,6 +1,6 @@
 import next from "next";
 import * as pty from "node-pty";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 
 import { createServer } from "node:http";
 import { parse } from "node:url";
