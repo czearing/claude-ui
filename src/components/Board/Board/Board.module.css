@@ -1,0 +1,15 @@
+.board {
+  flex: 1;
+  overflow-x: auto;
+  padding: var(--space-6);
+  background-color: var(--color-bg);
+  height: 100%;
+}
+
+.columns {
+  display: flex;
+  gap: var(--space-6);
+  height: 100%;
+  align-items: flex-start;
+  min-width: max-content;
+}
