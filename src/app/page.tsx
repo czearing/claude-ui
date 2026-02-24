@@ -1,5 +1,5 @@
-import { TerminalPage } from "./TerminalPage";
+import { HomePage } from "./HomePage";
 
-export default function HomePage() {
-  return <TerminalPage />;
+export default function Page() {
+  return <HomePage />;
 }
