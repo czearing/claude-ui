@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { Terminal as XTerm } from "@xterm/xterm";
 
 import { Terminal } from "@/components";
 import { useTerminalSocket } from "@/hooks/useTerminalSocket";
 import styles from "./TerminalPage.module.css";
+import type { TerminalPageState } from "./TerminalPage.types";
 
 export const TerminalPage = () => {
-  const [xterm, setXterm] = useState<XTerm | null>(null);
+  const [xterm, setXterm] = useState<TerminalPageState["xterm"]>(null);
 
   useTerminalSocket(xterm);
 
