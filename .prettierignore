@@ -1,0 +1,14 @@
+# generated or imported files
+package-deps.json
+CHANGELOG.*
+yarn.lock
+
+# generated folders
+node_modules
+dist
+temp
+coverage
+__snapshots__
+.yarn/
+.next/
+storybook-static/

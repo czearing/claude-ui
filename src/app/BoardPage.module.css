@@ -1,0 +1,43 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--ui-Canvas);
+  color: var(--ui-TextPrimary);
+}
+
+.main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
+}
+
+.boardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+
+.boardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ui-TextPrimary);
+  margin: 0;
+}
+
+.newTaskBtn {
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--ui-Border);
+  background: var(--ui-Surface);
+  color: var(--ui-TextPrimary);
+  cursor: pointer;
+}
+
+.newTaskBtn:hover {
+  background: var(--ui-SurfaceHover);
+}

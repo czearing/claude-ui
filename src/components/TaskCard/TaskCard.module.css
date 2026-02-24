@@ -1,0 +1,215 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--ui-Canvas);
+  border: 1px solid var(--ui-Border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+  position: relative;
+}
+
+.card:hover {
+  border-color: var(--ui-TextMuted);
+  background: var(--ui-SurfaceHover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--agent-Active);
+  outline-offset: 2px;
+}
+
+.hasError {
+  border-color: var(--agent-Error);
+}
+
+.hasError:hover {
+  border-color: var(--agent-Error);
+}
+
+.dragging {
+  opacity: 0.4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Drag handle — hidden by default, shown on card hover */
+.dragHandle {
+  display: flex;
+  align-items: center;
+  color: transparent;
+  cursor: grab;
+  flex-shrink: 0;
+  transition: color 0.12s ease;
+  user-select: none;
+}
+
+.card:hover .dragHandle {
+  color: var(--ui-TextMuted);
+}
+
+.cardInner {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ui-TextPrimary);
+  line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ui-SurfaceHover);
+  color: var(--ui-TextSecondary);
+  border: 1px solid var(--ui-BorderSubtle);
+}
+
+.errorBadge {
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--agent-Error);
+  color: #fff;
+}
+
+/* Context menu / dropdown */
+.menu {
+  min-width: 180px;
+  padding: 4px;
+  background: var(--ui-Surface);
+  border: 1px solid var(--ui-Border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 0.875rem;
+  color: var(--ui-TextPrimary);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.menuItem:hover,
+.menuItem[data-highlighted] {
+  background: var(--ui-SurfaceHover);
+}
+
+.menuItemDanger {
+  color: var(--agent-Error);
+}
+
+.menuSeparator {
+  height: 1px;
+  background: var(--ui-BorderSubtle);
+  margin: 4px 0;
+}
+
+/* Delete confirmation dialog */
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+}
+
+.dialogContent {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--ui-Surface);
+  border: 1px solid var(--ui-Border);
+  border-radius: 10px;
+  padding: 24px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialogTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ui-TextPrimary);
+  margin: 0;
+}
+
+.dialogDescription {
+  font-size: 0.875rem;
+  color: var(--ui-TextSecondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.btnCancel {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ui-TextPrimary);
+  background: var(--ui-SurfaceHover);
+  border: 1px solid var(--ui-Border);
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.btnCancel:hover {
+  background: var(--ui-Border);
+}
+
+.btnConfirm {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  background: var(--agent-Error);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+.btnConfirm:hover {
+  opacity: 0.85;
+}

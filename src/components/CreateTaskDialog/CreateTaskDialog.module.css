@@ -1,0 +1,176 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.dialog {
+  background: var(--ui-Surface);
+  border: 1px solid var(--ui-Border);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ui-Border);
+  gap: 12px;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ui-TextPrimary);
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--ui-TextSecondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.closeButton:hover {
+  background: var(--ui-SurfaceHover);
+  color: var(--ui-TextPrimary);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--agent-Active);
+  outline-offset: 2px;
+}
+
+.body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ui-TextSecondary);
+}
+
+.required {
+  color: var(--agent-Error);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--ui-SurfaceHover);
+  border: 1px solid var(--ui-Border);
+  border-radius: 6px;
+  color: var(--ui-TextPrimary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--ui-TextMuted);
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--agent-Active);
+}
+
+.textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.cancelButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--ui-Border);
+  background: transparent;
+  color: var(--ui-TextSecondary);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.cancelButton:hover {
+  background: var(--ui-SurfaceHover);
+  color: var(--ui-TextPrimary);
+}
+
+.cancelButton:focus-visible {
+  outline: 2px solid var(--agent-Active);
+  outline-offset: 2px;
+}
+
+.submitButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--agent-Active);
+  background: var(--agent-Active);
+  color: #ffffff;
+  transition: opacity 0.15s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--agent-Active);
+  outline-offset: 2px;
+}
