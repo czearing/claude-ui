@@ -1,5 +1,5 @@
-import { HomePage } from "./HomePage";
+import { AppShell } from './AppShell';
 
 export default function Page() {
-  return <HomePage />;
+  return <AppShell />;
 }
