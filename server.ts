@@ -205,6 +205,111 @@ app
           return;
         }
 
+        // POST /api/tasks/:id/handover
+        if (
+          req.method === "POST" &&
+          parsedUrl.pathname?.endsWith("/handover")
+        ) {
+          const id = parsedUrl.pathname.slice(
+            "/api/tasks/".length,
+            -"/handover".length,
+          );
+          const tasks = await readTasks();
+          const idx = tasks.findIndex((t) => t.id === id);
+          if (idx === -1) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          const task = tasks[idx]!;
+          const sessionId = randomUUID();
+          const specText = extractTextFromLexical(task.spec);
+
+          let ptyProcess: pty.IPty;
+          try {
+            ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
+              name: "xterm-color",
+              cols: 80,
+              rows: 24,
+              cwd: process.cwd(),
+              env: process.env as Record<string, string>,
+            });
+          } catch (err) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: String(err) }));
+            return;
+          }
+
+          const entry: SessionEntry = {
+            pty: ptyProcess,
+            outputBuffer: [],
+            bufferSize: 0,
+            activeWs: null,
+          };
+          sessions.set(sessionId, entry);
+
+          // Send spec as initial prompt after Claude initialises (~2 s)
+          if (specText.trim()) {
+            setTimeout(() => {
+              if (sessions.has(sessionId)) {
+                ptyProcess.write(specText + "\n");
+              }
+            }, 2000);
+          }
+
+          ptyProcess.onData((data) => {
+            const chunk = Buffer.from(data);
+            const e = sessions.get(sessionId);
+            if (!e) return;
+            appendToBuffer(e, chunk);
+            if (e.activeWs?.readyState === WebSocket.OPEN) {
+              e.activeWs.send(chunk);
+            }
+          });
+
+          ptyProcess.onExit(({ exitCode }) => {
+            const e = sessions.get(sessionId);
+            if (e?.activeWs?.readyState === WebSocket.OPEN) {
+              e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+              e.activeWs.close();
+            }
+            sessions.delete(sessionId);
+
+            // Auto-advance to Review
+            void readTasks().then((current) => {
+              const taskIdx = current.findIndex(
+                (t) => t.sessionId === sessionId,
+              );
+              if (
+                taskIdx !== -1 &&
+                current[taskIdx]!.status === "In Progress"
+              ) {
+                current[taskIdx] = {
+                  ...current[taskIdx]!,
+                  status: "Review",
+                  updatedAt: new Date().toISOString(),
+                };
+                void writeTasks(current).then(() =>
+                  broadcastTaskEvent("task:updated", current[taskIdx]),
+                );
+              }
+            });
+          });
+
+          tasks[idx] = {
+            ...task,
+            sessionId,
+            status: "In Progress",
+            updatedAt: new Date().toISOString(),
+          };
+          await writeTasks(tasks);
+          broadcastTaskEvent("task:updated", tasks[idx]);
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(tasks[idx]));
+          return;
+        }
+
         // Handle DELETE /api/sessions/:id — kill the pty and remove from registry
         if (
           req.method === "DELETE" &&
@@ -230,7 +335,28 @@ app
       }
     });
 
-    const wss = new WebSocketServer({ server, path: "/ws/terminal" });
+    const wss = new WebSocketServer({ noServer: true });
+    const boardWss = new WebSocketServer({ noServer: true });
+
+    server.on("upgrade", (req, socket, head) => {
+      const url = parse(req.url ?? "", true);
+      if (url.pathname === "/ws/terminal") {
+        wss.handleUpgrade(req, socket, head, (ws) =>
+          wss.emit("connection", ws, req),
+        );
+      } else if (url.pathname === "/ws/board") {
+        boardWss.handleUpgrade(req, socket, head, (ws) =>
+          boardWss.emit("connection", ws, req),
+        );
+      } else {
+        socket.destroy();
+      }
+    });
+
+    boardWss.on("connection", (ws) => {
+      boardClients.add(ws);
+      ws.on("close", () => boardClients.delete(ws));
+    });
 
     wss.on("connection", (ws, req) => {
       const url = parse(req.url ?? "", true);
