@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Activity, ArrowRight, Code, FileText, User, Warning } from '@phosphor-icons/react';
+import { ArrowRight, Code, FileText, Kanban, User, Warning } from '@phosphor-icons/react';
 import clsx from 'clsx';
 
 import type { Priority, Task } from '@/utils/tasks.types';
@@ -51,7 +51,7 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
       {isAgentActive && (
         <div className={styles.agentBadge}>
           <div className={styles.shimmer} />
-          <Activity size={12} />
+          <Kanban size={12} />
           <span>Agent Processing...</span>
         </div>
       )}

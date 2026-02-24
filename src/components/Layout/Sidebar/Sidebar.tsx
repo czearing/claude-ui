@@ -1,4 +1,4 @@
-import { Activity, Archive, CheckSquare, Gear, SquaresFour } from '@phosphor-icons/react';
+import { Archive, CheckSquare, Gear, Kanban, SquaresFour } from '@phosphor-icons/react';
 import clsx from 'clsx';
 
 import type { SidebarProps, View } from './Sidebar.types';
@@ -33,7 +33,7 @@ export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
         <div className={styles.logoIcon}>
-          <Activity size={14} color="white" weight="bold" />
+          <Kanban size={14} color="white" weight="bold" />
         </div>
         <span className={styles.logoText}>Claude Code</span>
       </div>
