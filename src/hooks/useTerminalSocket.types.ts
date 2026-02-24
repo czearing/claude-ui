@@ -1,6 +1,1 @@
-import type { Terminal as XTerm } from "@xterm/xterm";
-
-export type UseTerminalSocketOptions = {
-  xterm: XTerm | null;
-  sessionId: string;
-};
+export type ClaudeStatus = "connecting" | "busy" | "idle" | "exited" | "disconnected";

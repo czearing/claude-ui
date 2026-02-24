@@ -14,11 +14,17 @@ const command = process.platform === "win32" ? "claude.cmd" : "claude";
 
 const BUFFER_CAP = 500 * 1024; // 500 KB rolling buffer per session
 
+const STATUS_DEBOUNCE_MS = 500;
+
+type ClaudeStatus = "connecting" | "busy" | "idle" | "exited" | "disconnected";
+
 type SessionEntry = {
   pty: pty.IPty;
   outputBuffer: Buffer[];
   bufferSize: number;
   activeWs: WebSocket | null;
+  statusDebounceTimer: ReturnType<typeof setTimeout> | null;
+  currentStatus: ClaudeStatus;
 };
 
 const sessions = new Map<string, SessionEntry>();
@@ -32,6 +38,25 @@ function appendToBuffer(entry: SessionEntry, chunk: Buffer): void {
   }
 }
 
+function emitStatus(ws: WebSocket | null, status: ClaudeStatus): void {
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "status", value: status }));
+  }
+}
+
+function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
+  if (entry.statusDebounceTimer !== null) {
+    clearTimeout(entry.statusDebounceTimer);
+  }
+  entry.statusDebounceTimer = setTimeout(() => {
+    const e = sessions.get(sessionId);
+    if (!e) return;
+    e.currentStatus = "idle";
+    e.statusDebounceTimer = null;
+    emitStatus(e.activeWs, "idle");
+  }, STATUS_DEBOUNCE_MS);
+}
+
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);
@@ -41,6 +66,9 @@ app.prepare().then(() => {
       const id = parsedUrl.pathname.slice("/api/sessions/".length);
       const entry = sessions.get(id);
       if (entry) {
+        if (entry.statusDebounceTimer !== null) {
+          clearTimeout(entry.statusDebounceTimer);
+        }
         entry.activeWs = null;
         entry.pty.kill();
         sessions.delete(id);
@@ -74,6 +102,7 @@ app.prepare().then(() => {
         const replay = Buffer.concat(entry.outputBuffer);
         ws.send(JSON.stringify({ type: "replay", data: replay.toString("base64") }));
       }
+      emitStatus(ws, entry.currentStatus); // resync status after replay
     } else {
       // New session: spawn pty
       let ptyProcess: pty.IPty;
@@ -91,8 +120,16 @@ app.prepare().then(() => {
         return;
       }
 
-      entry = { pty: ptyProcess, outputBuffer: [], bufferSize: 0, activeWs: ws };
+      entry = {
+        pty: ptyProcess,
+        outputBuffer: [],
+        bufferSize: 0,
+        activeWs: ws,
+        statusDebounceTimer: null,
+        currentStatus: "connecting",
+      };
       sessions.set(sessionId, entry);
+      emitStatus(ws, "connecting");
 
       ptyProcess.onData((data) => {
         const chunk = Buffer.from(data);
@@ -101,13 +138,24 @@ app.prepare().then(() => {
         if (e.activeWs?.readyState === WebSocket.OPEN) {
           e.activeWs.send(chunk);
         }
+        if (e.currentStatus !== "busy") {
+          e.currentStatus = "busy";
+          emitStatus(e.activeWs, "busy");
+        }
+        scheduleIdleStatus(e, sessionId);
       });
 
       ptyProcess.onExit(({ exitCode }) => {
         const e = sessions.get(sessionId);
-        if (e?.activeWs?.readyState === WebSocket.OPEN) {
-          e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
-          e.activeWs.close();
+        if (e) {
+          if (e.statusDebounceTimer !== null) {
+            clearTimeout(e.statusDebounceTimer);
+          }
+          e.currentStatus = "exited";
+          if (e.activeWs?.readyState === WebSocket.OPEN) {
+            e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+            e.activeWs.close();
+          }
         }
         sessions.delete(sessionId);
       });
