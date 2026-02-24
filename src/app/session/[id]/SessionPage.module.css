@@ -1,0 +1,39 @@
+.page {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+
+.backLink {
+  color: #58a6ff;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color 0.15s ease;
+}
+
+.backLink:hover {
+  color: #79c0ff;
+  text-decoration: underline;
+}
+
+.sessionName {
+  font-size: 0.875rem;
+  color: #8b949e;
+}
+
+.terminal {
+  flex: 1;
+  overflow: hidden;
+}
