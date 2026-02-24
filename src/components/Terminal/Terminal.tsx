@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-
-import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { Terminal as XTerm } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
 import styles from "./Terminal.module.css";
@@ -13,7 +12,9 @@ export const Terminal = ({ onReady }: TerminalProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      return;
+    }
 
     const xterm = new XTerm({
       cursorBlink: true,
@@ -35,7 +36,8 @@ export const Terminal = ({ onReady }: TerminalProps) => {
       onReady(null);
       xterm.dispose();
     };
-  }, []); // onReady is a setState setter — stable reference
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onReady is a stable setState setter
+  }, []);
 
   return <div ref={containerRef} data-testid="terminal-container" className={styles.container} />;
 };
