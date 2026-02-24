@@ -1,0 +1,233 @@
+.panel {
+  position: fixed;
+  inset-block: 0;
+  right: 0;
+  width: 600px;
+  background: rgba(30, 30, 33, 0.7);
+  backdrop-filter: blur(12px);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.taskId {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.taskTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.closeButton {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 150ms, color 150ms;
+}
+
+.closeButton:hover {
+  background-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dotAgent { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-agent); }
+.dotOrange { width: 8px; height: 8px; border-radius: 50%; background-color: #f97316; }
+
+.editorWrapper {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg);
+  min-height: 240px;
+}
+
+.editorToolbar {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.editorLabel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.editToggle {
+  font-size: var(--text-xs);
+  color: var(--color-agent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: text-decoration 150ms;
+}
+
+.editToggle:hover {
+  text-decoration: underline;
+}
+
+.editorBody {
+  flex: 1;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.agentNotes {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.agentNotesTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-agent);
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+
+.agentNotesText {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.viewDiffButton {
+  background-color: var(--color-border);
+  color: var(--color-text);
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  width: fit-content;
+  transition: background-color 150ms;
+}
+
+.viewDiffButton:hover {
+  background-color: #3f3f46;
+}
+
+.footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.footerMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.saveDraftButton {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+
+.saveDraftButton:hover {
+  background-color: var(--color-border);
+}
+
+.handoverButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-agent);
+  color: white;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+
+.handoverButton:hover {
+  opacity: 0.9;
+}
+
+.handoverButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
