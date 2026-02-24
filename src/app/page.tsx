@@ -1,5 +1,5 @@
-import { BoardPage } from './BoardPage';
+import { HomePage } from "./HomePage";
 
 export default function Page() {
-  return <BoardPage />;
+  return <HomePage />;
 }

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from "react";
 
 export type Session = {
   id: string;
@@ -8,10 +8,10 @@ export type Session = {
   createdAt: string;
 };
 
-const STORAGE_KEY = 'claude-sessions';
+const STORAGE_KEY = "claude-sessions";
 
 function loadSessions(): Session[] {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return [];
   }
   try {
@@ -32,7 +32,11 @@ function nextInstanceName(sessions: Session[]): string {
 }
 
 export function useSessionStore() {
-  const [sessions, setSessions] = useState<Session[]>(() => loadSessions());
+  const [sessions, setSessions] = useState<Session[]>([]);
+
+  useEffect(() => {
+    setSessions(loadSessions());
+  }, []);
 
   function addSession(): Session {
     const current = loadSessions();
@@ -49,7 +53,7 @@ export function useSessionStore() {
 
   async function deleteSession(id: string): Promise<void> {
     try {
-      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      await fetch(`/api/sessions/${id}`, { method: "DELETE" });
     } catch {
       // best effort — remove from local store regardless
     }

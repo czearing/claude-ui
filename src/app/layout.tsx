@@ -1,30 +1,16 @@
-import type { Metadata } from 'next';
-import { Toaster } from 'sonner';
+import type { Metadata } from "next";
 
-import { ThemeProvider } from '@/components/Theme';
-import '@/app/global.css';
-import { Providers } from './providers';
+import "@/app/global.css";
 
 export const metadata: Metadata = {
-  title: 'Claude Code UI',
-  description: 'Claude Code UI',
+  title: "Claude Code UI",
+  description: "Claude Code UI",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <Providers>
-          <ThemeProvider>
-            {children}
-            <Toaster />
-          </ThemeProvider>
-        </Providers>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
