@@ -24,7 +24,7 @@ app.prepare().then(() => {
     let ptyProcess: pty.IPty | null = null;
 
     try {
-      ptyProcess = pty.spawn(command, [], {
+      ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
         name: "xterm-color",
         cols: 80,
         rows: 24,
