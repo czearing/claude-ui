@@ -52,6 +52,7 @@ export const useTerminalSocket = (xterm: XTerm | null) => {
     return () => {
       dataDisposable.dispose();
       resizeDisposable.dispose();
+      ws.onclose = null;
       ws.close();
     };
   }, [xterm]);

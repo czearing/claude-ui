@@ -1,8 +1,9 @@
+import next from "next";
+import * as pty from "node-pty";
+import { WebSocketServer } from "ws";
+
 import { createServer } from "node:http";
 import { parse } from "node:url";
-import next from "next";
-import { WebSocketServer } from "ws";
-import * as pty from "node-pty";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -14,7 +15,7 @@ const command = process.platform === "win32" ? "claude.cmd" : "claude";
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);
-    handle(req, res, parsedUrl);
+    void handle(req, res, parsedUrl);
   });
 
   const wss = new WebSocketServer({ server, path: "/ws/terminal" });
@@ -37,24 +38,26 @@ app.prepare().then(() => {
     }
 
     ptyProcess.onData((data) => {
-      if (ws.readyState === ws.OPEN) {
+      if (ws.readyState === WebSocket.OPEN) {
         ws.send(Buffer.from(data));
       }
     });
 
     ptyProcess.onExit(({ exitCode }) => {
-      if (ws.readyState === ws.OPEN) {
+      if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "exit", code: exitCode }));
         ws.close();
       }
     });
 
     ws.on("message", (data, isBinary) => {
-      if (!ptyProcess) return;
+      if (!ptyProcess) {
+        return;
+      }
       if (isBinary) {
-        ptyProcess.write(Buffer.from(data as Buffer).toString());
+        ptyProcess.write(Buffer.from(data as ArrayBuffer).toString());
       } else {
-        const text = data.toString();
+        const text = (data as Buffer).toString("utf8");
         try {
           const msg = JSON.parse(text) as { type: string; cols?: number; rows?: number };
           if (msg.type === "resize" && msg.cols && msg.rows) {
@@ -75,6 +78,9 @@ app.prepare().then(() => {
   });
 
   server.listen(port, () => {
-    console.log(`> Ready on http://localhost:${port}`);
+    console.error(`> Ready on http://localhost:${port}`);
   });
+}).catch((err: unknown) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
 });
