@@ -3,13 +3,15 @@
 import { useEffect } from "react";
 import type { Terminal as XTerm } from "@xterm/xterm";
 
-export const useTerminalSocket = (xterm: XTerm | null) => {
+export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
   useEffect(() => {
     if (!xterm) {
       return;
     }
 
-    const ws = new WebSocket(`ws://${window.location.host}/ws/terminal`);
+    const ws = new WebSocket(
+      `ws://${window.location.host}/ws/terminal?sessionId=${encodeURIComponent(sessionId)}`
+    );
     ws.binaryType = "arraybuffer";
 
     ws.onopen = () => {
@@ -22,8 +24,16 @@ export const useTerminalSocket = (xterm: XTerm | null) => {
         return;
       }
       try {
-        const msg = JSON.parse(event.data as string) as { type: string; code?: number; message?: string };
-        if (msg.type === "exit") {
+        const msg = JSON.parse(event.data as string) as {
+          type: string;
+          code?: number;
+          message?: string;
+          data?: string;
+        };
+        if (msg.type === "replay" && msg.data) {
+          xterm.clear();
+          xterm.write(Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0)));
+        } else if (msg.type === "exit") {
           xterm.write("\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n");
         } else if (msg.type === "error") {
           xterm.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
@@ -55,5 +65,5 @@ export const useTerminalSocket = (xterm: XTerm | null) => {
       ws.onclose = null;
       ws.close();
     };
-  }, [xterm]);
+  }, [xterm, sessionId]);
 };

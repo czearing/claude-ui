@@ -7,10 +7,14 @@ import { useTerminalSocket } from "@/hooks/useTerminalSocket";
 import styles from "./TerminalPage.module.css";
 import type { TerminalPageState } from "./TerminalPage.types";
 
-export const TerminalPage = () => {
+type TerminalPageProps = {
+  sessionId: string;
+};
+
+export const TerminalPage = ({ sessionId }: TerminalPageProps) => {
   const [xterm, setXterm] = useState<TerminalPageState["xterm"]>(null);
 
-  useTerminalSocket(xterm);
+  useTerminalSocket(xterm, sessionId);
 
   return (
     <div className={styles.page}>

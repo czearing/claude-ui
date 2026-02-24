@@ -27,7 +27,7 @@ export const SessionPage = ({ params }: SessionPageProps) => {
         <span className={styles.sessionName}>{sessionName}</span>
       </header>
       <div className={styles.terminal}>
-        <TerminalPage />
+        <TerminalPage sessionId={id} />
       </div>
     </div>
   );

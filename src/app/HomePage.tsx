@@ -10,7 +10,7 @@ import type { Session } from "@/hooks/useSessionStore";
 
 export const HomePage = () => {
   const router = useRouter();
-  const { sessions, addSession, removeSession } = useSessionStore();
+  const { sessions, addSession, deleteSession } = useSessionStore();
 
   function handleNewInstance() {
     const session = addSession();
@@ -22,7 +22,7 @@ export const HomePage = () => {
   }
 
   function handleDelete(id: string) {
-    removeSession(id);
+    void deleteSession(id);
   }
 
   return (

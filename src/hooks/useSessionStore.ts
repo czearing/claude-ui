@@ -51,11 +51,17 @@ export function useSessionStore() {
     return session;
   }
 
-  function removeSession(id: string): void {
-    const updated = sessions.filter((s) => s.id !== id);
+  async function deleteSession(id: string): Promise<void> {
+    try {
+      await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    } catch {
+      // best effort — remove from local store regardless
+    }
+    const current = loadSessions();
+    const updated = current.filter((s) => s.id !== id);
     saveSessions(updated);
     setSessions(updated);
   }
 
-  return { sessions, addSession, removeSession };
+  return { sessions, addSession, deleteSession };
 }
