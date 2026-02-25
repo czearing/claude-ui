@@ -1,4 +1,4 @@
-export type View = "Board" | "Backlog";
+export type View = "Board" | "Tasks" | "Archive";
 
 export interface SidebarProps {
   repoId: string;

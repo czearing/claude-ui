@@ -43,9 +43,9 @@ const NAV_VIEWS: {
     icon: <SquaresFour size={16} />,
   },
   {
-    view: "Backlog",
-    path: "backlog",
-    label: "Backlog",
+    view: "Tasks",
+    path: "tasks",
+    label: "Tasks",
     icon: <CheckSquare size={16} />,
   },
 ];
@@ -68,7 +68,12 @@ export function Sidebar({ repoId, currentView, agentActive }: SidebarProps) {
             onClick={() => router.push(`/repos/${repoId}/${path}`)}
           />
         ))}
-        <NavItem icon={<Archive size={16} />} label="Archives" />
+        <NavItem
+          icon={<Archive size={16} />}
+          label="Archives"
+          active={currentView === "Archive"}
+          onClick={() => router.push(`/repos/${repoId}/archive`)}
+        />
       </nav>
 
       <div className={styles.footer}>
