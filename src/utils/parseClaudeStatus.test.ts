@@ -40,6 +40,20 @@ describe("parseClaudeStatus", () => {
       },
     );
 
+    it("returns 'thinking' when chunk contains (thinking) label", () => {
+      // Claude Code v2 renders "(thinking)" as status text during processing
+      expect(
+        parseClaudeStatus("\x1b[38;2;174;174;174m\x1b[8;13H(thinking)"),
+      ).toBe("thinking");
+    });
+
+    it("(thinking) takes priority over typing-length text", () => {
+      // chunk has >8 printable chars but also contains (thinking)
+      expect(
+        parseClaudeStatus("\x1b[38;2;176;176;176m\x1b[11C(thinking) more text"),
+      ).toBe("thinking");
+    });
+
     it("thinking takes priority over typing-length text", () => {
       // Short spinner chunk — not enough text to be 'typing' on its own
       expect(parseClaudeStatus("\r⣾ ok")).toBe("thinking");

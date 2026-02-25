@@ -45,7 +45,7 @@ const SPEC_ECHO_WINDOW_MS = 500;
 // How long the PTY must be silent before we treat it as "waiting for input".
 // Must be longer than Claude's longest internal API-call pause (~3 s observed)
 // to avoid false-positives during processing gaps.
-const SESSION_IDLE_MS = 3500;
+const SESSION_IDLE_MS = 5000;
 
 type ClaudeStatus =
   | "connecting"

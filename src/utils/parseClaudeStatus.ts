@@ -20,6 +20,13 @@ const BRACKETED_PASTE_ON = "\x1b[?2004h";
 const SPINNER_RE = /\r[⣾⣽⣻⢿⡿⣟⣯⣷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✻✶✢·*]/;
 
 /**
+ * Claude Code v2 renders "(thinking)" as status text alongside the spinner
+ * while Claude is processing. This is a reliable thinking signal that is
+ * absent once Claude starts streaming its response.
+ */
+const THINKING_TEXT = "(thinking)";
+
+/**
  * Matches all standard ANSI / VT100 escape sequences so we can strip them
  * before counting printable characters.
  *
@@ -54,12 +61,17 @@ export function parseClaudeStatus(chunk: string): ParsedStatus | null {
     return "waiting";
   }
 
-  // 2. Spinner + carriage-return = processing animation
+  // 2. Claude Code v2 "(thinking)" status label — highest-priority thinking signal
+  if (chunk.includes(THINKING_TEXT)) {
+    return "thinking";
+  }
+
+  // 3. Spinner + carriage-return = processing animation
   if (SPINNER_RE.test(chunk)) {
     return "thinking";
   }
 
-  // 3. Substantial printable text = Claude is streaming its response
+  // 4. Substantial printable text = Claude is streaming its response
   const printable = stripAnsi(chunk).replace(/\s/g, "");
   if (printable.length >= TYPING_THRESHOLD) {
     return "typing";
