@@ -7,8 +7,9 @@ import {
 } from "@phosphor-icons/react";
 import clsx from "clsx";
 
-import type { SidebarProps, View } from "./Sidebar.types";
+import { RepoSwitcher } from "./RepoSwitcher";
 import styles from "./Sidebar.module.css";
+import type { SidebarProps, View } from "./Sidebar.types";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -38,6 +39,7 @@ const NAV_VIEWS: { view: View; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function Sidebar({
+  repoId,
   currentView,
   agentActive,
   onViewChange,
@@ -49,6 +51,10 @@ export function Sidebar({
           <Kanban size={14} color="white" weight="bold" />
         </div>
         <span className={styles.logoText}>Claude Code</span>
+      </div>
+
+      <div className={styles.repoSection}>
+        <RepoSwitcher activeRepoId={repoId} />
       </div>
 
       <nav className={styles.nav}>

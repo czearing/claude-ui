@@ -107,4 +107,5 @@ package-manifest.json
 
 # Runtime data
 tasks.json
+repos.json
 task-logs/
