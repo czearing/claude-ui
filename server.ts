@@ -2,6 +2,13 @@ import next from "next";
 import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
 
+import {
+  loadRegistry,
+  saveRegistry,
+  type SessionRegistryEntry,
+} from "./src/utils/sessionRegistry";
+import { parseClaudeStatus } from "./src/utils/parseClaudeStatus";
+
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import {
@@ -29,32 +36,52 @@ const command = process.platform === "win32" ? "claude.cmd" : "claude";
 
 const BUFFER_CAP = 500 * 1024; // 500 KB rolling buffer per session
 
-const STATUS_DEBOUNCE_MS = 500;
 // Window after writing the spec to the PTY during which output is treated as
 // echo/startup noise rather than meaningful Claude activity.  Any onData event
 // that fires more than this many ms after spec injection is counted as
-// "meaningful busy", which gates the idle → Review transition.
+// "meaningful activity", which gates the waiting → Review transition.
 const SPEC_ECHO_WINDOW_MS = 500;
 
-type ClaudeStatus = "connecting" | "busy" | "idle" | "exited" | "disconnected";
+type ClaudeStatus =
+  | "connecting"
+  | "thinking"
+  | "typing"
+  | "waiting"
+  | "exited"
+  | "disconnected";
 
-type HandoverPhase = "waiting_for_idle" | "spec_sent" | "done";
+type HandoverPhase = "spec_sent" | "done";
 
 type SessionEntry = {
   pty: pty.IPty;
   outputBuffer: Buffer[];
   bufferSize: number;
   activeWs: WebSocket | null;
-  statusDebounceTimer: ReturnType<typeof setTimeout> | null;
   currentStatus: ClaudeStatus;
-  // null for non-handover sessions; set to "waiting_for_idle" on handover spawn
+  // null for non-handover sessions
   handoverPhase: HandoverPhase | null;
   handoverSpec: string;
   specSentAt: number;
-  hadMeaningfulBusy: boolean;
+  hadMeaningfulActivity: boolean;
 };
 
 const sessions = new Map<string, SessionEntry>();
+
+// ─── Session Registry (persistent across server restarts) ────────────────────
+
+const SESSIONS_REGISTRY_FILE = join(process.cwd(), "sessions-registry.json");
+
+const sessionRegistry = new Map<string, SessionRegistryEntry>();
+
+async function loadSessionRegistry(): Promise<void> {
+  const loaded = await loadRegistry(SESSIONS_REGISTRY_FILE);
+  for (const [k, v] of loaded) {
+    sessionRegistry.set(k, v);
+  }
+}
+
+const saveSessionRegistry = (): Promise<void> =>
+  saveRegistry(SESSIONS_REGISTRY_FILE, sessionRegistry);
 
 // ─── Tasks ─────────────────────────────────────────────────────────────────────────────────
 
@@ -210,7 +237,10 @@ async function listSkills(
         try {
           const raw = await readFile(join(dir, e.name, "SKILL.md"), "utf8");
           const parsed = parseSkillFile(raw, e.name);
-          results.push({ name: parsed.name || e.name, description: parsed.description });
+          results.push({
+            name: parsed.name || e.name,
+            description: parsed.description,
+          });
         } catch {
           // directory exists but no SKILL.md — skip
         }
@@ -230,7 +260,11 @@ async function readSkill(dir: string, name: string): Promise<Skill | null> {
 
 async function writeSkill(dir: string, skill: Skill): Promise<void> {
   await mkdir(join(dir, skill.name), { recursive: true });
-  await writeFile(skillFile(dir, skill.name), serializeSkillFile(skill), "utf8");
+  await writeFile(
+    skillFile(dir, skill.name),
+    serializeSkillFile(skill),
+    "utf8",
+  );
 }
 
 async function deleteSkill(dir: string, name: string): Promise<void> {
@@ -248,7 +282,7 @@ function globalAgentsDir(): string {
 }
 
 function agentFile(dir: string, name: string): string {
-  return join(dir, name, "AGENT.md");
+  return join(dir, `${name}.md`);
 }
 
 async function ensureAgentsDir(dir: string): Promise<void> {
@@ -293,14 +327,18 @@ async function listAgents(
   const results: { name: string; description: string }[] = [];
   await Promise.all(
     entries
-      .filter((e) => e.isDirectory())
+      .filter((e) => e.isFile() && e.name.endsWith(".md"))
       .map(async (e) => {
+        const name = e.name.slice(0, -3); // strip .md
         try {
-          const raw = await readFile(join(dir, e.name, "AGENT.md"), "utf8");
-          const parsed = parseAgentFile(raw, e.name);
-          results.push({ name: parsed.name || e.name, description: parsed.description });
+          const raw = await readFile(join(dir, e.name), "utf8");
+          const parsed = parseAgentFile(raw, name);
+          results.push({
+            name: parsed.name || name,
+            description: parsed.description,
+          });
         } catch {
-          // directory exists but no AGENT.md — skip
+          // unreadable file — skip
         }
       }),
   );
@@ -317,12 +355,20 @@ async function readAgent(dir: string, name: string): Promise<Agent | null> {
 }
 
 async function writeAgent(dir: string, agent: Agent): Promise<void> {
-  await mkdir(join(dir, agent.name), { recursive: true });
-  await writeFile(agentFile(dir, agent.name), serializeAgentFile(agent), "utf8");
+  await ensureAgentsDir(dir);
+  await writeFile(
+    agentFile(dir, agent.name),
+    serializeAgentFile(agent),
+    "utf8",
+  );
 }
 
 async function deleteAgent(dir: string, name: string): Promise<void> {
-  await rm(join(dir, name), { recursive: true, force: true });
+  try {
+    await unlink(agentFile(dir, name));
+  } catch {
+    // file already gone — ignore
+  }
 }
 
 function repoSpecsDir(repoId: string): string {
@@ -566,39 +612,12 @@ function advanceToReview(sessionId: string): void {
   });
 }
 
-function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
-  if (entry.statusDebounceTimer !== null) {
-    clearTimeout(entry.statusDebounceTimer);
-  }
-  entry.statusDebounceTimer = setTimeout(() => {
-    const e = sessions.get(sessionId);
-    if (!e) {
-      return;
-    }
-    e.currentStatus = "idle";
-    e.statusDebounceTimer = null;
-    emitStatus(e.activeWs, "idle");
-
-    if (e.handoverPhase === "waiting_for_idle") {
-      // Phase 1 → Phase 2: Claude's startup idle detected — inject the spec now
-      e.pty.write(e.handoverSpec + "\r");
-      e.handoverPhase = "spec_sent";
-      e.specSentAt = Date.now();
-      e.hadMeaningfulBusy = false;
-    } else if (e.handoverPhase === "spec_sent" && e.hadMeaningfulBusy) {
-      // Phase 2 → done: idle arrived after meaningful Claude activity → Review
-      e.handoverPhase = "done";
-      advanceToReview(sessionId);
-    }
-    // spec_sent + !hadMeaningfulBusy → echo still settling, keep waiting
-    // done or null → no-op
-  }, STATUS_DEBOUNCE_MS);
-}
 
 app
   .prepare()
   .then(async () => {
     await ensureDefaultRepo();
+    await loadSessionRegistry();
 
     const server = createServer(async (req, res) => {
       try {
@@ -730,13 +749,12 @@ app
           if (oldSessionId) {
             const entry = sessions.get(oldSessionId);
             if (entry) {
-              if (entry.statusDebounceTimer !== null) {
-                clearTimeout(entry.statusDebounceTimer);
-              }
               entry.activeWs = null;
               entry.pty.kill();
               sessions.delete(oldSessionId);
             }
+            sessionRegistry.delete(oldSessionId);
+            void saveSessionRegistry();
           }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(updatedTask));
@@ -812,15 +830,20 @@ app
             outputBuffer: [],
             bufferSize: 0,
             activeWs: null,
-            statusDebounceTimer: null,
             currentStatus: "connecting",
-            // Spec is already passed via CLI arg — skip waiting_for_idle.
             handoverPhase: "spec_sent",
             handoverSpec: specText,
             specSentAt: Date.now(),
-            hadMeaningfulBusy: false,
+            hadMeaningfulActivity: false,
           };
           sessions.set(sessionId, entry);
+          sessionRegistry.set(sessionId, {
+            id: sessionId,
+            cwd,
+            taskId: task.id,
+            createdAt: new Date().toISOString(),
+          });
+          void saveSessionRegistry();
 
           ptyProcess.onData((data) => {
             const chunk = Buffer.from(data);
@@ -828,23 +851,36 @@ app
             if (!e) {
               return;
             }
+
             appendToBuffer(e, chunk);
             if (e.activeWs?.readyState === WebSocket.OPEN) {
               e.activeWs.send(chunk);
             }
-            if (e.currentStatus !== "busy") {
-              e.currentStatus = "busy";
-              emitStatus(e.activeWs, "busy");
+
+            const parsed = parseClaudeStatus(data);
+            if (parsed !== null && parsed !== e.currentStatus) {
+              e.currentStatus = parsed;
+              emitStatus(e.activeWs, parsed);
             }
-            scheduleIdleStatus(e, sessionId);
-            // After spec injection, any data arriving outside the echo window
-            // counts as genuine Claude activity.
+
+            // Track meaningful activity (thinking/typing) after the echo window
             if (
               e.handoverPhase === "spec_sent" &&
-              !e.hadMeaningfulBusy &&
+              !e.hadMeaningfulActivity &&
+              (parsed === "thinking" || parsed === "typing") &&
               Date.now() - e.specSentAt > SPEC_ECHO_WINDOW_MS
             ) {
-              e.hadMeaningfulBusy = true;
+              e.hadMeaningfulActivity = true;
+            }
+
+            // Advance to Review when Claude shows the prompt after meaningful work
+            if (
+              e.handoverPhase === "spec_sent" &&
+              parsed === "waiting" &&
+              e.hadMeaningfulActivity
+            ) {
+              e.handoverPhase = "done";
+              advanceToReview(sessionId);
             }
           });
 
@@ -856,9 +892,6 @@ app
             const isHandover = e !== undefined && e.handoverPhase !== null;
             const wasHandoverDone = e?.handoverPhase === "done";
             if (e) {
-              if (e.statusDebounceTimer !== null) {
-                clearTimeout(e.statusDebounceTimer);
-              }
               e.currentStatus = "exited";
               if (e.activeWs?.readyState === WebSocket.OPEN) {
                 e.activeWs.send(
@@ -898,13 +931,12 @@ app
           const id = parsedUrl.pathname.slice("/api/sessions/".length);
           const entry = sessions.get(id);
           if (entry) {
-            if (entry.statusDebounceTimer !== null) {
-              clearTimeout(entry.statusDebounceTimer);
-            }
             entry.activeWs = null;
             entry.pty.kill();
             sessions.delete(id);
           }
+          sessionRegistry.delete(id);
+          void saveSessionRegistry();
           res.writeHead(204);
           res.end();
           return;
@@ -1028,7 +1060,9 @@ app
               ? body["description"]
               : existing.description;
           const content =
-            typeof body["content"] === "string" ? body["content"] : existing.content;
+            typeof body["content"] === "string"
+              ? body["content"]
+              : existing.content;
           const skill: Skill = { name, description, content };
           await writeSkill(dir, skill);
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -1187,7 +1221,9 @@ app
               ? body["description"]
               : existing.description;
           const content =
-            typeof body["content"] === "string" ? body["content"] : existing.content;
+            typeof body["content"] === "string"
+              ? body["content"]
+              : existing.content;
           const agent: Agent = { name, description, content };
           await writeAgent(dir, agent);
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -1369,14 +1405,20 @@ app
         }
         emitStatus(ws, entry.currentStatus);
       } else {
-        // New session: spawn pty
+        // New or resumed session: spawn pty
+        const registryEntry = sessionRegistry.get(sessionId);
+        const sessionCwd = registryEntry?.cwd ?? process.cwd();
+        const spawnArgs = registryEntry
+          ? ["--dangerously-skip-permissions", "--continue"]
+          : ["--dangerously-skip-permissions"];
+
         let ptyProcess: pty.IPty;
         try {
-          ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
+          ptyProcess = pty.spawn(command, spawnArgs, {
             name: "xterm-color",
             cols: 80,
             rows: 24,
-            cwd: process.cwd(),
+            cwd: sessionCwd,
             env: process.env as Record<string, string>,
           });
         } catch (err) {
@@ -1385,17 +1427,26 @@ app
           return;
         }
 
+        // Track in registry so the session survives future server restarts
+        if (!registryEntry) {
+          sessionRegistry.set(sessionId, {
+            id: sessionId,
+            cwd: process.cwd(),
+            createdAt: new Date().toISOString(),
+          });
+          void saveSessionRegistry();
+        }
+
         entry = {
           pty: ptyProcess,
           outputBuffer: [],
           bufferSize: 0,
           activeWs: ws,
-          statusDebounceTimer: null,
           currentStatus: "connecting",
           handoverPhase: null,
           handoverSpec: "",
           specSentAt: 0,
-          hadMeaningfulBusy: false,
+          hadMeaningfulActivity: false,
         };
         sessions.set(sessionId, entry);
         emitStatus(ws, "connecting");
@@ -1407,19 +1458,17 @@ app
           if (e.activeWs?.readyState === WebSocket.OPEN) {
             e.activeWs.send(chunk);
           }
-          if (e.currentStatus !== "busy") {
-            e.currentStatus = "busy";
-            emitStatus(e.activeWs, "busy");
+
+          const parsed = parseClaudeStatus(data);
+          if (parsed !== null && parsed !== e.currentStatus) {
+            e.currentStatus = parsed;
+            emitStatus(e.activeWs, parsed);
           }
-          scheduleIdleStatus(e, sessionId);
         });
 
         ptyProcess.onExit(({ exitCode }) => {
           const e = sessions.get(sessionId);
           if (e) {
-            if (e.statusDebounceTimer !== null) {
-              clearTimeout(e.statusDebounceTimer);
-            }
             e.currentStatus = "exited";
             if (e.activeWs?.readyState === WebSocket.OPEN) {
               e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));

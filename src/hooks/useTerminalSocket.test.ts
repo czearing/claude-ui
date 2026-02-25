@@ -111,10 +111,10 @@ describe("useTerminalSocket", () => {
     );
 
     MockWebSocket.lastInstance.onmessage?.({
-      data: JSON.stringify({ type: "status", value: "busy" }),
+      data: JSON.stringify({ type: "status", value: "thinking" }),
     } as MessageEvent);
 
-    expect(onStatus).toHaveBeenCalledWith("busy");
+    expect(onStatus).toHaveBeenCalledWith("thinking");
   });
 
   it("calls onStatus('exited') on exit message", () => {
