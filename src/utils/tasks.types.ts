@@ -17,6 +17,7 @@ export interface Task {
   sessionId?: string; // linked Claude PTY session
   createdAt: string; // ISO timestamp
   updatedAt: string; // ISO timestamp
+  archivedAt?: string; // ISO timestamp, set when status → "Done"
 }
 
 export type CreateTaskInput = Pick<Task, "title" | "repoId"> & {
@@ -24,7 +25,7 @@ export type CreateTaskInput = Pick<Task, "title" | "repoId"> & {
   priority?: Priority;
 };
 export type UpdateTaskInput = Partial<
-  Pick<Task, "title" | "status" | "priority" | "spec" | "sessionId">
+  Pick<Task, "title" | "status" | "priority" | "spec" | "sessionId" | "archivedAt">
 >;
 
 export interface Repo {
