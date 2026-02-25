@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
-import { useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
+import { useDeleteTask, useRecallTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task, TaskStatus } from "@/utils/tasks.types";
 import styles from "./Board.module.css";
@@ -40,6 +40,7 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
 
   const { mutate: updateTask } = useUpdateTask(repoId);
   const { mutate: deleteTask } = useDeleteTask(repoId);
+  const { mutate: recallTask } = useRecallTask(repoId);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -85,6 +86,7 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
               tasks={tasks.filter((t) => t.status === status)}
               onSelectTask={onSelectTask}
               onRemoveTask={deleteTask}
+              onRecall={recallTask}
               onHandover={onHandover}
             />
           ))}

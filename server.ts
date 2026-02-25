@@ -2,13 +2,13 @@ import next from "next";
 import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { parse } from "node:url";
 import type { IncomingMessage } from "node:http";
+import { join } from "node:path";
+import { parse } from "node:url";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -91,7 +91,9 @@ async function writeRepos(repos: Repo[]): Promise<void> {
 
 async function ensureDefaultRepo(): Promise<void> {
   const repos = await readRepos();
-  if (repos.length > 0) return;
+  if (repos.length > 0) {
+    return;
+  }
 
   const defaultRepo: Repo = {
     id: randomUUID(),
@@ -134,7 +136,9 @@ function extractTextFromLexical(specJson: string): string {
     const state = JSON.parse(specJson) as { root: { children: unknown[] } };
     const texts: string[] = [];
     function walk(node: unknown): void {
-      if (typeof node !== "object" || node === null) return;
+      if (typeof node !== "object" || node === null) {
+        return;
+      }
       const n = node as Record<string, unknown>;
       if (n["type"] === "text" && typeof n["text"] === "string") {
         texts.push(n["text"]);
@@ -186,7 +190,9 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
   }
   entry.statusDebounceTimer = setTimeout(() => {
     const e = sessions.get(sessionId);
-    if (!e) return;
+    if (!e) {
+      return;
+    }
     e.currentStatus = "idle";
     e.statusDebounceTimer = null;
     emitStatus(e.activeWs, "idle");
@@ -285,6 +291,49 @@ app
           return;
         }
 
+        // POST /api/tasks/:id/recall
+        if (
+          req.method === "POST" &&
+          parsedUrl.pathname?.startsWith("/api/tasks/") &&
+          parsedUrl.pathname.endsWith("/recall")
+        ) {
+          const id = parsedUrl.pathname.slice(
+            "/api/tasks/".length,
+            -"/recall".length,
+          );
+          const tasks = await readTasks();
+          const idx = tasks.findIndex((t) => t.id === id);
+          if (idx === -1) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          const oldSessionId = tasks[idx].sessionId;
+          const updatedTask: Task = {
+            ...tasks[idx],
+            status: "Backlog",
+            updatedAt: new Date().toISOString(),
+          };
+          delete updatedTask.sessionId;
+          tasks[idx] = updatedTask;
+          await writeTasks(tasks);
+          broadcastTaskEvent("task:updated", updatedTask);
+          if (oldSessionId) {
+            const entry = sessions.get(oldSessionId);
+            if (entry) {
+              if (entry.statusDebounceTimer !== null) {
+                clearTimeout(entry.statusDebounceTimer);
+              }
+              entry.activeWs = null;
+              entry.pty.kill();
+              sessions.delete(oldSessionId);
+            }
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(updatedTask));
+          return;
+        }
+
         // POST /api/tasks/:id/handover
         if (
           req.method === "POST" &&
@@ -343,7 +392,7 @@ app
           if (specText.trim()) {
             setTimeout(() => {
               if (sessions.has(sessionId)) {
-                ptyProcess.write(specText + "\n");
+                ptyProcess.write(`${specText}\n`);
               }
             }, 2000);
           }
@@ -351,7 +400,9 @@ app
           ptyProcess.onData((data) => {
             const chunk = Buffer.from(data);
             const e = sessions.get(sessionId);
-            if (!e) return;
+            if (!e) {
+              return;
+            }
             appendToBuffer(e, chunk);
             if (e.activeWs?.readyState === WebSocket.OPEN) {
               e.activeWs.send(chunk);
@@ -485,14 +536,11 @@ app
             res.end();
             return;
           }
-          if (
-            typeof body["path"] === "string" &&
-            !existsSync(body["path"] as string)
-          ) {
+          if (typeof body["path"] === "string" && !existsSync(body["path"])) {
             res.writeHead(400, { "Content-Type": "application/json" });
             res.end(
               JSON.stringify({
-                error: `Path does not exist: ${body["path"] as string}`,
+                error: `Path does not exist: ${body["path"]}`,
               }),
             );
             return;
@@ -634,7 +682,9 @@ app
 
       ws.on("message", (data, isBinary) => {
         const e = sessions.get(sessionId);
-        if (!e) return;
+        if (!e) {
+          return;
+        }
         if (isBinary) {
           e.pty.write(Buffer.from(data as ArrayBuffer).toString());
         } else {

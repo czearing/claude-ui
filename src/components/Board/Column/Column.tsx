@@ -23,6 +23,7 @@ export function Column({
   tasks,
   onSelectTask,
   onRemoveTask,
+  onRecall,
   onHandover: _onHandover,
 }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -51,6 +52,7 @@ export function Column({
               task={task}
               onSelect={onSelectTask}
               onRemove={onRemoveTask}
+              onRecall={onRecall}
             />
           ))}
         </SortableContext>

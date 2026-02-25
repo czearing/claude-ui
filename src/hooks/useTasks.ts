@@ -105,3 +105,37 @@ export function useHandoverTask(repoId: string) {
       queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
   });
 }
+
+export function useRecallTask(repoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetch(`/api/tasks/${id}/recall`, { method: "POST" }).then((r) =>
+        r.json(),
+      ) as Promise<Task>,
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
+      const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
+      queryClient.setQueryData<Task[]>(tasksKey(repoId), (old) =>
+        (old ?? []).map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                status: "Backlog" as const,
+                sessionId: undefined,
+                updatedAt: new Date().toISOString(),
+              }
+            : t,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(tasksKey(repoId), context.previous);
+      }
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+  });
+}

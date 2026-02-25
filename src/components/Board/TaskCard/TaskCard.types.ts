@@ -4,5 +4,6 @@ export interface TaskCardProps {
   task: Task;
   onSelect: (task: Task) => void;
   onRemove?: (id: string) => void;
+  onRecall?: (id: string) => void;
   selected?: boolean;
 }

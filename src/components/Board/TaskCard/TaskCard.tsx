@@ -1,6 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowRight, FileText, Kanban, X } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  ArrowRight,
+  DotsThree,
+  FileText,
+  Kanban,
+  Trash,
+} from "@phosphor-icons/react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import clsx from "clsx";
 
 import styles from "./TaskCard.module.css";
@@ -10,6 +21,7 @@ export function TaskCard({
   task,
   onSelect,
   onRemove,
+  onRecall,
   selected,
 }: TaskCardProps) {
   const {
@@ -21,16 +33,21 @@ export function TaskCard({
     isDragging,
   } = useSortable({ id: task.id });
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const style = { transform: CSS.Transform.toString(transform), transition };
   const isAgentActive = task.status === "In Progress";
   const isReview = task.status === "Review";
   const isDone = task.status === "Done";
 
-  const handleRemove = (e: React.MouseEvent) => {
+  const handleRecall = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm(`Delete "${task.title}"?`)) {
-      onRemove!(task.id);
-    }
+    onRecall?.(task.id);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRemove?.(task.id);
   };
 
   return (
@@ -57,15 +74,57 @@ export function TaskCard({
         </div>
         <div className={styles.headerRight}>
           {isReview && <span className={styles.reviewBadge}>Review</span>}
-          {onRemove && (
-            <button
-              className={styles.removeBtn}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={handleRemove}
-              aria-label="Remove task"
-            >
-              <X size={12} />
-            </button>
+          {(onRemove ?? onRecall) && (
+            <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  className={`${styles.menuTrigger} ${menuOpen ? styles.menuTriggerOpen : ""}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Task actions"
+                >
+                  <DotsThree size={14} weight="bold" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content
+                className={styles.menuContent}
+                align="end"
+                sideOffset={4}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                {isAgentActive && onRecall && (
+                  <>
+                    <DropdownMenu.Item asChild>
+                      <button
+                        className={styles.menuItem}
+                        onClick={handleRecall}
+                      >
+                        <span className={styles.menuItemLabel}>
+                          <ArrowCounterClockwise size={13} />
+                          Move to Backlog
+                        </span>
+                        <span className={styles.menuItemSubtext}>
+                          stops the running agent
+                        </span>
+                      </button>
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Separator className={styles.menuSeparator} />
+                  </>
+                )}
+                {onRemove && (
+                  <DropdownMenu.Item asChild>
+                    <button
+                      className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                      onClick={handleDelete}
+                    >
+                      <span className={styles.menuItemLabel}>
+                        <Trash size={13} />
+                        Delete
+                      </span>
+                    </button>
+                  </DropdownMenu.Item>
+                )}
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
           )}
         </div>
       </div>

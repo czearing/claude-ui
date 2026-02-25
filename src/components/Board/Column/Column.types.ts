@@ -5,5 +5,6 @@ export interface ColumnProps {
   tasks: Task[];
   onSelectTask: (task: Task) => void;
   onRemoveTask?: (id: string) => void;
+  onRecall?: (id: string) => void;
   onHandover?: (taskId: string) => void;
 }
