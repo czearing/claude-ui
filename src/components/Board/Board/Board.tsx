@@ -78,7 +78,11 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
             <Column
               key={status}
               status={status}
-              tasks={status === "Done" ? [] : tasks.filter((t) => t.status === status)}
+              tasks={
+                status === "Done"
+                  ? []
+                  : tasks.filter((t) => t.status === status)
+              }
               onSelectTask={onSelectTask}
               onRemoveTask={deleteTask}
               onRecall={recallTask}

@@ -25,7 +25,10 @@ export type CreateTaskInput = Pick<Task, "title" | "repoId"> & {
   priority?: Priority;
 };
 export type UpdateTaskInput = Partial<
-  Pick<Task, "title" | "status" | "priority" | "spec" | "sessionId" | "archivedAt">
+  Pick<
+    Task,
+    "title" | "status" | "priority" | "spec" | "sessionId" | "archivedAt"
+  >
 >;
 
 export interface Repo {

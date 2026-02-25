@@ -9,7 +9,8 @@ import type { SpecEditorProps } from "./SpecEditor.types";
 import { LexicalEditor } from "../LexicalEditor";
 
 export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
-  const { mutate: updateTask } = useUpdateTask(repoId);
+  const { mutate: updateTask, mutateAsync: updateTaskAsync } =
+    useUpdateTask(repoId);
   const { mutate: handoverTask, isPending: isHandingOver } =
     useHandoverTask(repoId);
 
@@ -60,15 +61,19 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
     }, 600);
   };
 
-  const handleHandover = () => {
-    // Cancel pending debounced saves and flush immediately
+  const handleHandover = async () => {
+    // flush immediately, awaiting the PATCH so handover POST reads latest spec
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-    updateTask({
-      id: task.id,
-      spec,
-      ...(title.trim() && { title: title.trim() }),
-    });
+    try {
+      await updateTaskAsync({
+        id: task.id,
+        spec,
+        ...(title.trim() && { title: title.trim() }),
+      });
+    } catch {
+      // spec save failed — proceed with handover using existing saved data
+    }
     handoverTask(task.id, { onSuccess: onClose });
   };
 
@@ -92,6 +97,7 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
             className={styles.closeButton}
             onClick={onClose}
             aria-label="Close"
+            tabIndex={-1}
           >
             <X size={16} />
           </button>

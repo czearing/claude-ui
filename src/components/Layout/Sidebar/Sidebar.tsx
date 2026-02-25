@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, CheckSquare, Gear, SquaresFour } from "@phosphor-icons/react";
+import { Archive, BookOpen, CheckSquare, Gear, SquaresFour } from "@phosphor-icons/react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 
@@ -48,14 +48,24 @@ const NAV_VIEWS: {
     label: "Tasks",
     icon: <CheckSquare size={16} />,
   },
+  {
+    view: "Playbooks",
+    path: "playbooks",
+    label: "Playbooks",
+    icon: <BookOpen size={16} />,
+  },
 ];
 
-export function Sidebar({ repoId, currentView, agentActive }: SidebarProps) {
+export function Sidebar({
+  repoId,
+  currentView,
+  agentActive = false,
+}: SidebarProps) {
   const router = useRouter();
   return (
     <aside className={styles.sidebar}>
       <div className={styles.header}>
-        <RepoSwitcher activeRepoId={repoId} />
+        <RepoSwitcher activeRepoId={repoId ?? ""} />
       </div>
 
       <nav className={styles.nav}>
@@ -65,7 +75,7 @@ export function Sidebar({ repoId, currentView, agentActive }: SidebarProps) {
             icon={icon}
             label={label}
             active={currentView === view}
-            onClick={() => router.push(`/repos/${repoId}/${path}`)}
+            onClick={() => repoId && router.push(`/repos/${repoId}/${path}`)}
           />
         ))}
         <NavItem

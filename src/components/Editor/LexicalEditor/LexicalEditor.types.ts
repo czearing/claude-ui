@@ -3,4 +3,5 @@ export interface LexicalEditorProps {
   onChange?: (value: string) => void;
   readOnly?: boolean;
   placeholder?: string;
+  format?: "json" | "markdown";
 }

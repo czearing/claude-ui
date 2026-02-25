@@ -15,6 +15,7 @@ import {
 } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { IncomingMessage } from "node:http";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse } from "node:url";
 
@@ -28,13 +29,15 @@ const command = process.platform === "win32" ? "claude.cmd" : "claude";
 const BUFFER_CAP = 500 * 1024; // 500 KB rolling buffer per session
 
 const STATUS_DEBOUNCE_MS = 500;
-// Extra delay after going idle before advancing a handover task to Review.
-// This filters out the startup gap that occurs before Claude's ● Working spinner
-// begins — startup output pauses for ~1s while the API call initialises, which
-// would otherwise trigger a premature Review transition.
-const REVIEW_CONFIRM_DELAY_MS = 2000;
+// Window after writing the spec to the PTY during which output is treated as
+// echo/startup noise rather than meaningful Claude activity.  Any onData event
+// that fires more than this many ms after spec injection is counted as
+// "meaningful busy", which gates the idle → Review transition.
+const SPEC_ECHO_WINDOW_MS = 500;
 
 type ClaudeStatus = "connecting" | "busy" | "idle" | "exited" | "disconnected";
+
+type HandoverPhase = "waiting_for_idle" | "spec_sent" | "done";
 
 type SessionEntry = {
   pty: pty.IPty;
@@ -43,7 +46,11 @@ type SessionEntry = {
   activeWs: WebSocket | null;
   statusDebounceTimer: ReturnType<typeof setTimeout> | null;
   currentStatus: ClaudeStatus;
-  isHandover: boolean;
+  // null for non-handover sessions; set to "waiting_for_idle" on handover spawn
+  handoverPhase: HandoverPhase | null;
+  handoverSpec: string;
+  specSentAt: number;
+  hadMeaningfulBusy: boolean;
 };
 
 const sessions = new Map<string, SessionEntry>();
@@ -139,6 +146,41 @@ function serializeTaskFile(task: Task): string {
   lines.push("");
   if (task.spec) lines.push(task.spec);
   return lines.join("\n");
+}
+
+// ─── Skills ────────────────────────────────────────────────────────────────
+
+const SKILL_NAME_RE = /^[a-z0-9-]{1,64}$/;
+
+function skillsDir(): string {
+  return join(homedir(), ".claude", "skills");
+}
+
+async function ensureSkillsDir(): Promise<void> {
+  await mkdir(skillsDir(), { recursive: true });
+}
+
+async function listSkillNames(): Promise<string[]> {
+  await ensureSkillsDir();
+  const files = await readdir(skillsDir());
+  return files.filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3));
+}
+
+async function readSkillContent(name: string): Promise<string | null> {
+  try {
+    return await readFile(join(skillsDir(), `${name}.md`), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function writeSkillContent(name: string, content: string): Promise<void> {
+  await ensureSkillsDir();
+  await writeFile(join(skillsDir(), `${name}.md`), content, "utf8");
+}
+
+async function deleteSkillContent(name: string): Promise<void> {
+  await unlink(join(skillsDir(), `${name}.md`));
 }
 
 function repoSpecsDir(repoId: string): string {
@@ -366,6 +408,22 @@ function emitStatus(ws: WebSocket | null, status: ClaudeStatus): void {
   }
 }
 
+function advanceToReview(sessionId: string): void {
+  void readAllTasks().then((current) => {
+    const task = current.find((t) => t.sessionId === sessionId);
+    if (task && task.status === "In Progress") {
+      const updated: Task = {
+        ...task,
+        status: "Review",
+        updatedAt: new Date().toISOString(),
+      };
+      void writeTask(updated).then(() =>
+        broadcastTaskEvent("task:updated", updated),
+      );
+    }
+  });
+}
+
 function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
   if (entry.statusDebounceTimer !== null) {
     clearTimeout(entry.statusDebounceTimer);
@@ -379,30 +437,19 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
     e.statusDebounceTimer = null;
     emitStatus(e.activeWs, "idle");
 
-    // Auto-advance handover task to Review — but only after an extra delay to
-    // confirm Claude is genuinely idle and not just in a startup gap before the
-    // ● Working spinner begins.
-    if (e.isHandover) {
-      setTimeout(() => {
-        const latestE = sessions.get(sessionId);
-        if (!latestE || latestE.currentStatus !== "idle") {
-          return; // went busy again (spinner resumed) — not the real idle
-        }
-        void readAllTasks().then((current) => {
-          const task = current.find((t) => t.sessionId === sessionId);
-          if (task && task.status === "In Progress") {
-            const updated: Task = {
-              ...task,
-              status: "Review",
-              updatedAt: new Date().toISOString(),
-            };
-            void writeTask(updated).then(() =>
-              broadcastTaskEvent("task:updated", updated),
-            );
-          }
-        });
-      }, REVIEW_CONFIRM_DELAY_MS);
+    if (e.handoverPhase === "waiting_for_idle") {
+      // Phase 1 → Phase 2: Claude's startup idle detected — inject the spec now
+      e.pty.write(e.handoverSpec + "\r");
+      e.handoverPhase = "spec_sent";
+      e.specSentAt = Date.now();
+      e.hadMeaningfulBusy = false;
+    } else if (e.handoverPhase === "spec_sent" && e.hadMeaningfulBusy) {
+      // Phase 2 → done: idle arrived after meaningful Claude activity → Review
+      e.handoverPhase = "done";
+      advanceToReview(sessionId);
     }
+    // spec_sent + !hadMeaningfulBusy → echo still settling, keep waiting
+    // done or null → no-op
   }, STATUS_DEBOUNCE_MS);
 }
 
@@ -572,13 +619,9 @@ app
             return;
           }
           const sessionId = randomUUID();
-          const specText = extractTextFromLexical(task.spec);
-          // Pass spec as a positional CLI argument so Claude receives it
-          // immediately on startup without any timing dependency.
-          const specLine = specText.replace(/\n+/g, " ").trim();
-          const spawnArgs = specLine
-            ? ["--dangerously-skip-permissions", specLine]
-            : ["--dangerously-skip-permissions"];
+          // Flatten newlines to spaces so the entire spec is submitted as a
+          // single PTY line when injected into Claude's interactive REPL.
+          const specText = task.spec.replace(/\n+/g, " ").trim();
 
           // Look up the repo path for this task
           const repos = await readRepos();
@@ -587,13 +630,20 @@ app
 
           let ptyProcess: pty.IPty;
           try {
-            ptyProcess = pty.spawn(command, spawnArgs, {
-              name: "xterm-color",
-              cols: 80,
-              rows: 24,
-              cwd,
-              env: process.env as Record<string, string>,
-            });
+            // Spawn interactively (no spec arg) so Claude enters its REPL.
+            // The spec is injected via PTY write once Claude reaches its first
+            // idle state (detected by scheduleIdleStatus state machine).
+            ptyProcess = pty.spawn(
+              command,
+              ["--dangerously-skip-permissions"],
+              {
+                name: "xterm-color",
+                cols: 80,
+                rows: 24,
+                cwd,
+                env: process.env as Record<string, string>,
+              },
+            );
           } catch (err) {
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: String(err) }));
@@ -607,7 +657,10 @@ app
             activeWs: null,
             statusDebounceTimer: null,
             currentStatus: "connecting",
-            isHandover: true,
+            handoverPhase: "waiting_for_idle",
+            handoverSpec: specText,
+            specSentAt: 0,
+            hadMeaningfulBusy: false,
           };
           sessions.set(sessionId, entry);
 
@@ -626,10 +679,24 @@ app
               emitStatus(e.activeWs, "busy");
             }
             scheduleIdleStatus(e, sessionId);
+            // After spec injection, any data arriving outside the echo window
+            // counts as genuine Claude activity.
+            if (
+              e.handoverPhase === "spec_sent" &&
+              !e.hadMeaningfulBusy &&
+              Date.now() - e.specSentAt > SPEC_ECHO_WINDOW_MS
+            ) {
+              e.hadMeaningfulBusy = true;
+            }
           });
 
           ptyProcess.onExit(({ exitCode }) => {
             const e = sessions.get(sessionId);
+            // Use explicit undefined check: `undefined !== null` would
+            // spuriously set isHandover=true when the session was already
+            // removed (e.g. by recall before the process exited).
+            const isHandover = e !== undefined && e.handoverPhase !== null;
+            const wasHandoverDone = e?.handoverPhase === "done";
             if (e) {
               if (e.statusDebounceTimer !== null) {
                 clearTimeout(e.statusDebounceTimer);
@@ -644,20 +711,11 @@ app
             }
             sessions.delete(sessionId);
 
-            // Auto-advance to Review
-            void readAllTasks().then((current) => {
-              const task = current.find((t) => t.sessionId === sessionId);
-              if (task && task.status === "In Progress") {
-                const updated: Task = {
-                  ...task,
-                  status: "Review",
-                  updatedAt: new Date().toISOString(),
-                };
-                void writeTask(updated).then(() =>
-                  broadcastTaskEvent("task:updated", updated),
-                );
-              }
-            });
+            // Fallback: if the process exits before the state machine could
+            // advance to Review (e.g. Claude crashed), do it now.
+            if (isHandover && !wasHandoverDone) {
+              advanceToReview(sessionId);
+            }
           });
 
           const inProgressTask: Task = {
@@ -689,6 +747,112 @@ app
             entry.pty.kill();
             sessions.delete(id);
           }
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        // GET /api/skills
+        if (req.method === "GET" && parsedUrl.pathname === "/api/skills") {
+          const names = await listSkillNames();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ skills: names.map((name) => ({ name })) }));
+          return;
+        }
+
+        // GET /api/skills/:name
+        if (
+          req.method === "GET" &&
+          parsedUrl.pathname?.startsWith("/api/skills/") &&
+          parsedUrl.pathname !== "/api/skills/"
+        ) {
+          const name = parsedUrl.pathname.slice("/api/skills/".length);
+          if (!SKILL_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid skill name" }));
+            return;
+          }
+          const content = await readSkillContent(name);
+          if (content === null) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ name, content }));
+          return;
+        }
+
+        // POST /api/skills
+        if (req.method === "POST" && parsedUrl.pathname === "/api/skills") {
+          const body = await readBody(req);
+          const name =
+            typeof body["name"] === "string" ? body["name"].trim() : "";
+          const content =
+            typeof body["content"] === "string" ? body["content"] : "";
+          if (!SKILL_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid skill name" }));
+            return;
+          }
+          const existing = await readSkillContent(name);
+          if (existing !== null) {
+            res.writeHead(409, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Skill already exists" }));
+            return;
+          }
+          await writeSkillContent(name, content);
+          res.writeHead(201, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ name, content }));
+          return;
+        }
+
+        // PUT /api/skills/:name
+        if (
+          req.method === "PUT" &&
+          parsedUrl.pathname?.startsWith("/api/skills/") &&
+          parsedUrl.pathname !== "/api/skills/"
+        ) {
+          const name = parsedUrl.pathname.slice("/api/skills/".length);
+          if (!SKILL_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid skill name" }));
+            return;
+          }
+          const existing = await readSkillContent(name);
+          if (existing === null) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          const body = await readBody(req);
+          const content =
+            typeof body["content"] === "string" ? body["content"] : "";
+          await writeSkillContent(name, content);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ name, content }));
+          return;
+        }
+
+        // DELETE /api/skills/:name
+        if (
+          req.method === "DELETE" &&
+          parsedUrl.pathname?.startsWith("/api/skills/") &&
+          parsedUrl.pathname !== "/api/skills/"
+        ) {
+          const name = parsedUrl.pathname.slice("/api/skills/".length);
+          if (!SKILL_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid skill name" }));
+            return;
+          }
+          const existing = await readSkillContent(name);
+          if (existing === null) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          await deleteSkillContent(name);
           res.writeHead(204);
           res.end();
           return;
@@ -858,7 +1022,10 @@ app
           activeWs: ws,
           statusDebounceTimer: null,
           currentStatus: "connecting",
-          isHandover: false,
+          handoverPhase: null,
+          handoverSpec: "",
+          specSentAt: 0,
+          hadMeaningfulBusy: false,
         };
         sessions.set(sessionId, entry);
         emitStatus(ws, "connecting");

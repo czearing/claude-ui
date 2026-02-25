@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { AppShell } from "@/app/AppShell";
 
 export default async function Page({
   params,
@@ -6,5 +6,5 @@ export default async function Page({
   params: Promise<{ repoId: string }>;
 }) {
   const { repoId } = await params;
-  redirect(`/repos/${repoId}/tasks`);
+  return <AppShell repoId={repoId} view="Tasks" />;
 }

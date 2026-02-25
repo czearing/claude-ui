@@ -54,3 +54,20 @@ describe("LexicalEditor", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 });
+
+describe("LexicalEditor markdown format", () => {
+  it("renders without crashing with format=markdown", () => {
+    render(<LexicalEditor format="markdown" />);
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("renders with a markdown value without crashing", () => {
+    render(<LexicalEditor format="markdown" value="# Hello\n\nWorld" />);
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("defaults to json format when format prop is omitted (existing behaviour)", () => {
+    render(<LexicalEditor />);
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+});

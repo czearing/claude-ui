@@ -250,3 +250,17 @@
   background: var(--color-border);
   margin: 4px 0;
 }
+
+.sessionLink {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 150ms;
+}
+
+.sessionLink:hover {
+  color: var(--color-text);
+}

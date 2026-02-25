@@ -1,0 +1,67 @@
+/* src/components/Settings/CategoryEditor/CategoryEditor.module.css */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.nameInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-2);
+  outline: none;
+  transition: background-color 150ms;
+}
+
+.nameInput:hover {
+  background-color: var(--color-surface);
+}
+
+.nameInput:focus {
+  background-color: var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.deleteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  padding: var(--space-1);
+  cursor: pointer;
+  transition:
+    color 150ms,
+    background-color 150ms;
+}
+
+.deleteButton:hover {
+  color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+}
+
+.editorBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+}

@@ -1,7 +1,8 @@
-export type View = "Board" | "Tasks" | "Archive";
+// src/components/Layout/Sidebar/Sidebar.types.ts
+export type View = "Board" | "Tasks" | "Playbooks" | "Archive" | "Settings";
 
 export interface SidebarProps {
-  repoId: string;
+  repoId?: string;
   currentView: View;
-  agentActive: boolean;
+  agentActive?: boolean;
 }

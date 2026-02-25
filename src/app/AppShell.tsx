@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Backlog } from "@/components/Board/Backlog";
@@ -62,6 +62,15 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
 
   const agentActive = tasks.some((t) => t.status === "In Progress");
 
+  useEffect(() => {
+    if (!selectedTask) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedTask(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedTask]);
+
   function handleNewTask() {
     createTask(
       { title: "", priority: "Medium", status: "Backlog" },
@@ -79,12 +88,18 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
     });
   }
 
-  const handleSelectTask = useCallback((task: Task) => {
+  function handleSelectTask(task: Task) {
+    if (currentView === "Board") {
+      if (task.sessionId) {
+        router.push(`/repos/${repoId}/session/${task.sessionId}`);
+      }
+      return;
+    }
     const w = readStoredWidth();
     widthRef.current = w;
     setLeftWidth(w);
     setSelectedTask(task);
-  }, []);
+  }
 
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

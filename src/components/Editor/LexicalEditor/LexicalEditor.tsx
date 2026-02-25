@@ -134,6 +134,21 @@ function StateLoader({ value }: { value?: string }) {
   return null;
 }
 
+function MarkdownStateLoader({ value }: { value?: string }) {
+  const [editor] = useLexicalComposerContext();
+  const didInitRef = useRef(false);
+  useEffect(() => {
+    if (didInitRef.current || !value) {
+      return;
+    }
+    didInitRef.current = true;
+    editor.update(() => {
+      $convertFromMarkdownString(value, TRANSFORMERS);
+    });
+  }, [editor, value]);
+  return null;
+}
+
 function CodeHighlightPlugin() {
   const [editor] = useLexicalComposerContext();
   useEffect(() => {
@@ -147,6 +162,7 @@ export function LexicalEditor({
   onChange,
   readOnly = false,
   placeholder = "Write something, or press '/' for commands…",
+  format = "json",
 }: LexicalEditorProps) {
   const initialConfig = {
     namespace: "SpecEditor",
@@ -157,9 +173,13 @@ export function LexicalEditor({
   };
 
   const handleChange = (editorState: EditorState) => {
-    editorState.read(() => {
-      onChange?.($convertToMarkdownString(TRANSFORMERS));
-    });
+    if (format === "markdown") {
+      editorState.read(() => {
+        onChange?.($convertToMarkdownString(TRANSFORMERS));
+      });
+    } else {
+      onChange?.(JSON.stringify(editorState.toJSON()));
+    }
   };
 
   return (
@@ -180,7 +200,11 @@ export function LexicalEditor({
         {onChange && (
           <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
         )}
-        <StateLoader value={value} />
+        {format === "markdown" ? (
+          <MarkdownStateLoader value={value} />
+        ) : (
+          <StateLoader value={value} />
+        )}
       </div>
     </LexicalComposer>
   );
