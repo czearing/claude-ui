@@ -78,10 +78,11 @@
 
 .searchInput {
   width: 100%;
+  height: var(--control-height);
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 8px var(--space-3) 8px 36px;
+  padding: 0 var(--space-3) 0 36px;
   font-size: var(--text-sm);
   color: var(--color-text);
   outline: none;
@@ -93,23 +94,6 @@
 }
 
 .searchInput:focus {
-  border-color: var(--color-agent);
-}
-
-.sortSelect {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 7px var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  cursor: pointer;
-  outline: none;
-  flex-shrink: 0;
-  transition: border-color 150ms;
-}
-
-.sortSelect:focus {
   border-color: var(--color-agent);
 }
 
@@ -176,6 +160,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rowTitleEmpty {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .rowDate {

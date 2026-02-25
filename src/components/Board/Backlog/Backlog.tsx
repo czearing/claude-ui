@@ -13,9 +13,24 @@ import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import { formatRelativeDate } from "@/utils/formatRelativeDate";
 import type { Task } from "@/utils/tasks.types";
+import {
+  Select,
+  SelectCaret,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/Select";
 import styles from "./Backlog.module.css";
 
-type SortBy = "newest" | "oldest" | "az" | "za";
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "az", label: "A → Z" },
+  { value: "za", label: "Z → A" },
+] as const;
+
+type SortBy = (typeof SORT_OPTIONS)[number]["value"];
 
 function sortTasks(tasks: Task[], sortBy: SortBy): Task[] {
   return [...tasks].sort((a, b) => {
@@ -97,17 +112,19 @@ export function Backlog({
               className={styles.searchInput}
             />
           </div>
-          <select
-            aria-label="Sort"
-            className={styles.sortSelect}
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-          >
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="az">A → Z</option>
-            <option value="za">Z → A</option>
-          </select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+            <SelectTrigger aria-label="Sort">
+              <SelectValue />
+              <SelectCaret />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className={styles.list}>
@@ -122,7 +139,11 @@ export function Backlog({
                   <FileText size={16} />
                 </div>
                 <div className={styles.rowContent}>
-                  <span className={styles.rowTitle}>{task.title}</span>
+                  <span
+                    className={`${styles.rowTitle}${!task.title ? ` ${styles.rowTitleEmpty}` : ""}`}
+                  >
+                    {task.title || "New Title"}
+                  </span>
                   <span className={styles.rowDate}>
                     {formatRelativeDate(task.createdAt)}
                   </span>

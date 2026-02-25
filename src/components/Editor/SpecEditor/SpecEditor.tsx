@@ -83,7 +83,7 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
               value={title}
               onChange={handleTitleChange}
               onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
-              placeholder="Untitled"
+              placeholder="New Title"
             />
           ) : (
             <h1 className={styles.pageTitle}>{task.title}</h1>
