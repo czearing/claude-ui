@@ -23,7 +23,9 @@ function readStoredWidth(): number {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const n = parseInt(raw, 10);
-      if (n >= MIN_LEFT) {return n;}
+      if (n >= MIN_LEFT) {
+        return n;
+      }
     }
   } catch {
     // localStorage unavailable (SSR / private browsing)
@@ -84,7 +86,9 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
     e.preventDefault();
     const contentEl = contentRef.current;
     const leftEl = leftRef.current;
-    if (!contentEl || !leftEl) {return;}
+    if (!contentEl || !leftEl) {
+      return;
+    }
 
     contentEl.setAttribute("data-resizing", "true");
     document.body.style.cursor = "col-resize";
@@ -123,7 +127,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
       />
 
       <main className={styles.main}>
-        <TopBar currentView={currentView} onNewTask={handleNewTask} />
+        <TopBar repoId={repoId} currentView={currentView} onNewTask={handleNewTask} />
 
         <div ref={contentRef} className={styles.content}>
           <div
