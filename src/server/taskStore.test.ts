@@ -1,11 +1,6 @@
 /**
  * @jest-environment node
  */
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import { parseTaskFile, serializeTaskFile } from "../utils/taskFile";
-import type { Task } from "../utils/tasks.types";
 import {
   deleteTaskFile,
   ensureSpecsDir,
@@ -17,6 +12,18 @@ import {
   SPECS_DIR,
   writeTask,
 } from "./taskStore";
+import { parseTaskFile, serializeTaskFile } from "../utils/taskFile";
+import type { Task } from "../utils/tasks.types";
+
+import {
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { join } from "node:path";
 
 jest.mock("node:fs/promises");
 jest.mock("../utils/taskFile");
@@ -27,7 +34,9 @@ const mockMkdir = mkdir as jest.MockedFunction<typeof mkdir>;
 const mockUnlink = unlink as jest.MockedFunction<typeof unlink>;
 const mockReaddir = readdir as jest.MockedFunction<typeof readdir>;
 const mockStat = stat as jest.MockedFunction<typeof stat>;
-const mockParseTaskFile = parseTaskFile as jest.MockedFunction<typeof parseTaskFile>;
+const mockParseTaskFile = parseTaskFile as jest.MockedFunction<
+  typeof parseTaskFile
+>;
 const mockSerializeTaskFile = serializeTaskFile as jest.MockedFunction<
   typeof serializeTaskFile
 >;
@@ -129,13 +138,17 @@ describe("deleteTaskFile", () => {
   it("does not throw on ENOENT", async () => {
     mockUnlink.mockRejectedValueOnce(enoent());
 
-    await expect(deleteTaskFile("TASK-001", "repo-abc")).resolves.toBeUndefined();
+    await expect(
+      deleteTaskFile("TASK-001", "repo-abc"),
+    ).resolves.toBeUndefined();
   });
 
   it("re-throws non-ENOENT errors", async () => {
     mockUnlink.mockRejectedValueOnce(eacces());
 
-    await expect(deleteTaskFile("TASK-001", "repo-abc")).rejects.toThrow("EACCES");
+    await expect(deleteTaskFile("TASK-001", "repo-abc")).rejects.toThrow(
+      "EACCES",
+    );
   });
 
   it("calls unlink with the correct path on success", async () => {
@@ -143,7 +156,9 @@ describe("deleteTaskFile", () => {
 
     await deleteTaskFile("TASK-001", "repo-abc");
 
-    expect(mockUnlink).toHaveBeenCalledWith(join(SPECS_DIR, "repo-abc", "TASK-001.md"));
+    expect(mockUnlink).toHaveBeenCalledWith(
+      join(SPECS_DIR, "repo-abc", "TASK-001.md"),
+    );
   });
 });
 
@@ -168,9 +183,11 @@ describe("readTasksForRepo", () => {
     const task1 = makeTask({ id: "TASK-001" });
     const task2 = makeTask({ id: "TASK-002" });
 
-    mockReaddir.mockResolvedValueOnce(
-      ["TASK-001.md", "TASK-002.md", "README.txt"] as never,
-    );
+    mockReaddir.mockResolvedValueOnce([
+      "TASK-001.md",
+      "TASK-002.md",
+      "README.txt",
+    ] as never);
     // readTask calls readFile then parseTaskFile — two .md files means two readFile calls
     mockReadFile.mockResolvedValueOnce("content1" as never);
     mockParseTaskFile.mockReturnValueOnce(task1);
@@ -197,6 +214,70 @@ describe("readTasksForRepo", () => {
   });
 });
 
+// ── readAllTasks ──────────────────────────────────────────────────────────────
+
+describe("readAllTasks", () => {
+  it("returns [] when SPECS_DIR does not exist", async () => {
+    mockReaddir.mockRejectedValueOnce(enoent());
+
+    const result = await readAllTasks();
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns all tasks across multiple repo subdirectories", async () => {
+    const task1 = makeTask({ id: "TASK-001", repoId: "repo-a" });
+    const task2 = makeTask({ id: "TASK-002", repoId: "repo-b" });
+    const dirStat = { isDirectory: () => true } as ReturnType<
+      typeof stat
+    > extends Promise<infer S>
+      ? S
+      : never;
+
+    // outer readdir: two repo dirs
+    mockReaddir.mockResolvedValueOnce(["repo-a", "repo-b"] as never);
+    // stat calls — both are directories
+    mockStat.mockResolvedValueOnce(dirStat);
+    mockStat.mockResolvedValueOnce(dirStat);
+    // readTasksForRepo("repo-a") → readdir + readFile + parseTaskFile
+    mockReaddir.mockResolvedValueOnce(["TASK-001.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content1" as never);
+    mockParseTaskFile.mockReturnValueOnce(task1);
+    // readTasksForRepo("repo-b") → readdir + readFile + parseTaskFile
+    mockReaddir.mockResolvedValueOnce(["TASK-002.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content2" as never);
+    mockParseTaskFile.mockReturnValueOnce(task2);
+
+    const result = await readAllTasks();
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining([task1, task2]));
+  });
+
+  it("silently skips a subdirectory when stat throws", async () => {
+    const task1 = makeTask({ id: "TASK-001", repoId: "repo-a" });
+    const dirStat = { isDirectory: () => true } as ReturnType<
+      typeof stat
+    > extends Promise<infer S>
+      ? S
+      : never;
+
+    // outer readdir: two repo dirs
+    mockReaddir.mockResolvedValueOnce(["repo-a", "repo-bad"] as never);
+    // stat for repo-a succeeds, stat for repo-bad throws
+    mockStat.mockResolvedValueOnce(dirStat);
+    mockStat.mockRejectedValueOnce(eacces());
+    // readTasksForRepo("repo-a") → readdir + readFile + parseTaskFile
+    mockReaddir.mockResolvedValueOnce(["TASK-001.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content1" as never);
+    mockParseTaskFile.mockReturnValueOnce(task1);
+
+    const result = await readAllTasks();
+
+    expect(result).toEqual([task1]);
+  });
+});
+
 // ── getNextTaskId ─────────────────────────────────────────────────────────────
 
 describe("getNextTaskId", () => {
@@ -218,7 +299,11 @@ describe("getNextTaskId", () => {
   });
 
   it("returns the next number after the highest TASK-NNN.md found", async () => {
-    const statMock = { isDirectory: () => true } as ReturnType<typeof stat> extends Promise<infer S> ? S : never;
+    const statMock = { isDirectory: () => true } as ReturnType<
+      typeof stat
+    > extends Promise<infer S>
+      ? S
+      : never;
 
     // outer readdir: two repo dirs
     mockReaddir.mockResolvedValueOnce(["repo-a", "repo-b"] as never);
@@ -236,7 +321,11 @@ describe("getNextTaskId", () => {
   });
 
   it("pads the number to 3 digits", async () => {
-    const statMock = { isDirectory: () => true } as ReturnType<typeof stat> extends Promise<infer S> ? S : never;
+    const statMock = { isDirectory: () => true } as ReturnType<
+      typeof stat
+    > extends Promise<infer S>
+      ? S
+      : never;
 
     mockReaddir.mockResolvedValueOnce(["repo-a"] as never);
     mockStat.mockResolvedValueOnce(statMock);
@@ -248,7 +337,11 @@ describe("getNextTaskId", () => {
   });
 
   it("skips non-directory entries", async () => {
-    const fileStat = { isDirectory: () => false } as ReturnType<typeof stat> extends Promise<infer S> ? S : never;
+    const fileStat = { isDirectory: () => false } as ReturnType<
+      typeof stat
+    > extends Promise<infer S>
+      ? S
+      : never;
 
     mockReaddir.mockResolvedValueOnce(["some-file.json"] as never);
     mockStat.mockResolvedValueOnce(fileStat);

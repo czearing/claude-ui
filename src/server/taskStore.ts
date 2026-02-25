@@ -1,8 +1,15 @@
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import type { Task } from "../utils/tasks.types";
 import { parseTaskFile, serializeTaskFile } from "../utils/taskFile";
+import type { Task } from "../utils/tasks.types";
+
+import {
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { join } from "node:path";
 
 export const SPECS_DIR = join(process.cwd(), "specs");
 
@@ -14,12 +21,17 @@ export async function ensureSpecsDir(repoId: string): Promise<void> {
   await mkdir(repoSpecsDir(repoId), { recursive: true });
 }
 
-export async function readTask(id: string, repoId: string): Promise<Task | null> {
+export async function readTask(
+  id: string,
+  repoId: string,
+): Promise<Task | null> {
   try {
     const raw = await readFile(join(repoSpecsDir(repoId), `${id}.md`), "utf8");
     return parseTaskFile(raw);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
     throw err;
   }
 }
@@ -33,11 +45,16 @@ export async function writeTask(task: Task): Promise<void> {
   );
 }
 
-export async function deleteTaskFile(id: string, repoId: string): Promise<void> {
+export async function deleteTaskFile(
+  id: string,
+  repoId: string,
+): Promise<void> {
   try {
     await unlink(join(repoSpecsDir(repoId), `${id}.md`));
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
     throw err;
   }
 }
@@ -53,7 +70,9 @@ export async function readTasksForRepo(repoId: string): Promise<Task[]> {
     );
     return tasks.filter((t): t is Task => t !== null);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
     throw err;
   }
 }
@@ -84,13 +103,17 @@ export async function getNextTaskId(): Promise<string> {
     for (const dir of dirs) {
       try {
         const s = await stat(join(SPECS_DIR, dir));
-        if (!s.isDirectory()) continue;
+        if (!s.isDirectory()) {
+          continue;
+        }
         const files = await readdir(join(SPECS_DIR, dir));
         for (const file of files) {
           const m = /^TASK-(\d+)\.md$/.exec(file);
           if (m) {
             const n = parseInt(m[1], 10);
-            if (n > max) max = n;
+            if (n > max) {
+              max = n;
+            }
           }
         }
       } catch {
