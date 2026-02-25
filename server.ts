@@ -4,7 +4,15 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:http";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
@@ -38,6 +46,7 @@ const sessions = new Map<string, SessionEntry>();
 
 const TASKS_FILE = join(process.cwd(), "tasks.json");
 const REPOS_FILE = join(process.cwd(), "repos.json");
+const SPECS_DIR = join(process.cwd(), "specs");
 
 type TaskStatus = "Backlog" | "Not Started" | "In Progress" | "Review" | "Done";
 type Priority = "Low" | "Medium" | "High" | "Urgent";
@@ -74,6 +83,150 @@ async function readTasks(): Promise<Task[]> {
 
 async function writeTasks(tasks: Task[]): Promise<void> {
   await writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf8");
+}
+
+function parseTaskFile(content: string): Task {
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(content);
+  if (!match) throw new Error("Invalid task file: missing frontmatter");
+  const frontmatter = match[1];
+  const body = match[2].trim();
+
+  const meta: Record<string, string> = {};
+  for (const line of frontmatter.split("\n")) {
+    const idx = line.indexOf(": ");
+    if (idx === -1) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 2).trim();
+    if (key) meta[key] = value;
+  }
+
+  const task: Task = {
+    id: meta["id"] ?? "",
+    title: meta["title"] ?? "",
+    status: (meta["status"] as TaskStatus) ?? "Backlog",
+    priority: (meta["priority"] as Priority) ?? "Medium",
+    repoId: meta["repoId"] ?? "",
+    spec: body,
+    createdAt: meta["createdAt"] ?? new Date().toISOString(),
+    updatedAt: meta["updatedAt"] ?? new Date().toISOString(),
+  };
+  if (meta["sessionId"]) task.sessionId = meta["sessionId"];
+  return task;
+}
+
+function serializeTaskFile(task: Task): string {
+  const lines = [
+    "---",
+    `id: ${task.id}`,
+    `title: ${task.title}`,
+    `status: ${task.status}`,
+    `priority: ${task.priority}`,
+    `repoId: ${task.repoId}`,
+  ];
+  if (task.sessionId) lines.push(`sessionId: ${task.sessionId}`);
+  lines.push(`createdAt: ${task.createdAt}`);
+  lines.push(`updatedAt: ${task.updatedAt}`);
+  lines.push("---");
+  lines.push("");
+  if (task.spec) lines.push(task.spec);
+  return lines.join("\n");
+}
+
+function repoSpecsDir(repoId: string): string {
+  return join(SPECS_DIR, repoId);
+}
+
+async function ensureSpecsDir(repoId: string): Promise<void> {
+  await mkdir(repoSpecsDir(repoId), { recursive: true });
+}
+
+async function readTask(id: string, repoId: string): Promise<Task | null> {
+  try {
+    const raw = await readFile(
+      join(repoSpecsDir(repoId), `${id}.md`),
+      "utf8",
+    );
+    return parseTaskFile(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function writeTask(task: Task): Promise<void> {
+  await ensureSpecsDir(task.repoId);
+  await writeFile(
+    join(repoSpecsDir(task.repoId), `${task.id}.md`),
+    serializeTaskFile(task),
+    "utf8",
+  );
+}
+
+async function deleteTaskFile(id: string, repoId: string): Promise<void> {
+  try {
+    await unlink(join(repoSpecsDir(repoId), `${id}.md`));
+  } catch {
+    // ignore if already gone
+  }
+}
+
+async function readTasksForRepo(repoId: string): Promise<Task[]> {
+  try {
+    const dir = repoSpecsDir(repoId);
+    const files = await readdir(dir);
+    const tasks = await Promise.all(
+      files
+        .filter((f) => f.endsWith(".md"))
+        .map((f) => readTask(f.slice(0, -3), repoId)),
+    );
+    return tasks.filter((t): t is Task => t !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function readAllTasks(): Promise<Task[]> {
+  try {
+    const dirs = await readdir(SPECS_DIR);
+    const groups = await Promise.all(
+      dirs.map(async (dir) => {
+        try {
+          const s = await stat(join(SPECS_DIR, dir));
+          return s.isDirectory() ? readTasksForRepo(dir) : [];
+        } catch {
+          return [];
+        }
+      }),
+    );
+    return groups.flat();
+  } catch {
+    return [];
+  }
+}
+
+async function getNextTaskId(): Promise<string> {
+  let max = 0;
+  try {
+    const dirs = await readdir(SPECS_DIR);
+    for (const dir of dirs) {
+      try {
+        const s = await stat(join(SPECS_DIR, dir));
+        if (!s.isDirectory()) continue;
+        const files = await readdir(join(SPECS_DIR, dir));
+        for (const file of files) {
+          const m = /^TASK-(\d+)\.md$/.exec(file);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (n > max) max = n;
+          }
+        }
+      } catch {
+        // skip unreadable dirs
+      }
+    }
+  } catch {
+    // SPECS_DIR doesn't exist yet
+  }
+  return `TASK-${String(max + 1).padStart(3, "0")}`;
 }
 
 async function readRepos(): Promise<Repo[]> {
