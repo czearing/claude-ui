@@ -1,3 +1,4 @@
+export { ArchivePage } from "./ArchivePage";
 export * from "./Board/Backlog";
 export * from "./Board/Board";
 export * from "./Board/Column";

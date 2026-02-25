@@ -58,7 +58,11 @@ describe("TaskCard", () => {
   it("does NOT call onSelect when the ... trigger is clicked", async () => {
     const onSelect = jest.fn();
     render(
-      <TaskCard task={notStartedTask} onSelect={onSelect} onRemove={jest.fn()} />,
+      <TaskCard
+        task={notStartedTask}
+        onSelect={onSelect}
+        onRemove={jest.fn()}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
     expect(onSelect).not.toHaveBeenCalled();
@@ -66,7 +70,11 @@ describe("TaskCard", () => {
 
   it("shows Delete option in the dropdown", async () => {
     render(
-      <TaskCard task={notStartedTask} onSelect={jest.fn()} onRemove={jest.fn()} />,
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={jest.fn()}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
     expect(
@@ -108,7 +116,11 @@ describe("TaskCard", () => {
   it("calls onRemove with the task id when Delete is clicked", async () => {
     const onRemove = jest.fn();
     render(
-      <TaskCard task={notStartedTask} onSelect={jest.fn()} onRemove={onRemove} />,
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={onRemove}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
     await userEvent.click(
@@ -120,7 +132,11 @@ describe("TaskCard", () => {
   it("does NOT call onSelect when Delete is clicked", async () => {
     const onSelect = jest.fn();
     render(
-      <TaskCard task={notStartedTask} onSelect={onSelect} onRemove={jest.fn()} />,
+      <TaskCard
+        task={notStartedTask}
+        onSelect={onSelect}
+        onRemove={jest.fn()}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
     await userEvent.click(
