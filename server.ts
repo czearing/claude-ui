@@ -2,7 +2,10 @@ import next from "next";
 import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
 
-import { parseClaudeStatus } from "./src/utils/parseClaudeStatus";
+import {
+  parseClaudeStatus,
+  type ParsedStatus,
+} from "./src/utils/parseClaudeStatus";
 import {
   loadRegistry,
   saveRegistry,
@@ -69,6 +72,10 @@ type SessionEntry = {
   handoverSpec: string;
   specSentAt: number;
   hadMeaningfulActivity: boolean;
+  /** Last non-null status from parseClaudeStatus. Used to distinguish
+   *  tool-use silences (last=thinking) from response-complete silences
+   *  (last=typing) so advanceToReview only fires after a real response. */
+  lastMeaningfulStatus: ParsedStatus | null;
 };
 
 const sessions = new Map<string, SessionEntry>();
@@ -624,7 +631,13 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
       e.currentStatus = "waiting";
       emitStatus(e.activeWs, "waiting");
     }
-    if (e.handoverPhase === "spec_sent" && e.hadMeaningfulActivity) {
+    // Only advance when silence follows *typing* (Claude finished streaming a
+    // response). Silence following *thinking* means a tool-use gap — the
+    // spinner paused while waiting for bash/file/API — not a completed task.
+    if (
+      e.handoverPhase === "spec_sent" &&
+      e.lastMeaningfulStatus === "typing"
+    ) {
       e.handoverPhase = "done";
       advanceToReview(sessionId);
     }
@@ -873,6 +886,7 @@ app
             handoverSpec: specText,
             specSentAt: Date.now(),
             hadMeaningfulActivity: false,
+            lastMeaningfulStatus: null,
           };
           sessions.set(sessionId, entry);
           sessionRegistry.set(sessionId, {
@@ -896,9 +910,12 @@ app
             }
 
             const parsed = parseClaudeStatus(data);
-            if (parsed !== null && parsed !== e.currentStatus) {
-              e.currentStatus = parsed;
-              emitStatus(e.activeWs, parsed);
+            if (parsed !== null) {
+              e.lastMeaningfulStatus = parsed;
+              if (parsed !== e.currentStatus) {
+                e.currentStatus = parsed;
+                emitStatus(e.activeWs, parsed);
+              }
             }
 
             // Track meaningful activity (thinking/typing) after the echo window
@@ -1485,6 +1502,7 @@ app
           handoverSpec: "",
           specSentAt: 0,
           hadMeaningfulActivity: false,
+          lastMeaningfulStatus: null,
         };
         sessions.set(sessionId, entry);
         emitStatus(ws, "connecting");
@@ -1498,9 +1516,12 @@ app
           }
 
           const parsed = parseClaudeStatus(data);
-          if (parsed !== null && parsed !== e.currentStatus) {
-            e.currentStatus = parsed;
-            emitStatus(e.activeWs, parsed);
+          if (parsed !== null) {
+            e.lastMeaningfulStatus = parsed;
+            if (parsed !== e.currentStatus) {
+              e.currentStatus = parsed;
+              emitStatus(e.activeWs, parsed);
+            }
           }
 
           scheduleIdleStatus(e, sessionId);
