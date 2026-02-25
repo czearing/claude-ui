@@ -8,9 +8,9 @@ import { LexicalEditor } from "../LexicalEditor";
 import type { SpecEditorProps } from "./SpecEditor.types";
 import styles from "./SpecEditor.module.css";
 
-export function SpecEditor({ task, onClose }: SpecEditorProps) {
-  const { mutate: updateTask } = useUpdateTask();
-  const { mutate: handoverTask, isPending: isHandingOver } = useHandoverTask();
+export function SpecEditor({ repoId, task, onClose }: SpecEditorProps) {
+  const { mutate: updateTask } = useUpdateTask(repoId);
+  const { mutate: handoverTask, isPending: isHandingOver } = useHandoverTask(repoId);
 
   const [spec, setSpec] = useState(task?.spec ?? "");
   const [isEditing, setIsEditing] = useState(!task?.spec);
@@ -92,7 +92,7 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
             </p>
             {task.sessionId && (
               <a
-                href={`/session/${task.sessionId}`}
+                href={`/repos/${repoId}/session/${task.sessionId}`}
                 className={styles.viewDiffButton}
                 style={{ textDecoration: "none", display: "inline-block" }}
               >

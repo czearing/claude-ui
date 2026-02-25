@@ -14,7 +14,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useState } from "react";
 
-import { useUpdateTask } from "@/hooks/useTasks";
+import { useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task, TaskStatus } from "@/utils/tasks.types";
 import { Column } from "../Column";
@@ -29,14 +29,17 @@ const BOARD_COLUMNS: TaskStatus[] = [
 ];
 
 interface BoardProps {
+  repoId: string;
   tasks: Task[];
   onSelectTask: (task: Task) => void;
+  onHandover?: (taskId: string) => void;
 }
 
-export function Board({ tasks, onSelectTask }: BoardProps) {
+export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
   useTasksSocket();
 
-  const { mutate: updateTask } = useUpdateTask();
+  const { mutate: updateTask } = useUpdateTask(repoId);
+  const { mutate: deleteTask } = useDeleteTask(repoId);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -79,6 +82,8 @@ export function Board({ tasks, onSelectTask }: BoardProps) {
               status={status}
               tasks={tasks.filter((t) => t.status === status)}
               onSelectTask={onSelectTask}
+              onRemoveTask={deleteTask}
+              onHandover={onHandover}
             />
           ))}
         </div>

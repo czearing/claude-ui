@@ -1,16 +1,9 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  ArrowRight,
-  Code,
-  FileText,
-  Kanban,
-  User,
-  Warning,
-} from "@phosphor-icons/react";
+import { ArrowRight, Kanban, User, Warning, X } from "@phosphor-icons/react";
 import clsx from "clsx";
 
-import type { Priority, Task } from "@/utils/tasks.types";
+import type { Priority } from "@/utils/tasks.types";
 import type { TaskCardProps } from "./TaskCard.types";
 import styles from "./TaskCard.module.css";
 
@@ -21,7 +14,7 @@ const PRIORITY_CLASS: Record<Priority, string> = {
   Urgent: styles.priorityUrgent,
 };
 
-export function TaskCard({ task, onSelect }: TaskCardProps) {
+export function TaskCard({ task, onSelect, onRemove }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -35,6 +28,13 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
   const isAgentActive = task.status === "In Progress";
   const isReview = task.status === "Review";
   const isDone = task.status === "Done";
+
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete "${task.title}"?`)) {
+      onRemove!(task.id);
+    }
+  };
 
   return (
     <div
@@ -52,16 +52,23 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
     >
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          {task.type === "Spec" ? (
-            <FileText size={16} className={styles.typeIcon} />
-          ) : (
-            <Code size={16} className={styles.typeIcon} />
-          )}
           <span className={clsx(styles.title, isDone && styles.titleDone)}>
             {task.title}
           </span>
         </div>
-        {isReview && <span className={styles.reviewBadge}>Review</span>}
+        <div className={styles.headerRight}>
+          {isReview && <span className={styles.reviewBadge}>Review</span>}
+          {onRemove && (
+            <button
+              className={styles.removeBtn}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={handleRemove}
+              aria-label="Remove task"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
       </div>
 
       {isAgentActive && (
@@ -80,7 +87,7 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
 
         {task.sessionId ? (
           <a
-            href={`/session/${task.sessionId}`}
+            href={`/repos/${task.repoId}/session/${task.sessionId}`}
             className={styles.sessionLink}
             onClick={(e) => e.stopPropagation()}
           >

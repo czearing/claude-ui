@@ -1,30 +1,27 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { Code, FileText, X } from "@phosphor-icons/react";
-import clsx from "clsx";
+import { X } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { useCreateTask } from "@/hooks/useTasks";
-import type { Priority, TaskType } from "@/utils/tasks.types";
+import type { Priority } from "@/utils/tasks.types";
 import type { NewIssueModalProps } from "./NewIssueModal.types";
 import styles from "./NewIssueModal.module.css";
 
-export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
-  const { mutate: createTask } = useCreateTask();
+export function NewIssueModal({ repoId, open, onClose }: NewIssueModalProps) {
+  const { mutate: createTask } = useCreateTask(repoId);
   const [title, setTitle] = useState("");
-  const [type, setType] = useState<TaskType>("Spec");
   const [priority, setPriority] = useState<Priority>("Medium");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     createTask(
-      { title: title.trim(), type, priority, status: "Backlog" },
+      { title: title.trim(), priority, status: "Backlog" },
       {
         onSuccess: () => {
           setTitle("");
-          setType("Spec");
           setPriority("Medium");
           onClose();
         },
@@ -59,44 +56,18 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
                 />
               </div>
 
-              <div className={styles.row}>
-                <div className={styles.field} style={{ flex: 1 }}>
-                  <label className={styles.label}>Type</label>
-                  <div className={styles.typeToggle}>
-                    {(["Spec", "Develop"] as TaskType[]).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setType(t)}
-                        className={clsx(
-                          styles.typeButton,
-                          type === t && styles.typeButtonActive,
-                        )}
-                      >
-                        {t === "Spec" ? (
-                          <FileText size={14} />
-                        ) : (
-                          <Code size={14} />
-                        )}
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.field} style={{ flex: 1 }}>
-                  <label className={styles.label}>Priority</label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as Priority)}
-                    className={styles.select}
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
-                  </select>
-                </div>
+              <div className={styles.field}>
+                <label className={styles.label}>Priority</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                  className={styles.select}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
               </div>
 
               <div className={styles.formFooter}>

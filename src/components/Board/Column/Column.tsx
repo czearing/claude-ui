@@ -18,7 +18,13 @@ const DOT_CLASS: Record<TaskStatus, string> = {
   Done: styles.dotGreen,
 };
 
-export function Column({ status, tasks, onSelectTask }: ColumnProps) {
+export function Column({
+  status,
+  tasks,
+  onSelectTask,
+  onRemoveTask,
+  onHandover,
+}: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
@@ -40,7 +46,12 @@ export function Column({ status, tasks, onSelectTask }: ColumnProps) {
           strategy={verticalListSortingStrategy}
         >
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onSelect={onSelectTask}
+              onRemove={onRemoveTask}
+            />
           ))}
         </SortableContext>
       </div>
