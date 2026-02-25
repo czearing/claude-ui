@@ -19,10 +19,12 @@ export function TopBar({ repoId, currentView, onNewTask }: TopBarProps) {
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.newIssueButton} onClick={onNewTask}>
-          <Plus size={16} weight="bold" />
-          <span>New Task</span>
-        </button>
+        {currentView === "Tasks" && (
+          <button className={styles.newIssueButton} onClick={onNewTask}>
+            <Plus size={16} weight="bold" />
+            <span>New Task</span>
+          </button>
+        )}
       </div>
     </header>
   );
