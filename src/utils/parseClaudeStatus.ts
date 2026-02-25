@@ -24,8 +24,10 @@ const SPINNER_RE = /\r[⣾⣽⣻⢿⡿⣟⣯⣷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/;
  *  - OSC sequences   \x1b]…\x07 or \x1b\  (title, hyperlinks)
  *  - Two-byte ESC    \x1b + one char  (Fe, Fp sequences)
  */
+/* eslint-disable no-control-regex */
 const ANSI_RE =
   /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-_])/g;
+/* eslint-enable no-control-regex */
 
 /** Minimum non-whitespace characters after stripping ANSI to count as typing. */
 const TYPING_THRESHOLD = 8;
@@ -44,14 +46,14 @@ function stripAnsi(s: string): string {
  */
 export function parseClaudeStatus(chunk: string): ParsedStatus | null {
   // 1. Bracketed paste ON = input prompt rendered = waiting for user
-  if (chunk.includes(BRACKETED_PASTE_ON)) return "waiting";
+  if (chunk.includes(BRACKETED_PASTE_ON)) { return "waiting"; }
 
   // 2. Spinner + carriage-return = processing animation
-  if (SPINNER_RE.test(chunk)) return "thinking";
+  if (SPINNER_RE.test(chunk)) { return "thinking"; }
 
   // 3. Substantial printable text = Claude is streaming its response
   const printable = stripAnsi(chunk).replace(/\s/g, "");
-  if (printable.length >= TYPING_THRESHOLD) return "typing";
+  if (printable.length >= TYPING_THRESHOLD) { return "typing"; }
 
   return null;
 }

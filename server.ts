@@ -2,12 +2,12 @@ import next from "next";
 import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { parseClaudeStatus } from "./src/utils/parseClaudeStatus";
 import {
   loadRegistry,
   saveRegistry,
   type SessionRegistryEntry,
 } from "./src/utils/sessionRegistry";
-import { parseClaudeStatus } from "./src/utils/parseClaudeStatus";
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -611,7 +611,6 @@ function advanceToReview(sessionId: string): void {
     }
   });
 }
-
 
 app
   .prepare()

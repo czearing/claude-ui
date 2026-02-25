@@ -11,6 +11,7 @@ export default config(
     ignores: [
       "node_modules/",
       ".next/",
+      ".worktrees/",
       "out/",
       "dist/",
       "coverage/",
