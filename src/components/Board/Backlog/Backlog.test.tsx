@@ -67,11 +67,39 @@ describe("Backlog", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows count of backlog tasks only", () => {
+  it("renders a sort combobox defaulting to Newest", () => {
     render(
       <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
-    expect(screen.getByText("2 issues")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /sort/i })).toHaveValue(
+      "newest",
+    );
+  });
+
+  it("sorts tasks A-Z by title when selected", async () => {
+    render(
+      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+    );
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: /sort/i }),
+      "az",
+    );
+    const buttons = screen.getAllByRole("button", { name: /to agent/i });
+    expect(buttons[0]).toHaveAccessibleName("Send Add dark mode to agent");
+    expect(buttons[1]).toHaveAccessibleName("Send Fix login bug to agent");
+  });
+
+  it("sorts tasks oldest-first when selected", async () => {
+    render(
+      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+    );
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: /sort/i }),
+      "oldest",
+    );
+    const buttons = screen.getAllByRole("button", { name: /to agent/i });
+    expect(buttons[0]).toHaveAccessibleName("Send Fix login bug to agent");
+    expect(buttons[1]).toHaveAccessibleName("Send Add dark mode to agent");
   });
 
   it("calls onNewTask when New Task button is clicked", async () => {

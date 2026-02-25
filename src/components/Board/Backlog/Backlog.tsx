@@ -15,6 +15,27 @@ import { formatRelativeDate } from "@/utils/formatRelativeDate";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
 
+type SortBy = "newest" | "oldest" | "az" | "za";
+
+function sortTasks(tasks: Task[], sortBy: SortBy): Task[] {
+  return [...tasks].sort((a, b) => {
+    switch (sortBy) {
+      case "newest":
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      case "oldest":
+        return (
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      case "az":
+        return a.title.localeCompare(b.title);
+      case "za":
+        return b.title.localeCompare(a.title);
+    }
+  });
+}
+
 interface BacklogProps {
   repoId: string;
   onSelectTask: (task: Task) => void;
@@ -37,12 +58,15 @@ export function Backlog({
   const backlogTasks = allTasks.filter((t) => t.status === "Backlog");
 
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortBy>("newest");
 
-  const filteredTasks = search.trim()
+  const filtered = search.trim()
     ? backlogTasks.filter((t) =>
         t.title.toLowerCase().includes(search.toLowerCase()),
       )
     : backlogTasks;
+
+  const sorted = sortTasks(filtered, sortBy);
 
   return (
     <div className={styles.backlog}>
@@ -73,11 +97,21 @@ export function Backlog({
               className={styles.searchInput}
             />
           </div>
-          <span className={styles.count}>{backlogTasks.length} issues</span>
+          <select
+            aria-label="Sort"
+            className={styles.sortSelect}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="az">A → Z</option>
+            <option value="za">Z → A</option>
+          </select>
         </div>
 
         <div className={styles.list}>
-          {filteredTasks.map((task) => (
+          {sorted.map((task) => (
             <div
               key={task.id}
               className={`${styles.row} ${task.id === selectedTaskId ? styles.rowSelected : ""}`}
@@ -121,7 +155,7 @@ export function Backlog({
             </div>
           ))}
 
-          {filteredTasks.length === 0 && (
+          {sorted.length === 0 && (
             <div className={styles.emptyState}>
               <FileText size={32} className={styles.emptyIcon} />
               <p>

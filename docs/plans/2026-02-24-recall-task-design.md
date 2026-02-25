@@ -26,6 +26,7 @@ Add a **three-dot overflow menu** (`…`) to every board `TaskCard` that consoli
 ### `POST /api/tasks/:id/recall`
 
 **Server logic (order matters to avoid race with `onExit` auto-advance):**
+
 1. Look up task by `id` — 404 if not found
 2. Update task in `tasks.json`: `status → "Backlog"`, `sessionId → undefined`, `updatedAt → now`
 3. Broadcast `task:updated`
@@ -39,6 +40,7 @@ Killing the session after updating status ensures the `onExit` handler's guard (
 ## Frontend Architecture
 
 ### `useTasks.ts` — new hook
+
 ```ts
 export function useRecallTask(repoId: string) {
   // POST /api/tasks/:id/recall
@@ -48,40 +50,46 @@ export function useRecallTask(repoId: string) {
 ```
 
 ### `TaskCard.types.ts`
+
 Add `onRecall?: (id: string) => void`.
 
 ### `TaskCard.tsx`
+
 - Import `DropdownMenu` from `@radix-ui/react-dropdown-menu`
 - Replace the standalone `removeBtn` with a `…` trigger button (same hover-reveal behaviour)
 - Render menu items based on `task.status === "In Progress"`
 - `onPointerDown` + `stopPropagation` on the trigger to prevent card click/drag
 
 ### `TaskCard.module.css`
+
 Add styles for: `.menuTrigger`, `.menuContent`, `.menuItem`, `.menuItemDanger`, `.menuItemWarning`, `.menuSeparator`, `.menuItemSubtext`.
 
 ### `Column.types.ts`
+
 Add `onRecall?: (id: string) => void`.
 
 ### `Column.tsx`
+
 Pass `onRecall` through to each `TaskCard`.
 
 ### `Board.tsx`
+
 - Import `useRecallTask`
 - Provide `onRecall` handler: calls `recallTask(taskId)`
 - Pass `onRecall` to `Column`
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `server.ts` | Add `POST /api/tasks/:id/recall` route |
-| `src/hooks/useTasks.ts` | Add `useRecallTask` hook |
-| `src/components/Board/TaskCard/TaskCard.types.ts` | Add `onRecall` prop |
-| `src/components/Board/TaskCard/TaskCard.tsx` | Replace delete btn with `…` dropdown |
-| `src/components/Board/TaskCard/TaskCard.module.css` | Dropdown styles |
-| `src/components/Board/Column/Column.types.ts` | Add `onRecall` prop |
-| `src/components/Board/Column/Column.tsx` | Thread `onRecall` to cards |
-| `src/components/Board/Board/Board.tsx` | Wire `useRecallTask`, pass to columns |
+| File                                                | Change                                 |
+| --------------------------------------------------- | -------------------------------------- |
+| `server.ts`                                         | Add `POST /api/tasks/:id/recall` route |
+| `src/hooks/useTasks.ts`                             | Add `useRecallTask` hook               |
+| `src/components/Board/TaskCard/TaskCard.types.ts`   | Add `onRecall` prop                    |
+| `src/components/Board/TaskCard/TaskCard.tsx`        | Replace delete btn with `…` dropdown   |
+| `src/components/Board/TaskCard/TaskCard.module.css` | Dropdown styles                        |
+| `src/components/Board/Column/Column.types.ts`       | Add `onRecall` prop                    |
+| `src/components/Board/Column/Column.tsx`            | Thread `onRecall` to cards             |
+| `src/components/Board/Board/Board.tsx`              | Wire `useRecallTask`, pass to columns  |
 
 ## What is NOT changing
 
