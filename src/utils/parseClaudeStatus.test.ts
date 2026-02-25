@@ -25,6 +25,30 @@ describe("parseClaudeStatus", () => {
         "waiting",
       );
     });
+
+    it("returns 'waiting' for Claude Code v2 ❯ input prompt", () => {
+      expect(parseClaudeStatus(`❯ Try "how does <filepath> work?"`)).toBe(
+        "waiting",
+      );
+    });
+
+    it("returns 'waiting' for ❯ prompt with ANSI color prefix", () => {
+      expect(
+        parseClaudeStatus(`\x1b[32m❯\x1b[0m Try "edit <filepath> to..."`),
+      ).toBe("waiting");
+    });
+
+    it("❯ prompt takes priority over typing-length hint text", () => {
+      // The hint text after ❯ is ≥8 printable chars and would be 'typing'
+      // without the ❯ check
+      expect(
+        parseClaudeStatus(`❯ Try "how does the authentication system work?"`),
+      ).toBe("waiting");
+    });
+
+    it("❯ prompt takes priority over spinner pattern", () => {
+      expect(parseClaudeStatus(`\r✻ Thinking...\n❯ `)).toBe("waiting");
+    });
   });
 
   // ── thinking ─────────────────────────────────────────────────────────────

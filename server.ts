@@ -631,11 +631,15 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
       e.currentStatus = "waiting";
       emitStatus(e.activeWs, "waiting");
     }
-    // Only advance when silence follows *typing* (Claude finished streaming a
-    // response). Silence following *thinking* means a tool-use gap — the
-    // spinner paused while waiting for bash/file/API — not a completed task.
+    // Only advance when:
+    //  - hadMeaningfulActivity: we saw the thinking spinner (Claude actually
+    //    processed the spec), guarding against startup splash text that also
+    //    looks like typing
+    //  - lastMeaningfulStatus === "typing": silence followed streamed response,
+    //    not a tool-use gap (thinking → silence = bash/file/API still running)
     if (
       e.handoverPhase === "spec_sent" &&
+      e.hadMeaningfulActivity &&
       e.lastMeaningfulStatus === "typing"
     ) {
       e.handoverPhase = "done";
@@ -832,7 +836,7 @@ app
           // Build the prompt: title + spec body (extracted from Lexical JSON
           // or passed through as plain text).
           const plainSpec = extractTextFromLexical(task.spec);
-          const specText = `${task.title}\n\n${plainSpec}`.trim();
+          const specText = plainSpec.trim();
 
           // Empty spec — nothing for Claude to do; advance straight to Review.
           if (!specText) {
@@ -918,17 +922,35 @@ app
               }
             }
 
-            // Track meaningful activity (thinking/typing) after the echo window
+            // Only the thinking spinner counts as meaningful activity — not
+            // "typing", which also matches startup splash text and ❯ hint text.
             if (
               e.handoverPhase === "spec_sent" &&
               !e.hadMeaningfulActivity &&
-              (parsed === "thinking" || parsed === "typing") &&
+              parsed === "thinking" &&
               Date.now() - e.specSentAt > SPEC_ECHO_WINDOW_MS
             ) {
               e.hadMeaningfulActivity = true;
             }
 
-            // Schedule waiting detection after PTY silence
+            // Fast path: ❯ prompt detected = Claude is done (task complete or
+            // question asked). Advance to Review immediately without waiting for
+            // the idle timer to fire.
+            if (
+              parsed === "waiting" &&
+              e.handoverPhase === "spec_sent" &&
+              e.hadMeaningfulActivity
+            ) {
+              if (e.idleTimer !== null) {
+                clearTimeout(e.idleTimer);
+                e.idleTimer = null;
+              }
+              e.handoverPhase = "done";
+              advanceToReview(sessionId);
+              return;
+            }
+
+            // Fallback: schedule waiting detection after PTY silence
             scheduleIdleStatus(e, sessionId);
           });
 

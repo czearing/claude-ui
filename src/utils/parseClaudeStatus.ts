@@ -9,6 +9,16 @@ export type ParsedStatus = "thinking" | "typing" | "waiting";
 const BRACKETED_PASTE_ON = "\x1b[?2004h";
 
 /**
+ * Claude Code v2 input prompt character (U+276F HEAVY RIGHT-POINTING ANGLE
+ * QUOTATION MARK) followed by a space. This is the ❯ glyph that Claude Code
+ * renders at the start of its interactive input line — distinct from the ASCII
+ * greater-than sign (U+003E) used in prose. Detecting it here gives us a fast,
+ * synchronous "waiting for input" signal that works in v2.1.58+ where
+ * \x1b[?2004h is not emitted.
+ */
+const INPUT_PROMPT_CHAR = "❯";
+
+/**
  * Spinner animation pattern: carriage return (no newline) followed by a
  * spinner character. This is how CLI spinners redraw in-place without
  * scrolling the terminal.
@@ -56,8 +66,15 @@ function stripAnsi(s: string): string {
  * Priority: waiting > thinking > typing > null
  */
 export function parseClaudeStatus(chunk: string): ParsedStatus | null {
-  // 1. Bracketed paste ON = input prompt rendered = waiting for user
+  // 1a. Bracketed paste ON = input prompt rendered = waiting for user
   if (chunk.includes(BRACKETED_PASTE_ON)) {
+    return "waiting";
+  }
+
+  // 1b. Claude Code v2 ❯ input prompt character = waiting for user input.
+  //     Takes priority over typing because the hint text after ❯ is ≥8 chars
+  //     and would otherwise be mis-classified as "typing".
+  if (chunk.includes(INPUT_PROMPT_CHAR)) {
     return "waiting";
   }
 
