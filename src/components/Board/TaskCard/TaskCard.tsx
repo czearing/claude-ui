@@ -1,20 +1,17 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowRight, Kanban, User, Warning, X } from "@phosphor-icons/react";
+import { ArrowRight, Kanban, X } from "@phosphor-icons/react";
 import clsx from "clsx";
 
-import type { Priority } from "@/utils/tasks.types";
-import type { TaskCardProps } from "./TaskCard.types";
 import styles from "./TaskCard.module.css";
+import type { TaskCardProps } from "./TaskCard.types";
 
-const PRIORITY_CLASS: Record<Priority, string> = {
-  Low: styles.priorityLow,
-  Medium: styles.priorityMedium,
-  High: styles.priorityHigh,
-  Urgent: styles.priorityUrgent,
-};
-
-export function TaskCard({ task, onSelect, onRemove }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onSelect,
+  onRemove,
+  selected,
+}: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -48,6 +45,7 @@ export function TaskCard({ task, onSelect, onRemove }: TaskCardProps) {
         isDragging && styles.cardDragging,
         isAgentActive && styles.cardAgentActive,
         isDone && styles.cardDone,
+        selected && styles.cardSelected,
       )}
     >
       <div className={styles.header}>
@@ -80,12 +78,9 @@ export function TaskCard({ task, onSelect, onRemove }: TaskCardProps) {
       )}
 
       <div className={styles.footer}>
-        <div className={styles.meta}>
-          <span className={styles.taskId}>{task.id}</span>
-          <Warning size={14} className={PRIORITY_CLASS[task.priority]} />
-        </div>
+        <div className={styles.meta} />
 
-        {task.sessionId ? (
+        {task.sessionId && (
           <a
             href={`/repos/${task.repoId}/session/${task.sessionId}`}
             className={styles.sessionLink}
@@ -94,10 +89,6 @@ export function TaskCard({ task, onSelect, onRemove }: TaskCardProps) {
             <span>Terminal</span>
             <ArrowRight size={10} />
           </a>
-        ) : (
-          <div className={styles.avatar}>
-            <User size={12} color="var(--color-text-muted)" />
-          </div>
         )}
       </div>
     </div>
