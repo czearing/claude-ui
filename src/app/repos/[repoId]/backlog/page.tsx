@@ -6,5 +6,5 @@ export default async function Page({
   params: Promise<{ repoId: string }>;
 }) {
   const { repoId } = await params;
-  return <AppShell repoId={repoId} view="Backlog" />;
+  return <AppShell repoId={repoId} view="Tasks" />;
 }

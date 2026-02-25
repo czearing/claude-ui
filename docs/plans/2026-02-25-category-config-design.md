@@ -31,8 +31,8 @@ Layout: master/detail split, same visual pattern as Backlog + SpecEditor. Fixed 
 
 ```ts
 interface SkillCategory {
-  name: string;     // filename without .md, e.g. "spec"
-  content: string;  // raw markdown string
+  name: string; // filename without .md, e.g. "spec"
+  content: string; // raw markdown string
 }
 ```
 
@@ -99,6 +99,7 @@ src/
 Add `format?: "json" | "markdown"` to `LexicalEditorProps`. Default: `"json"` (no change to existing behavior).
 
 When `format="markdown"`:
+
 - `StateLoader` uses `$convertFromMarkdownString(value, TRANSFORMERS)` instead of `editor.parseEditorState(value)`
 - `handleChange` uses `$convertToMarkdownString(TRANSFORMERS)` instead of `JSON.stringify(editorState.toJSON())`
 
@@ -123,8 +124,8 @@ Scrollable left rail. "New Category" button at top. Each row shows the skill nam
 interface CategoryEditorProps {
   name: string;
   content: string;
-  onChange: (content: string) => void;   // debounced 800ms → PUT /api/skills/:name
-  onRename: (newName: string) => void;   // on blur/enter → POST new + DELETE old
+  onChange: (content: string) => void; // debounced 800ms → PUT /api/skills/:name
+  onRename: (newName: string) => void; // on blur/enter → POST new + DELETE old
   onDelete: () => void;
 }
 ```
@@ -156,6 +157,7 @@ All follow the existing `useTasks` pattern exactly.
 ## Styling
 
 All CSS uses existing design tokens from `global.css`:
+
 - `--color-bg`, `--color-surface`, `--color-border`, `--color-text`, `--color-text-muted`
 - `--space-*`, `--radius-*`, `--text-*`
 - No new tokens needed. No hardcoded hex values in component CSS.
@@ -167,16 +169,21 @@ All CSS uses existing design tokens from `global.css`:
 ## Agent Team & Contracts
 
 ### Agent 1 — Backend Engineer
+
 Owns `server.ts` only. Implements the five `/api/skills` endpoints per the API contract above. Done when all five endpoints return correct status codes with real files written to `~/.claude/skills/` on disk.
 
 ### Agent 2 — Frontend Engineer
+
 Owns: LexicalEditor `format` extension, all Settings components, hooks, utils, SettingsPage, Sidebar wiring. Works from the component contracts above. No new npm dependencies. Uses mock data from `skills.client.ts` if Backend isn't ready.
 
 ### Agent 3 — Code Reviewer
+
 Reviews Agent 1 & 2 output against this document. Checks: API contract matches exactly, name validation present, no path traversal risk, LexicalEditor `format` prop is backward-compatible, CSS uses only design tokens, folder structure matches spec, no new dependencies.
 
 ### Agent 4 — Test Writer
+
 Runs after review is approved. Writes:
+
 - `useSkills.test.ts` — mock fetch, assert query/mutation behavior
 - `CategoryEditor.test.tsx` — renders with content, fires onChange
 - `CategoryList.test.tsx` — renders list, highlights selected, fires onSelect

@@ -1,0 +1,254 @@
+/* ─── Shell layout (mirrors AppShell) ────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ─── Content area ───────────────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+.headerRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 2px;
+  color: var(--color-text);
+}
+
+.subheading {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ─── Task list ──────────────────────────────────────────────────────────── */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ─── Row ────────────────────────────────────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: default;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  transition: border-color 120ms;
+}
+
+.row:hover {
+  border-color: color-mix(in srgb, var(--color-border) 60%, var(--color-text));
+}
+
+.rowLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rowContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rowTitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowTitleEmpty {
+  font-style: italic;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowDate {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ─── Priority badge ─────────────────────────────────────────────────────── */
+.priority {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 4px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.priorityLow {
+  background: #2d333b;
+  color: #8b949e;
+}
+.priorityMedium {
+  background: #2d3a1e;
+  color: #7ee787;
+}
+.priorityHigh {
+  background: #3d2b1f;
+  color: #f0883e;
+}
+.priorityUrgent {
+  background: #3d1f1f;
+  color: #f85149;
+}
+
+/* ─── Row actions ────────────────────────────────────────────────────────── */
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.restoreButton {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition:
+    color 120ms,
+    border-color 120ms;
+}
+
+.restoreButton:hover {
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-border) 50%, var(--color-text));
+}
+
+/* ─── Dropdown ───────────────────────────────────────────────────────────── */
+.moreButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm, 4px);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    background 120ms;
+}
+
+.row:hover .moreButton,
+.moreButtonOpen {
+  opacity: 1;
+}
+
+.moreButton:hover,
+.moreButtonOpen {
+  background: color-mix(in srgb, var(--color-surface) 80%, var(--color-text));
+  color: var(--color-text);
+}
+
+.menuContent {
+  min-width: 140px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 0.8125rem;
+  border-radius: var(--radius-sm, 4px);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: color-mix(in srgb, var(--color-surface) 60%, var(--color-text));
+}
+
+.menuItemDanger {
+  color: #f85149;
+}
+.menuItemDanger:hover {
+  background: rgba(248, 81, 73, 0.1);
+}
+
+.menuItemLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Empty state ────────────────────────────────────────────────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.emptyIcon {
+  opacity: 0.4;
+}
