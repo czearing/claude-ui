@@ -48,7 +48,7 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
     }
     saveTimerRef.current = setTimeout(() => {
       updateTask({ id: task.id, spec: json });
-    }, 800);
+    }, 300);
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
