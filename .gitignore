@@ -103,3 +103,8 @@ package-manifest.json
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
+
+# Runtime data
+tasks.json
+task-logs/
