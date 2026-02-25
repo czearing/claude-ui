@@ -50,10 +50,15 @@ h6 {
   --color-bg: #121214;
   --color-surface: #1e1e21;
   --color-border: #2e2e32;
+  --color-border-hover: #4b5563;
   --color-text: #ededef;
   --color-text-muted: #a0a0a5;
   --color-agent: #7c3aed;
   --color-agent-light: rgba(124, 58, 237, 0.2);
+  --color-danger: #f85149;
+  --color-danger-bg: rgba(248, 81, 73, 0.15);
+  --color-warning: #fb923c;
+  --color-warning-bg: rgba(249, 115, 22, 0.2);
 
   --font-sans: var(--font-inter, ui-sans-serif, system-ui, sans-serif);
   --font-mono: var(

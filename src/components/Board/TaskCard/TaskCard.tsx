@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowRight, Kanban, X } from "@phosphor-icons/react";
+import { ArrowRight, FileText, Kanban, X } from "@phosphor-icons/react";
 import clsx from "clsx";
 
 import styles from "./TaskCard.module.css";
@@ -50,6 +50,7 @@ export function TaskCard({
     >
       <div className={styles.header}>
         <div className={styles.titleRow}>
+          <FileText size={14} className={styles.docIcon} />
           <span className={clsx(styles.title, isDone && styles.titleDone)}>
             {task.title}
           </span>

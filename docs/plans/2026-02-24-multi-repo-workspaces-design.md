@@ -15,10 +15,10 @@ Add support for multiple git repos as isolated workspaces. Each repo has its own
 
 ```typescript
 interface Repo {
-  id: string       // stable UUID
-  name: string     // user-defined display name (e.g. "Frontend")
-  path: string     // absolute path on disk (e.g. "/Users/caleb/code/my-app")
-  createdAt: string // ISO 8601
+  id: string; // stable UUID
+  name: string; // user-defined display name (e.g. "Frontend")
+  path: string; // absolute path on disk (e.g. "/Users/caleb/code/my-app")
+  createdAt: string; // ISO 8601
 }
 ```
 
@@ -66,11 +66,11 @@ GET /api/tasks?repoId=:id  — filter tasks by repo
 
 ## Routing Structure
 
-| Route | Description |
-|-------|-------------|
-| `/` | Redirects to `/repos/[firstRepoId]`, or repo picker if no repos configured |
-| `/repos/[repoId]` | Board/backlog view scoped to that repo |
-| `/repos/[repoId]/session/[sessionId]` | Terminal session |
+| Route                                 | Description                                                                |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `/`                                   | Redirects to `/repos/[firstRepoId]`, or repo picker if no repos configured |
+| `/repos/[repoId]`                     | Board/backlog view scoped to that repo                                     |
+| `/repos/[repoId]/session/[sessionId]` | Terminal session                                                           |
 
 ### Migration
 
@@ -106,6 +106,7 @@ Selecting "Add repo" opens a Radix `Dialog` (`AddRepoDialog`).
 ### AddRepoDialog
 
 Fields:
+
 - **Name** — text input, required
 - **Path** — text input, required, validated on submit
 

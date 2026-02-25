@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -12,14 +13,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { useState } from "react";
 
 import { useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task, TaskStatus } from "@/utils/tasks.types";
+import styles from "./Board.module.css";
 import { Column } from "../Column";
 import { TaskCard } from "../TaskCard";
-import styles from "./Board.module.css";
 
 const BOARD_COLUMNS: TaskStatus[] = [
   "Not Started",
@@ -55,7 +55,9 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveTask(null);
-    if (!over) return;
+    if (!over) {
+      return;
+    }
 
     const overId = over.id as string;
     const targetStatus = BOARD_COLUMNS.includes(overId as TaskStatus)

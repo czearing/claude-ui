@@ -1,13 +1,17 @@
 .wrapper {
   position: relative;
+  height: 100%;
 }
+
+/* ─── Content area ───────────────────────────────────────────────────────── */
 
 .editorContent {
   outline: none;
   min-height: 200px;
-  font-size: var(--text-sm);
-  line-height: 1.6;
+  font-size: var(--text-lg);
+  line-height: 1.7;
   color: var(--color-text);
+  caret-color: var(--color-text);
 }
 
 .placeholder {
@@ -16,6 +20,167 @@
   left: 0;
   color: var(--color-text-muted);
   pointer-events: none;
+  font-size: var(--text-lg);
+  line-height: 1.7;
+  user-select: none;
+}
+
+/* ─── Block types ────────────────────────────────────────────────────────── */
+
+.paragraph {
+  margin: 0 0 2px;
+}
+
+.h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text);
+  margin: 24px 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text);
+  margin: 20px 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text);
+  margin: 16px 0 4px;
+}
+
+.quote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 14px;
+  margin: 8px 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ─── Lists ──────────────────────────────────────────────────────────────── */
+
+.ol {
+  padding: 0;
+  margin: 4px 0;
+  padding-left: 24px;
+  list-style-type: decimal;
+}
+
+.ul {
+  padding: 0;
+  margin: 4px 0;
+  padding-left: 24px;
+  list-style-type: disc;
+}
+
+.listItem {
+  margin: 2px 0;
+  line-height: 1.7;
+}
+
+.nestedListItem {
+  list-style-type: none;
+}
+
+/* ─── Inline text formats ────────────────────────────────────────────────── */
+
+.bold {
+  font-weight: 600;
+}
+
+.italic {
+  font-style: italic;
+}
+
+.underline {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.strikethrough {
+  text-decoration: line-through;
+}
+
+.underlineStrikethrough {
+  text-decoration: underline line-through;
+  text-underline-offset: 3px;
+}
+
+.inlineCode {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e879a0;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+}
+
+.link {
+  color: var(--color-agent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link:hover {
+  opacity: 0.8;
+}
+
+/* ─── Code block ─────────────────────────────────────────────────────────── */
+
+.codeBlock {
+  display: block;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 1.6;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 8px 0;
+  overflow-x: auto;
+  tab-size: 2;
+  white-space: pre;
+}
+
+/* ─── Code highlight tokens ──────────────────────────────────────────────── */
+
+.tokenComment {
+  color: #6a737d;
+}
+
+.tokenPunctuation {
+  color: #a0a0a5;
+}
+
+.tokenProperty {
+  color: #79b8ff;
+}
+
+.tokenSelector {
+  color: #85e89d;
+}
+
+.tokenOperator {
+  color: #e1e4e8;
+}
+
+.tokenAttr {
+  color: #ffab70;
+}
+
+.tokenVariable {
+  color: #b392f0;
+}
+
+.tokenFunction {
+  color: #b392f0;
 }

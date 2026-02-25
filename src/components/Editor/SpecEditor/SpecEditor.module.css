@@ -2,44 +2,77 @@
   position: fixed;
   inset-block: 0;
   right: 0;
-  width: 600px;
-  background: rgba(30, 30, 33, 0.7);
-  backdrop-filter: blur(12px);
+  width: 640px;
+  background: var(--color-bg);
   border-left: 1px solid var(--color-border);
-  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.4);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35);
   z-index: 50;
   display: flex;
   flex-direction: column;
 }
 
-.panelHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
+.panelInline {
+  position: relative;
+  inset: unset;
+  width: 100%;
+  height: 100%;
+  box-shadow: none;
+  border-left: none;
+  z-index: auto;
 }
 
-.panelTitle {
+/* ─── Editor area ────────────────────────────────────────────────────────── */
+
+.editorArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-8) var(--space-8) var(--space-6);
   display: flex;
-  align-items: center;
+  flex-direction: column;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
+  margin-bottom: var(--space-6);
 }
 
-.taskId {
-  font-size: var(--text-sm);
-  font-family: var(--font-mono);
+/* Notion-style page title */
+.pageTitle {
+  flex: 1;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  word-break: break-word;
+  margin: 0;
+}
+
+.pageTitleInput {
+  flex: 1;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.pageTitleInput::placeholder {
   color: var(--color-text-muted);
 }
 
-.taskTitle {
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
 .closeButton {
-  padding: 6px;
+  flex-shrink: 0;
+  margin-top: 6px;
+  padding: 4px;
   background: transparent;
   border: none;
   color: var(--color-text-muted);
@@ -49,104 +82,27 @@
   align-items: center;
   justify-content: center;
   transition:
-    background-color 150ms,
-    color 150ms;
+    background-color 120ms,
+    color 120ms;
 }
 
 .closeButton:hover {
-  background-color: var(--color-border);
+  background: var(--color-surface);
   color: var(--color-text);
 }
 
-.content {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.statusRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.statusItem {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.dotAgent {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--color-agent);
-}
-.dotOrange {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #f97316;
-}
-
-.editorWrapper {
-  flex: 1;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-bg);
-  min-height: 240px;
-}
-
-.editorToolbar {
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: var(--color-surface);
-  flex-shrink: 0;
-}
-
-.editorLabel {
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.editToggle {
-  font-size: var(--text-xs);
-  color: var(--color-agent);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: text-decoration 150ms;
-}
-
-.editToggle:hover {
-  text-decoration: underline;
-}
-
-.editorBody {
-  flex: 1;
-  padding: var(--space-4);
-  overflow-y: auto;
-}
+/* ─── Agent notes ────────────────────────────────────────────────────────── */
 
 .agentNotes {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  margin: 0 var(--space-8) var(--space-6);
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.2);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  flex-shrink: 0;
 }
 
 .agentNotesTitle {
@@ -161,85 +117,60 @@
 .agentNotesText {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 .viewDiffButton {
-  background-color: var(--color-border);
-  color: var(--color-text);
-  border: none;
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--color-agent);
+  border: 1px solid rgba(124, 58, 237, 0.3);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
   width: fit-content;
-  transition: background-color 150ms;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
 }
 
 .viewDiffButton:hover {
-  background-color: #3f3f46;
+  background: rgba(124, 58, 237, 0.25);
+  border-color: rgba(124, 58, 237, 0.5);
 }
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
 
 .footer {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--color-border);
-  background-color: var(--color-surface);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-shrink: 0;
-}
-
-.footerMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.footerActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.saveDraftButton {
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  background: transparent;
-  border: none;
-  color: var(--color-text);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background-color 150ms;
-}
-
-.saveDraftButton:hover {
-  background-color: var(--color-border);
 }
 
 .handoverButton {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background-color: var(--color-agent);
+  background: var(--color-agent);
   color: white;
   border: none;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: opacity 150ms;
+  transition: opacity 120ms;
 }
 
 .handoverButton:hover {
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
 .handoverButton:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }

@@ -28,65 +28,6 @@
   gap: var(--space-3);
 }
 
-.searchWrapper {
-  position: relative;
-}
-
-.searchIcon {
-  position: absolute;
-  left: var(--space-3);
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-
-.searchInput {
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 6px var(--space-3) 6px 32px;
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  width: 256px;
-  transition: border-color 150ms;
-  outline: none;
-}
-
-.searchInput:focus {
-  border-color: var(--color-agent);
-}
-
-.searchInput::placeholder {
-  color: var(--color-text-muted);
-}
-
-.iconButton {
-  padding: 6px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background-color 150ms,
-    color 150ms;
-}
-
-.iconButton:hover {
-  background-color: var(--color-border);
-  color: var(--color-text);
-}
-
-.divider {
-  width: 1px;
-  height: 16px;
-  background-color: var(--color-border);
-}
-
 .newIssueButton {
   display: flex;
   align-items: center;

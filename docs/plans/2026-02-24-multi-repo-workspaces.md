@@ -13,6 +13,7 @@
 ## Task 1: Add Repo types and update Task type
 
 **Files:**
+
 - Modify: `src/utils/tasks.types.ts`
 
 **Step 1: Add `Repo` interface and `repoId` to `Task`**
@@ -43,7 +44,10 @@ export interface Task {
   updatedAt: string; // ISO timestamp
 }
 
-export type CreateTaskInput = Pick<Task, "title" | "type" | "priority" | "repoId"> & {
+export type CreateTaskInput = Pick<
+  Task,
+  "title" | "type" | "priority" | "repoId"
+> & {
   status?: TaskStatus;
 };
 export type UpdateTaskInput = Partial<
@@ -51,9 +55,9 @@ export type UpdateTaskInput = Partial<
 >;
 
 export interface Repo {
-  id: string;    // stable UUID
-  name: string;  // user-defined display name
-  path: string;  // absolute path on disk
+  id: string; // stable UUID
+  name: string; // user-defined display name
+  path: string; // absolute path on disk
   createdAt: string; // ISO 8601
 }
 
@@ -65,7 +69,7 @@ export type UpdateRepoInput = Partial<Pick<Repo, "name" | "path">>;
 
 Run: `yarn tsc --noEmit`
 
-Expect: errors about `repoId` being missing from existing `CreateTaskInput` usages — that's fine, you'll fix them in later tasks. If there are *other* unexpected errors, investigate before continuing.
+Expect: errors about `repoId` being missing from existing `CreateTaskInput` usages — that's fine, you'll fix them in later tasks. If there are _other_ unexpected errors, investigate before continuing.
 
 **Step 3: Commit**
 
@@ -79,6 +83,7 @@ git commit -m "feat: add Repo type and repoId field to Task"
 ## Task 2: Server — repos persistence and startup migration
 
 **Files:**
+
 - Modify: `server.ts`
 
 **Step 1: Add Repo type and file path to server.ts**
@@ -183,6 +188,7 @@ git commit -m "feat: add repos persistence and startup migration to server"
 ## Task 3: Server — repos REST endpoints
 
 **Files:**
+
 - Modify: `server.ts`
 
 **Step 1: Add `fs` import**
@@ -195,7 +201,7 @@ import { existsSync } from "node:fs";
 
 **Step 2: Add repo endpoints**
 
-Add these handlers inside the `createServer` callback, *before* the `void handle(req, res, parsedUrl)` fallthrough line. Add them after the `DELETE /api/sessions/:id` block:
+Add these handlers inside the `createServer` callback, _before_ the `void handle(req, res, parsedUrl)` fallthrough line. Add them after the `DELETE /api/sessions/:id` block:
 
 ```typescript
 // GET /api/repos
@@ -237,10 +243,7 @@ if (req.method === "POST" && parsedUrl.pathname === "/api/repos") {
 }
 
 // PATCH /api/repos/:id
-if (
-  req.method === "PATCH" &&
-  parsedUrl.pathname?.startsWith("/api/repos/")
-) {
+if (req.method === "PATCH" && parsedUrl.pathname?.startsWith("/api/repos/")) {
   const id = parsedUrl.pathname.slice("/api/repos/".length);
   const body = await readBody(req);
   const repos = await readRepos();
@@ -253,7 +256,9 @@ if (
   if (typeof body["path"] === "string" && !existsSync(body["path"] as string)) {
     res.writeHead(400, { "Content-Type": "application/json" });
     res.end(
-      JSON.stringify({ error: `Path does not exist: ${body["path"] as string}` }),
+      JSON.stringify({
+        error: `Path does not exist: ${body["path"] as string}`,
+      }),
     );
     return;
   }
@@ -265,10 +270,7 @@ if (
 }
 
 // DELETE /api/repos/:id
-if (
-  req.method === "DELETE" &&
-  parsedUrl.pathname?.startsWith("/api/repos/")
-) {
+if (req.method === "DELETE" && parsedUrl.pathname?.startsWith("/api/repos/")) {
   const id = parsedUrl.pathname.slice("/api/repos/".length);
   const repos = await readRepos();
   const filtered = repos.filter((r) => r.id !== id);
@@ -311,6 +313,7 @@ git commit -m "feat: add repos REST endpoints to server"
 ## Task 4: Server — scope tasks by repoId and fix handover cwd
 
 **Files:**
+
 - Modify: `server.ts`
 
 **Step 1: Filter tasks by repoId in GET /api/tasks**
@@ -382,17 +385,13 @@ const cwd = repo?.path ?? process.cwd();
 
 let ptyProcess: pty.IPty;
 try {
-  ptyProcess = pty.spawn(
-    command,
-    ["--dangerously-skip-permissions"],
-    {
-      name: "xterm-color",
-      cols: 80,
-      rows: 24,
-      cwd,
-      env: process.env as Record<string, string>,
-    },
-  );
+  ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
+    name: "xterm-color",
+    cols: 80,
+    rows: 24,
+    cwd,
+    env: process.env as Record<string, string>,
+  });
 } catch (err) {
   res.writeHead(500, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: String(err) }));
@@ -419,6 +418,7 @@ git commit -m "feat: scope tasks by repoId, fix handover cwd to use repo path"
 ## Task 5: Client — `useRepos` hook
 
 **Files:**
+
 - Create: `src/hooks/useRepos.ts`
 
 **Step 1: Create the hook file**
@@ -463,8 +463,7 @@ export function useCreateRepo() {
 export function useDeleteRepo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/repos/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => fetch(`/api/repos/${id}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: REPOS_KEY }),
   });
 }
@@ -488,6 +487,7 @@ git commit -m "feat: add useRepos hook for repo CRUD"
 ## Task 6: Client — update `useTasks` and `useTasksSocket` for repoId scoping
 
 **Files:**
+
 - Modify: `src/hooks/useTasks.ts`
 - Modify: `src/hooks/useTasksSocket.ts`
 
@@ -570,8 +570,7 @@ export function useUpdateTask(repoId: string) {
 export function useDeleteTask(repoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/tasks/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => fetch(`/api/tasks/${id}`, { method: "DELETE" }),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
       const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
@@ -643,10 +642,7 @@ export function useTasksSocket() {
           } else {
             void queryClient.invalidateQueries({ queryKey: ["tasks"] });
           }
-        } else if (
-          msg.type === "repo:created" ||
-          msg.type === "repo:deleted"
-        ) {
+        } else if (msg.type === "repo:created" || msg.type === "repo:deleted") {
           void queryClient.invalidateQueries({ queryKey: ["repos"] });
         }
       } catch {
@@ -677,6 +673,7 @@ git commit -m "feat: scope useTasks and useTasksSocket by repoId"
 ## Task 7: Client — new routing structure
 
 **Files:**
+
 - Modify: `src/app/page.tsx`
 - Create: `src/app/repos/[repoId]/page.tsx`
 - Create: `src/app/repos/[repoId]/session/[sessionId]/page.tsx`
@@ -693,8 +690,7 @@ import { redirect } from "next/navigation";
 
 async function getFirstRepoId(): Promise<string | null> {
   try {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     const res = await fetch(`${baseUrl}/api/repos`, { cache: "no-store" });
     if (!res.ok) return null;
     const repos = (await res.json()) as { id: string }[];
@@ -822,6 +818,7 @@ git commit -m "feat: add /repos/[repoId] routing and new session route"
 ## Task 8: Client — update `AppShell` to accept and scope by `repoId`
 
 **Files:**
+
 - Modify: `src/app/AppShell.tsx`
 
 **Step 1: Update AppShell to take repoId and pass to hooks**
@@ -939,6 +936,7 @@ git commit -m "feat: update AppShell to accept repoId and scope all queries"
 ## Task 9: Client — update `Backlog` and `Board` for repoId
 
 **Files:**
+
 - Modify: `src/components/Board/Backlog/Backlog.tsx`
 - Modify: `src/components/Board/Board/Board.tsx` (if it calls mutations directly)
 
@@ -986,6 +984,7 @@ git commit -m "feat: pass repoId through Backlog and Board components"
 ## Task 10: Client — `RepoSwitcher` component
 
 **Files:**
+
 - Create: `src/components/Layout/Sidebar/RepoSwitcher/RepoSwitcher.tsx`
 - Create: `src/components/Layout/Sidebar/RepoSwitcher/RepoSwitcher.types.ts`
 - Create: `src/components/Layout/Sidebar/RepoSwitcher/RepoSwitcher.module.css`
@@ -1435,6 +1434,7 @@ git commit -m "feat: add RepoSwitcher and AddRepoDialog components"
 ## Task 11: Client — update `Sidebar` to include `RepoSwitcher`
 
 **Files:**
+
 - Modify: `src/components/Layout/Sidebar/Sidebar.types.ts`
 - Modify: `src/components/Layout/Sidebar/Sidebar.tsx`
 - Modify: `src/components/Layout/Sidebar/Sidebar.module.css`
@@ -1499,6 +1499,7 @@ git commit -m "feat: add RepoSwitcher to Sidebar below brand lockup"
 ## Task 12: Final wiring and smoke test
 
 **Files:**
+
 - Check: all components compile
 - Check: dev server routes work end-to-end
 
@@ -1541,17 +1542,17 @@ git commit -m "fix: resolve remaining type and lint issues for multi-repo"
 
 ## Summary
 
-| Task | What it does |
-|------|-------------|
-| 1 | Add `Repo` type, add `repoId` to `Task` |
-| 2 | Server: `repos.json` persistence + startup migration |
-| 3 | Server: repos REST endpoints (GET/POST/PATCH/DELETE) |
-| 4 | Server: task filtering by repoId, handover uses repo cwd |
-| 5 | Client: `useRepos` hook |
-| 6 | Client: `useTasks` + `useTasksSocket` scoped by repoId |
-| 7 | Client: new routing (`/repos/[repoId]`, `/repos/[repoId]/session/[id]`) |
-| 8 | Client: `AppShell` accepts `repoId` prop |
-| 9 | Client: `Backlog` + `Board` pass repoId to mutations |
-| 10 | Client: `RepoSwitcher` + `AddRepoDialog` components |
-| 11 | Client: `Sidebar` gains `RepoSwitcher` below brand lockup |
-| 12 | Final TypeScript + lint + smoke test |
+| Task | What it does                                                            |
+| ---- | ----------------------------------------------------------------------- |
+| 1    | Add `Repo` type, add `repoId` to `Task`                                 |
+| 2    | Server: `repos.json` persistence + startup migration                    |
+| 3    | Server: repos REST endpoints (GET/POST/PATCH/DELETE)                    |
+| 4    | Server: task filtering by repoId, handover uses repo cwd                |
+| 5    | Client: `useRepos` hook                                                 |
+| 6    | Client: `useTasks` + `useTasksSocket` scoped by repoId                  |
+| 7    | Client: new routing (`/repos/[repoId]`, `/repos/[repoId]/session/[id]`) |
+| 8    | Client: `AppShell` accepts `repoId` prop                                |
+| 9    | Client: `Backlog` + `Board` pass repoId to mutations                    |
+| 10   | Client: `RepoSwitcher` + `AddRepoDialog` components                     |
+| 11   | Client: `Sidebar` gains `RepoSwitcher` below brand lockup               |
+| 12   | Final TypeScript + lint + smoke test                                    |

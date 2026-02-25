@@ -1,133 +1,143 @@
 "use client";
 
-import { PaperPlaneTilt, Robot, User, X } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { PaperPlaneTilt, Robot, X } from "@phosphor-icons/react";
 
 import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
-import { LexicalEditor } from "../LexicalEditor";
-import type { SpecEditorProps } from "./SpecEditor.types";
 import styles from "./SpecEditor.module.css";
+import type { SpecEditorProps } from "./SpecEditor.types";
+import { LexicalEditor } from "../LexicalEditor";
 
-export function SpecEditor({ repoId, task, onClose }: SpecEditorProps) {
+export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
   const { mutate: updateTask } = useUpdateTask(repoId);
-  const { mutate: handoverTask, isPending: isHandingOver } = useHandoverTask(repoId);
+  const { mutate: handoverTask, isPending: isHandingOver } =
+    useHandoverTask(repoId);
 
   const [spec, setSpec] = useState(task?.spec ?? "");
-  const [isEditing, setIsEditing] = useState(!task?.spec);
+  const [title, setTitle] = useState(task?.title ?? "");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
 
-  if (!task) return null;
+  // Auto-focus the title when opening a new (untitled) task
+  useEffect(() => {
+    if (!task?.title) {
+      titleRef.current?.focus();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flush any pending debounced saves on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    };
+  }, []);
+
+  if (!task) {
+    return null;
+  }
 
   const isBacklog = task.status === "Backlog";
   const isReview = task.status === "Review";
 
-  const handleSave = () => {
-    updateTask({ id: task.id, spec });
-    setIsEditing(false);
+  const handleSpecChange = (json: string) => {
+    setSpec(json);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      updateTask({ id: task.id, spec: json });
+    }, 800);
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setTitle(val);
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(() => {
+      if (val.trim()) updateTask({ id: task.id, title: val.trim() });
+    }, 600);
   };
 
   const handleHandover = () => {
-    updateTask({ id: task.id, spec });
+    // Cancel pending debounced saves and flush immediately
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    updateTask({
+      id: task.id,
+      spec,
+      ...(title.trim() && { title: title.trim() }),
+    });
     handoverTask(task.id, { onSuccess: onClose });
   };
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.panelHeader}>
-        <div className={styles.panelTitle}>
-          <span className={styles.taskId}>{task.id}</span>
-          <h2 className={styles.taskTitle}>{task.title}</h2>
-        </div>
-        <button
-          className={styles.closeButton}
-          onClick={onClose}
-          aria-label="Close"
-        >
-          <X size={20} />
-        </button>
-      </div>
-
-      <div className={styles.content}>
-        <div className={styles.statusRow}>
-          <div className={styles.statusItem}>
-            <div className={styles.dotAgent} />
-            <span>Status: {task.status}</span>
-          </div>
-          <div className={styles.statusItem}>
-            <div className={styles.dotOrange} />
-            <span>Priority: {task.priority}</span>
-          </div>
-        </div>
-
-        <div className={styles.editorWrapper}>
-          <div className={styles.editorToolbar}>
-            <span className={styles.editorLabel}>Specification</span>
-            {isBacklog && (
-              <button
-                className={styles.editToggle}
-                onClick={() => setIsEditing((v) => !v)}
-              >
-                {isEditing ? "Preview" : "Edit"}
-              </button>
-            )}
-          </div>
-          <div className={styles.editorBody}>
-            <LexicalEditor
-              key={`${task.id}-${isEditing ? "edit" : "read"}`}
-              value={spec}
-              onChange={isEditing ? setSpec : undefined}
-              readOnly={!isEditing}
+    <div className={`${styles.panel}${inline ? ` ${styles.panelInline}` : ""}`}>
+      <div className={styles.editorArea}>
+        <div className={styles.titleRow}>
+          {isBacklog ? (
+            <input
+              ref={titleRef}
+              className={styles.pageTitleInput}
+              value={title}
+              onChange={handleTitleChange}
+              onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+              placeholder="Untitled"
             />
-          </div>
+          ) : (
+            <h1 className={styles.pageTitle}>{task.title}</h1>
+          )}
+          <button
+            className={styles.closeButton}
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
         </div>
-
-        {isReview && (
-          <div className={styles.agentNotes}>
-            <div className={styles.agentNotesTitle}>
-              <Robot size={16} />
-              <span>Agent Notes</span>
-            </div>
-            <p className={styles.agentNotesText}>
-              Implementation complete according to the spec. Please review the
-              changes in the terminal.
-            </p>
-            {task.sessionId && (
-              <a
-                href={`/repos/${repoId}/session/${task.sessionId}`}
-                className={styles.viewDiffButton}
-                style={{ textDecoration: "none", display: "inline-block" }}
-              >
-                Open Terminal
-              </a>
-            )}
-          </div>
-        )}
+        <LexicalEditor
+          key={`${task.id}-${isBacklog ? "edit" : "read"}`}
+          value={spec}
+          onChange={isBacklog ? handleSpecChange : undefined}
+          readOnly={!isBacklog}
+          placeholder="Write a specification for this task…"
+        />
       </div>
 
-      <div className={styles.footer}>
-        <div className={styles.footerMeta}>
-          <User size={16} />
-          <span>You are editing</span>
-        </div>
-        <div className={styles.footerActions}>
-          {isEditing && isBacklog && (
-            <button className={styles.saveDraftButton} onClick={handleSave}>
-              Save Draft
-            </button>
-          )}
-          {isBacklog && (
-            <button
-              className={styles.handoverButton}
-              onClick={handleHandover}
-              disabled={isHandingOver}
+      {isReview && (
+        <div className={styles.agentNotes}>
+          <div className={styles.agentNotesTitle}>
+            <Robot size={15} />
+            <span>Agent Notes</span>
+          </div>
+          <p className={styles.agentNotesText}>
+            Implementation complete. Review the changes in the terminal.
+          </p>
+          {task.sessionId && (
+            <a
+              href={`/repos/${repoId}/session/${task.sessionId}`}
+              className={styles.viewDiffButton}
+              style={{ textDecoration: "none", display: "inline-block" }}
             >
-              <PaperPlaneTilt size={16} />
-              <span>
-                {isHandingOver ? "Starting..." : "Handover to Claude"}
-              </span>
-            </button>
+              Open Terminal
+            </a>
           )}
         </div>
-      </div>
+      )}
+
+      {isBacklog && (
+        <div className={styles.footer}>
+          <button
+            className={styles.handoverButton}
+            onClick={handleHandover}
+            disabled={isHandingOver}
+          >
+            <PaperPlaneTilt size={15} />
+            <span>{isHandingOver ? "Starting…" : "Handover to Claude"}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

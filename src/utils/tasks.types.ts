@@ -19,8 +19,9 @@ export interface Task {
   updatedAt: string; // ISO timestamp
 }
 
-export type CreateTaskInput = Pick<Task, "title" | "priority" | "repoId"> & {
+export type CreateTaskInput = Pick<Task, "title" | "repoId"> & {
   status?: TaskStatus;
+  priority?: Priority;
 };
 export type UpdateTaskInput = Partial<
   Pick<Task, "title" | "status" | "priority" | "spec" | "sessionId">

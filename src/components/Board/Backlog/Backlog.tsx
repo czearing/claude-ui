@@ -1,94 +1,134 @@
 "use client";
 
-import { Plus } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import {
+  DotsThree,
+  FileText,
+  MagnifyingGlass,
+  Plus,
+  Sparkle,
+} from "@phosphor-icons/react";
 
-import { useCreateTask, useDeleteTask, useTasks } from "@/hooks/useTasks";
+import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
+import { formatRelativeDate } from "@/utils/formatRelativeDate";
 import type { Task } from "@/utils/tasks.types";
-import { TaskCard } from "../TaskCard";
 import styles from "./Backlog.module.css";
 
 interface BacklogProps {
   repoId: string;
   onSelectTask: (task: Task) => void;
-  focusCreate?: boolean;
-  onFocused?: () => void;
+  onNewTask: () => void;
+  selectedTaskId?: string;
 }
 
 export function Backlog({
   repoId,
   onSelectTask,
-  focusCreate,
-  onFocused,
+  onNewTask,
+  selectedTaskId,
 }: BacklogProps) {
   useTasksSocket();
 
   const { data: allTasks = [] } = useTasks(repoId);
-  const { mutate: createTask } = useCreateTask(repoId);
   const { mutate: deleteTask } = useDeleteTask(repoId);
+  const { mutate: handoverTask } = useHandoverTask(repoId);
+
   const backlogTasks = allTasks.filter((t) => t.status === "Backlog");
 
-  const [draftTitle, setDraftTitle] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    if (focusCreate) {
-      inputRef.current?.focus();
-      onFocused?.();
-    }
-  }, [focusCreate, onFocused]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!draftTitle.trim()) return;
-    createTask({
-      title: draftTitle.trim(),
-      priority: "Medium",
-      status: "Backlog",
-    });
-    setDraftTitle("");
-  };
+  const filteredTasks = search.trim()
+    ? backlogTasks.filter((t) =>
+        t.title.toLowerCase().includes(search.toLowerCase()),
+      )
+    : backlogTasks;
 
   return (
     <div className={styles.backlog}>
       <div className={styles.inner}>
         <div className={styles.headerRow}>
-          <h1 className={styles.heading}>Backlog</h1>
+          <div>
+            <h1 className={styles.heading}>Backlog</h1>
+            <p className={styles.subheading}>Manage your issues and tasks</p>
+          </div>
+          <button className={styles.newButton} onClick={onNewTask}>
+            <Plus size={16} />
+            New Task
+          </button>
+        </div>
+
+        <div className={styles.searchRow}>
+          <div className={styles.searchWrap}>
+            <MagnifyingGlass
+              size={16}
+              className={styles.searchIcon}
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search issues..."
+              className={styles.searchInput}
+            />
+          </div>
           <span className={styles.count}>{backlogTasks.length} issues</span>
         </div>
 
-        <form onSubmit={handleSubmit} className={styles.createForm}>
-          <Plus size={20} color="var(--color-text-muted)" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={draftTitle}
-            onChange={(e) => setDraftTitle(e.target.value)}
-            placeholder="Create a new draft..."
-            className={styles.createInput}
-          />
-          <button
-            type="submit"
-            disabled={!draftTitle.trim()}
-            className={styles.addButton}
-          >
-            Add
-          </button>
-        </form>
-
         <div className={styles.list}>
-          {backlogTasks.map((task) => (
-            <TaskCard
+          {filteredTasks.map((task) => (
+            <div
               key={task.id}
-              task={task}
-              onSelect={onSelectTask}
-              onRemove={deleteTask}
-            />
+              className={`${styles.row} ${task.id === selectedTaskId ? styles.rowSelected : ""}`}
+              onClick={() => onSelectTask(task)}
+            >
+              <div className={styles.rowLeft}>
+                <div className={styles.docIcon}>
+                  <FileText size={16} />
+                </div>
+                <div className={styles.rowContent}>
+                  <span className={styles.rowTitle}>{task.title}</span>
+                  <span className={styles.rowDate}>
+                    {formatRelativeDate(task.createdAt)}
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.rowActions}>
+                <button
+                  className={styles.agentButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handoverTask(task.id);
+                  }}
+                  aria-label={`Send ${task.title} to agent`}
+                >
+                  <Sparkle size={14} aria-hidden="true" />
+                  Send to Agent
+                </button>
+                <button
+                  className={styles.moreButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteTask(task.id);
+                  }}
+                  aria-label={`Delete ${task.title}`}
+                >
+                  <DotsThree size={16} weight="bold" />
+                </button>
+              </div>
+            </div>
           ))}
-          {backlogTasks.length === 0 && (
+
+          {filteredTasks.length === 0 && (
             <div className={styles.emptyState}>
-              No issues in the backlog. Create a draft above to get started.
+              <FileText size={32} className={styles.emptyIcon} />
+              <p>
+                {search.trim()
+                  ? "No issues match your search."
+                  : "No issues in the backlog. Create a new task to get started."}
+              </p>
             </div>
           )}
         </div>

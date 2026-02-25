@@ -7,7 +7,9 @@ const REPOS_KEY = ["repos"] as const;
 
 async function fetchRepos(): Promise<Repo[]> {
   const res = await fetch("/api/repos");
-  if (!res.ok) {throw new Error("Failed to fetch repos");}
+  if (!res.ok) {
+    throw new Error("Failed to fetch repos");
+  }
   return res.json() as Promise<Repo[]>;
 }
 

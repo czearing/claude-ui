@@ -8,7 +8,7 @@ import { Board } from "@/components/Board/Board";
 import { SpecEditor } from "@/components/Editor/SpecEditor";
 import { Sidebar, type View } from "@/components/Layout/Sidebar";
 import { TopBar } from "@/components/Layout/TopBar";
-import { useHandoverTask, useTasks } from "@/hooks/useTasks";
+import { useCreateTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./AppShell.module.css";
@@ -51,6 +51,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const router = useRouter();
   const handoverTask = useHandoverTask(repoId);
+  const { mutate: createTask } = useCreateTask(repoId);
 
   useTasksSocket();
 
@@ -62,7 +63,10 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
   const agentActive = tasks.some((t) => t.status === "In Progress");
 
   function handleNewTask() {
-    router.push(`/repos/${repoId}/backlog`);
+    createTask(
+      { title: "", priority: "Medium", status: "Backlog" },
+      { onSuccess: (task) => handleSelectTask(task) },
+    );
   }
 
   function handleHandover(taskId: string) {
@@ -127,7 +131,11 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
       />
 
       <main className={styles.main}>
-        <TopBar repoId={repoId} currentView={currentView} onNewTask={handleNewTask} />
+        <TopBar
+          repoId={repoId}
+          currentView={currentView}
+          onNewTask={handleNewTask}
+        />
 
         <div ref={contentRef} className={styles.content}>
           <div
@@ -146,6 +154,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
               <Backlog
                 repoId={repoId}
                 onSelectTask={handleSelectTask}
+                onNewTask={handleNewTask}
                 selectedTaskId={selectedTask?.id}
               />
             )}

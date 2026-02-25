@@ -6,9 +6,9 @@ import {
 import clsx from "clsx";
 
 import type { TaskStatus } from "@/utils/tasks.types";
-import { TaskCard } from "../TaskCard";
-import type { ColumnProps } from "./Column.types";
 import styles from "./Column.module.css";
+import type { ColumnProps } from "./Column.types";
+import { TaskCard } from "../TaskCard";
 
 const DOT_CLASS: Record<TaskStatus, string> = {
   Backlog: styles.dotGray,
@@ -23,7 +23,7 @@ export function Column({
   tasks,
   onSelectTask,
   onRemoveTask,
-  onHandover,
+  onHandover: _onHandover,
 }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 

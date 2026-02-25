@@ -7,7 +7,6 @@ import Link from "next/link";
 import { TerminalPage } from "@/app/TerminalPage";
 import { StatusIndicator } from "@/components";
 import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
-
 import styles from "./SessionPage.module.css";
 
 type SessionPageProps = {

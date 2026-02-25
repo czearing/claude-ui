@@ -14,7 +14,9 @@ export function NewIssueModal({ repoId, open, onClose }: NewIssueModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {return;}
+    if (!title.trim()) {
+      return;
+    }
     createTask(
       { title: title.trim(), status: "Backlog" },
       {
