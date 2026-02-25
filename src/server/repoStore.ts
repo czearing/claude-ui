@@ -1,9 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export type { Repo };
-
-interface Repo {
+export interface Repo {
   id: string;
   name: string;
   path: string;
@@ -16,8 +14,9 @@ export async function readRepos(): Promise<Repo[]> {
   try {
     const raw = await readFile(REPOS_FILE, "utf8");
     return JSON.parse(raw) as Repo[];
-  } catch {
-    return [];
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
   }
 }
 
