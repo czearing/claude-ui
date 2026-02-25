@@ -142,10 +142,7 @@ async function ensureSpecsDir(repoId: string): Promise<void> {
 
 async function readTask(id: string, repoId: string): Promise<Task | null> {
   try {
-    const raw = await readFile(
-      join(repoSpecsDir(repoId), `${id}.md`),
-      "utf8",
-    );
+    const raw = await readFile(join(repoSpecsDir(repoId), `${id}.md`), "utf8");
     return parseTaskFile(raw);
   } catch {
     return null;
@@ -363,11 +360,10 @@ app
 
         // GET /api/tasks
         if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
-          const tasks = await readTasks();
           const repoId = parsedUrl.query["repoId"] as string | undefined;
           const result = repoId
-            ? tasks.filter((t) => t.repoId === repoId)
-            : tasks;
+            ? await readTasksForRepo(repoId)
+            : await readAllTasks();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(result));
           return;
@@ -376,10 +372,9 @@ app
         // POST /api/tasks
         if (req.method === "POST" && parsedUrl.pathname === "/api/tasks") {
           const body = await readBody(req);
-          const tasks = await readTasks();
           const now = new Date().toISOString();
           const task: Task = {
-            id: generateTaskId(tasks),
+            id: await getNextTaskId(),
             title: typeof body["title"] === "string" ? body["title"] : "",
             status: (body["status"] as TaskStatus) ?? "Backlog",
             priority: (body["priority"] as Priority) ?? "Medium",
@@ -389,8 +384,7 @@ app
             createdAt: now,
             updatedAt: now,
           };
-          tasks.push(task);
-          await writeTasks(tasks);
+          await writeTask(task);
           broadcastTaskEvent("task:created", task);
           res.writeHead(201, { "Content-Type": "application/json" });
           res.end(JSON.stringify(task));
@@ -405,23 +399,25 @@ app
         ) {
           const id = parsedUrl.pathname.slice("/api/tasks/".length);
           const body = await readBody(req);
-          const tasks = await readTasks();
-          const idx = tasks.findIndex((t) => t.id === id);
-          if (idx === -1) {
+          const existing = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (!existing) {
             res.writeHead(404);
             res.end();
             return;
           }
-          tasks[idx] = {
-            ...tasks[idx],
+          const updated: Task = {
+            ...existing,
             ...body,
             id,
+            repoId: existing.repoId,
             updatedAt: new Date().toISOString(),
           } as Task;
-          await writeTasks(tasks);
-          broadcastTaskEvent("task:updated", tasks[idx]);
+          await writeTask(updated);
+          broadcastTaskEvent("task:updated", updated);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(tasks[idx]));
+          res.end(JSON.stringify(updated));
           return;
         }
 
@@ -431,10 +427,12 @@ app
           parsedUrl.pathname?.startsWith("/api/tasks/")
         ) {
           const id = parsedUrl.pathname.slice("/api/tasks/".length);
-          const tasks = await readTasks();
-          const taskToDelete = tasks.find((t) => t.id === id);
-          const filtered = tasks.filter((t) => t.id !== id);
-          await writeTasks(filtered);
+          const taskToDelete = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (taskToDelete) {
+            await deleteTaskFile(id, taskToDelete.repoId);
+          }
           broadcastTaskEvent("task:deleted", {
             id,
             repoId: taskToDelete?.repoId,
@@ -454,22 +452,22 @@ app
             "/api/tasks/".length,
             -"/recall".length,
           );
-          const tasks = await readTasks();
-          const idx = tasks.findIndex((t) => t.id === id);
-          if (idx === -1) {
+          const existing = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (!existing) {
             res.writeHead(404);
             res.end();
             return;
           }
-          const oldSessionId = tasks[idx].sessionId;
+          const oldSessionId = existing.sessionId;
           const updatedTask: Task = {
-            ...tasks[idx],
+            ...existing,
             status: "Backlog",
             updatedAt: new Date().toISOString(),
           };
           delete updatedTask.sessionId;
-          tasks[idx] = updatedTask;
-          await writeTasks(tasks);
+          await writeTask(updatedTask);
           broadcastTaskEvent("task:updated", updatedTask);
           if (oldSessionId) {
             const entry = sessions.get(oldSessionId);
@@ -496,14 +494,14 @@ app
             "/api/tasks/".length,
             -"/handover".length,
           );
-          const tasks = await readTasks();
-          const idx = tasks.findIndex((t) => t.id === id);
-          if (idx === -1) {
+          const task = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (!task) {
             res.writeHead(404);
             res.end();
             return;
           }
-          const task = tasks[idx];
           const sessionId = randomUUID();
           const specText = extractTextFromLexical(task.spec);
 
@@ -584,34 +582,32 @@ app
             sessions.delete(sessionId);
 
             // Auto-advance to Review
-            void readTasks().then((current) => {
-              const taskIdx = current.findIndex(
-                (t) => t.sessionId === sessionId,
-              );
-              if (taskIdx !== -1 && current[taskIdx].status === "In Progress") {
-                current[taskIdx] = {
-                  ...current[taskIdx],
+            void readAllTasks().then((current) => {
+              const task = current.find((t) => t.sessionId === sessionId);
+              if (task && task.status === "In Progress") {
+                const updated: Task = {
+                  ...task,
                   status: "Review",
                   updatedAt: new Date().toISOString(),
                 };
-                void writeTasks(current).then(() =>
-                  broadcastTaskEvent("task:updated", current[taskIdx]),
+                void writeTask(updated).then(() =>
+                  broadcastTaskEvent("task:updated", updated),
                 );
               }
             });
           });
 
-          tasks[idx] = {
+          const inProgressTask: Task = {
             ...task,
             sessionId,
             status: "In Progress",
             updatedAt: new Date().toISOString(),
           };
-          await writeTasks(tasks);
-          broadcastTaskEvent("task:updated", tasks[idx]);
+          await writeTask(inProgressTask);
+          broadcastTaskEvent("task:updated", inProgressTask);
 
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(tasks[idx]));
+          res.end(JSON.stringify(inProgressTask));
           return;
         }
 
