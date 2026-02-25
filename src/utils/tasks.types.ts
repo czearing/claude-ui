@@ -5,24 +5,33 @@ export type TaskStatus =
   | "In Progress"
   | "Review"
   | "Done";
-export type TaskType = "Spec" | "Develop";
 export type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 export interface Task {
   id: string;
   title: string;
-  type: TaskType;
   status: TaskStatus;
   priority: Priority;
   spec: string; // Lexical editor state JSON
+  repoId: string; // which repo this task belongs to
   sessionId?: string; // linked Claude PTY session
   createdAt: string; // ISO timestamp
   updatedAt: string; // ISO timestamp
 }
 
-export type CreateTaskInput = Pick<Task, "title" | "type" | "priority"> & {
+export type CreateTaskInput = Pick<Task, "title" | "priority" | "repoId"> & {
   status?: TaskStatus;
 };
 export type UpdateTaskInput = Partial<
-  Pick<Task, "title" | "type" | "status" | "priority" | "spec" | "sessionId">
+  Pick<Task, "title" | "status" | "priority" | "spec" | "sessionId">
 >;
+
+export interface Repo {
+  id: string; // stable UUID
+  name: string; // user-defined display name
+  path: string; // absolute path on disk
+  createdAt: string; // ISO 8601
+}
+
+export type CreateRepoInput = Pick<Repo, "name" | "path">;
+export type UpdateRepoInput = Partial<Pick<Repo, "name" | "path">>;
