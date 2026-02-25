@@ -742,8 +742,24 @@ app
                 ? undefined // clear when restoring
                 : existing.archivedAt, // unchanged
           } as Task;
+          if (becomingDone) {
+            delete updated.sessionId;
+          }
           await writeTask(updated);
           broadcastTaskEvent("task:updated", updated);
+          if (becomingDone && existing.sessionId) {
+            const entry = sessions.get(existing.sessionId);
+            if (entry) {
+              if (entry.idleTimer !== null) {
+                clearTimeout(entry.idleTimer);
+              }
+              entry.activeWs = null;
+              entry.pty.kill();
+              sessions.delete(existing.sessionId);
+            }
+            sessionRegistry.delete(existing.sessionId);
+            void saveSessionRegistry();
+          }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(updated));
           return;
@@ -922,12 +938,15 @@ app
               }
             }
 
-            // Only the thinking spinner counts as meaningful activity — not
-            // "typing", which also matches startup splash text and ❯ hint text.
+            // thinking spinner OR ⎿ prefix (tool results, "Interrupted" message,
+            // etc.) = Claude Code is actively working. "⎿" never appears in the
+            // startup splash so it's safe to use as a meaningful-activity signal
+            // even when no spinner was detected (e.g. the task was interrupted
+            // before thinking started).
             if (
               e.handoverPhase === "spec_sent" &&
               !e.hadMeaningfulActivity &&
-              parsed === "thinking" &&
+              (parsed === "thinking" || data.includes("⎿")) &&
               Date.now() - e.specSentAt > SPEC_ECHO_WINDOW_MS
             ) {
               e.hadMeaningfulActivity = true;
@@ -1511,6 +1530,9 @@ app
             createdAt: new Date().toISOString(),
           });
           void saveSessionRegistry();
+        } else {
+          // Notify the client that --continue was used to resume the conversation
+          ws.send(JSON.stringify({ type: "resumed" }));
         }
 
         entry = {
@@ -1544,6 +1566,23 @@ app
               e.currentStatus = parsed;
               emitStatus(e.activeWs, parsed);
             }
+          }
+
+          // Track meaningful activity: thinking spinner or ⎿ prefix (tool
+          // results, "Interrupted" message). Recalled sessions also need this
+          // so the ❯ fast-path below can fire for In-Progress tasks.
+          if (
+            !e.hadMeaningfulActivity &&
+            (parsed === "thinking" || data.includes("⎿"))
+          ) {
+            e.hadMeaningfulActivity = true;
+          }
+
+          // Fast path for recalled sessions: ❯ prompt + meaningful activity
+          // means the task needs user attention — advance to Review if it is
+          // still "In Progress". advanceToReview checks status before moving.
+          if (parsed === "waiting" && e.hadMeaningfulActivity) {
+            void advanceToReview(sessionId);
           }
 
           scheduleIdleStatus(e, sessionId);
