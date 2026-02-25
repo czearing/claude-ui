@@ -1,6 +1,13 @@
 "use client";
 
-import { Archive, BookOpen, CheckSquare, Gear, SquaresFour } from "@phosphor-icons/react";
+import {
+  Archive,
+  BookOpen,
+  CheckSquare,
+  Gear,
+  Robot,
+  SquaresFour,
+} from "@phosphor-icons/react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 
@@ -49,10 +56,16 @@ const NAV_VIEWS: {
     icon: <CheckSquare size={16} />,
   },
   {
-    view: "Playbooks",
-    path: "playbooks",
-    label: "Playbooks",
+    view: "Skills",
+    path: "skills",
+    label: "Skills",
     icon: <BookOpen size={16} />,
+  },
+  {
+    view: "Agents",
+    path: "agents",
+    label: "Agents",
+    icon: <Robot size={16} />,
   },
 ];
 
@@ -78,15 +91,15 @@ export function Sidebar({
             onClick={() => repoId && router.push(`/repos/${repoId}/${path}`)}
           />
         ))}
+      </nav>
+
+      <div className={styles.footer}>
         <NavItem
           icon={<Archive size={16} />}
           label="Archives"
           active={currentView === "Archive"}
           onClick={() => router.push(`/repos/${repoId}/archive`)}
         />
-      </nav>
-
-      <div className={styles.footer}>
         <div className={styles.agentStatus}>
           <span className={styles.agentLabel}>Agent Status</span>
           <div className={styles.agentIndicator}>

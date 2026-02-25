@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PaperPlaneTilt, Robot, X } from "@phosphor-icons/react";
 
 import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import styles from "./SpecEditor.module.css";
 import type { SpecEditorProps } from "./SpecEditor.types";
 import { LexicalEditor } from "../LexicalEditor";
@@ -16,9 +17,17 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
 
   const [spec, setSpec] = useState(task?.spec ?? "");
   const [title, setTitle] = useState(task?.title ?? "");
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const [scheduleSpecSave, cancelSpecSave] = useDebouncedCallback(
+    (json: string) => updateTask({ id: task?.id ?? "", spec: json }),
+    300,
+  );
+  const [scheduleTitleSave, cancelTitleSave] = useDebouncedCallback(
+    (val: string) => {
+      if (val.trim()) updateTask({ id: task?.id ?? "", title: val.trim() });
+    },
+    600,
+  );
 
   // Auto-focus the title when opening a new (untitled) task
   useEffect(() => {
@@ -26,14 +35,6 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
       titleRef.current?.focus();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Flush any pending debounced saves on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-    };
-  }, []);
 
   if (!task) {
     return null;
@@ -44,27 +45,19 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
 
   const handleSpecChange = (json: string) => {
     setSpec(json);
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    saveTimerRef.current = setTimeout(() => {
-      updateTask({ id: task.id, spec: json });
-    }, 300);
+    scheduleSpecSave(json);
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setTitle(val);
-    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-    titleTimerRef.current = setTimeout(() => {
-      if (val.trim()) updateTask({ id: task.id, title: val.trim() });
-    }, 600);
+    scheduleTitleSave(val);
   };
 
   const handleHandover = async () => {
     // flush immediately, awaiting the PATCH so handover POST reads latest spec
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    cancelSpecSave();
+    cancelTitleSave();
     try {
       await updateTaskAsync({
         id: task.id,

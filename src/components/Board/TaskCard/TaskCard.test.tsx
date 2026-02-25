@@ -174,8 +174,106 @@ describe("TaskCard", () => {
     expect(screen.getByText("Agent Processing...")).toBeInTheDocument();
   });
 
-  it("shows the Terminal link when a sessionId is present", () => {
-    render(<TaskCard task={inProgressTask} onSelect={jest.fn()} />);
-    expect(screen.getByRole("link", { name: /terminal/i })).toBeInTheDocument();
+  it("applies selected styling when the selected prop is true", () => {
+    render(
+      <TaskCard task={notStartedTask} onSelect={jest.fn()} selected={true} />,
+    );
+    // identity-obj-proxy returns the class key as the string value
+    const card = screen
+      .getByText("Fix the bug")
+      .closest('[class*="card"]') as HTMLElement;
+    expect(card).toHaveClass("cardSelected");
+  });
+});
+
+describe("TaskCard keyboard accessibility", () => {
+  it("Task actions button has an accessible label", () => {
+    render(
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Task actions" }),
+    ).toBeInTheDocument();
+  });
+
+  it("menu opens when Enter is pressed on the focused trigger", async () => {
+    render(
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Task actions" });
+    trigger.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+  });
+
+  it("menu opens when Space is pressed on the focused trigger", async () => {
+    render(
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Task actions" });
+    trigger.focus();
+    await userEvent.keyboard(" ");
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+  });
+
+  it("Escape key closes an open dropdown", async () => {
+    render(
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
+    await screen.findByRole("menu");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("ArrowDown key moves focus through menu items", async () => {
+    render(
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
+    const items = await screen.findAllByRole("menuitem");
+    // Radix focuses the menu container on open; first ArrowDown moves to item[0]
+    await userEvent.keyboard("{ArrowDown}");
+    expect(items[0]).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(items[1]).toHaveFocus();
+  });
+
+  it("menu item can be activated with Enter after keyboard navigation", async () => {
+    const onRemove = jest.fn();
+    render(
+      <TaskCard
+        task={notStartedTask}
+        onSelect={jest.fn()}
+        onRemove={onRemove}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Task actions" }));
+    await screen.findByRole("menu");
+    // menu container focused → ArrowDown → View prompt → ArrowDown → Delete → Enter
+    await userEvent.keyboard("{ArrowDown}");
+    await userEvent.keyboard("{ArrowDown}");
+    await userEvent.keyboard("{Enter}");
+    expect(onRemove).toHaveBeenCalledWith("task-1");
   });
 });

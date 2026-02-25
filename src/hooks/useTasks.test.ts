@@ -6,6 +6,8 @@ import React from "react";
 import {
   useCreateTask,
   useDeleteTask,
+  useHandoverTask,
+  useRecallTask,
   useTasks,
   useUpdateTask,
 } from "./useTasks";
@@ -201,6 +203,92 @@ describe("useDeleteTask", () => {
     expect(queryClient.getQueryData<Task[]>(["tasks", REPO_ID])).toEqual([
       mockTask,
     ]);
+    expect(result.current.isError).toBe(true);
+  });
+});
+
+describe("useHandoverTask", () => {
+  it("POSTs to /api/tasks/:id/handover", async () => {
+    const handedOverTask: Task = { ...mockTask, status: "In Progress" };
+    mockFetch.mockResolvedValue(okJson(handedOverTask));
+    const { wrapper } = makeWrapper();
+    const { result } = renderHook(() => useHandoverTask(REPO_ID), { wrapper });
+
+    act(() => {
+      result.current.mutate("task-1");
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/tasks/task-1/handover");
+    expect(opts.method).toBe("POST");
+  });
+});
+
+describe("useRecallTask", () => {
+  it("optimistically sets task status to Backlog before request resolves", async () => {
+    const inProgressTask: Task = {
+      ...mockTask,
+      status: "In Progress",
+      sessionId: "session-abc",
+    };
+    const { wrapper, queryClient } = makeWrapper();
+    queryClient.setQueryData(["tasks", REPO_ID], [inProgressTask]);
+
+    let resolveFetch!: (v: unknown) => void;
+    const pendingFetch = new Promise((res) => {
+      resolveFetch = res;
+    });
+    mockFetch.mockReturnValue(pendingFetch);
+
+    const { result } = renderHook(() => useRecallTask(REPO_ID), { wrapper });
+
+    act(() => {
+      result.current.mutate("task-1");
+    });
+
+    // Before the fetch resolves, the cache should optimistically show Backlog
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<Task[]>(["tasks", REPO_ID]);
+      return cached?.[0]?.status === "Backlog";
+    });
+
+    const cached = queryClient.getQueryData<Task[]>(["tasks", REPO_ID]);
+    expect(cached?.[0]?.sessionId).toBeUndefined();
+
+    resolveFetch({
+      ok: true,
+      json: () => Promise.resolve({ ...inProgressTask, status: "Backlog" }),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
+  it("rolls back optimistic recall when request fails", async () => {
+    const inProgressTask: Task = {
+      ...mockTask,
+      status: "In Progress",
+      sessionId: "session-abc",
+    };
+    const { wrapper, queryClient } = makeWrapper();
+    queryClient.setQueryData(["tasks", REPO_ID], [inProgressTask]);
+
+    mockFetch.mockRejectedValue(new Error("Network error"));
+
+    const { result } = renderHook(() => useRecallTask(REPO_ID), { wrapper });
+
+    act(() => {
+      result.current.mutate("task-1");
+    });
+
+    // Wait for rollback — original In Progress status should be restored
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<Task[]>(["tasks", REPO_ID]);
+      return cached?.[0]?.status === "In Progress";
+    });
+
+    const cached = queryClient.getQueryData<Task[]>(["tasks", REPO_ID]);
+    expect(cached?.[0]?.sessionId).toBe("session-abc");
     expect(result.current.isError).toBe(true);
   });
 });

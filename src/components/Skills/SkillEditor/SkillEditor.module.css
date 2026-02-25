@@ -1,4 +1,4 @@
-/* src/components/Settings/CategoryEditor/CategoryEditor.module.css */
+/* src/components/Playbooks/PlaybookEditor/PlaybookEditor.module.css */
 
 .editor {
   display: flex;
@@ -58,6 +58,34 @@
 .deleteButton:hover {
   color: var(--color-danger);
   background-color: var(--color-danger-bg);
+}
+
+.descriptionRow {
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.descriptionInput {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  outline: none;
+  transition: background-color 150ms;
+}
+
+.descriptionInput:hover {
+  background-color: var(--color-surface);
+}
+
+.descriptionInput:focus {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px var(--color-border);
 }
 
 .editorBody {

@@ -5,7 +5,6 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowCounterClockwise,
-  ArrowRight,
   DotsThree,
   Eye,
   FileText,
@@ -138,19 +137,6 @@ export function TaskCard({
         </div>
       )}
 
-      <div className={styles.footer}>
-        <div className={styles.meta} />
-        {task.sessionId && (
-          <a
-            href={`/repos/${task.repoId}/session/${task.sessionId}`}
-            className={styles.sessionLink}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span>Terminal</span>
-            <ArrowRight size={10} />
-          </a>
-        )}
-      </div>
     </div>
   );
 }

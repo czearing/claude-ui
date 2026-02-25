@@ -6,7 +6,7 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCorners,
+  pointerWithin,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -69,7 +69,7 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
     <div className={styles.board}>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={pointerWithin}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >

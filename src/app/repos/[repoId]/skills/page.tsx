@@ -1,4 +1,4 @@
-import { PlaybooksPage } from "./PlaybooksPage";
+import { SkillsPage } from "./SkillsPage";
 
 export default async function Page({
   params,
@@ -6,5 +6,5 @@ export default async function Page({
   params: Promise<{ repoId: string }>;
 }) {
   const { repoId } = await params;
-  return <PlaybooksPage repoId={repoId} />;
+  return <SkillsPage repoId={repoId} />;
 }

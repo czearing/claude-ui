@@ -14,7 +14,11 @@ async function fetchRepos(): Promise<Repo[]> {
 }
 
 export function useRepos() {
-  return useQuery({ queryKey: REPOS_KEY, queryFn: fetchRepos });
+  return useQuery({
+    queryKey: REPOS_KEY,
+    queryFn: fetchRepos,
+    staleTime: Infinity, // WebSocket keeps repos fresh via invalidation
+  });
 }
 
 export function useCreateRepo() {
@@ -39,7 +43,10 @@ export function useCreateRepo() {
 export function useDeleteRepo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => fetch(`/api/repos/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/repos/${id}`, { method: "DELETE" });
+      if (!r.ok && r.status !== 404) throw new Error("Failed to delete repo");
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: REPOS_KEY }),
   });
 }

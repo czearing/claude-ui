@@ -9,6 +9,7 @@ import {
   readdir,
   readFile,
   rename,
+  rm,
   stat,
   unlink,
   writeFile,
@@ -152,35 +153,176 @@ function serializeTaskFile(task: Task): string {
 
 const SKILL_NAME_RE = /^[a-z0-9-]{1,64}$/;
 
-function skillsDir(): string {
+type Skill = { name: string; description: string; content: string };
+
+function globalSkillsDir(): string {
   return join(homedir(), ".claude", "skills");
 }
 
-async function ensureSkillsDir(): Promise<void> {
-  await mkdir(skillsDir(), { recursive: true });
+function skillFile(dir: string, name: string): string {
+  return join(dir, name, "SKILL.md");
 }
 
-async function listSkillNames(): Promise<string[]> {
-  await ensureSkillsDir();
-  const files = await readdir(skillsDir());
-  return files.filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3));
+async function ensureSkillsDir(dir: string): Promise<void> {
+  await mkdir(dir, { recursive: true });
 }
 
-async function readSkillContent(name: string): Promise<string | null> {
+async function resolveSkillsDir(
+  scope: string,
+  repoId: string | null,
+): Promise<string> {
+  if (scope === "repo" && repoId) {
+    const repos = await readRepos();
+    const repo = repos.find((r) => r.id === repoId);
+    if (!repo) throw new Error("Repo not found");
+    return join(repo.path, ".claude", "skills");
+  }
+  return globalSkillsDir();
+}
+
+function parseSkillFile(raw: string, name: string): Skill {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!m) return { name, description: "", content: raw.trim() };
+  const front = m[1];
+  const body = m[2].trim();
+  const descMatch = front.match(/^description:\s*(.+)$/m);
+  return {
+    name,
+    description: descMatch ? descMatch[1].trim() : "",
+    content: body,
+  };
+}
+
+function serializeSkillFile(skill: Skill): string {
+  return `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n\n${skill.content}`;
+}
+
+async function listSkills(
+  dir: string,
+): Promise<{ name: string; description: string }[]> {
+  await ensureSkillsDir(dir);
+  const entries = await readdir(dir, { withFileTypes: true });
+  const results: { name: string; description: string }[] = [];
+  await Promise.all(
+    entries
+      .filter((e) => e.isDirectory())
+      .map(async (e) => {
+        try {
+          const raw = await readFile(join(dir, e.name, "SKILL.md"), "utf8");
+          const parsed = parseSkillFile(raw, e.name);
+          results.push({ name: parsed.name || e.name, description: parsed.description });
+        } catch {
+          // directory exists but no SKILL.md — skip
+        }
+      }),
+  );
+  return results.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function readSkill(dir: string, name: string): Promise<Skill | null> {
   try {
-    return await readFile(join(skillsDir(), `${name}.md`), "utf8");
+    const raw = await readFile(skillFile(dir, name), "utf8");
+    return parseSkillFile(raw, name);
   } catch {
     return null;
   }
 }
 
-async function writeSkillContent(name: string, content: string): Promise<void> {
-  await ensureSkillsDir();
-  await writeFile(join(skillsDir(), `${name}.md`), content, "utf8");
+async function writeSkill(dir: string, skill: Skill): Promise<void> {
+  await mkdir(join(dir, skill.name), { recursive: true });
+  await writeFile(skillFile(dir, skill.name), serializeSkillFile(skill), "utf8");
 }
 
-async function deleteSkillContent(name: string): Promise<void> {
-  await unlink(join(skillsDir(), `${name}.md`));
+async function deleteSkill(dir: string, name: string): Promise<void> {
+  await rm(join(dir, name), { recursive: true, force: true });
+}
+
+// ─── Agents ─────────────────────────────────────────────────────────────────
+
+const AGENT_NAME_RE = /^[a-z0-9-]{1,64}$/;
+
+type Agent = { name: string; description: string; content: string };
+
+function globalAgentsDir(): string {
+  return join(homedir(), ".claude", "agents");
+}
+
+function agentFile(dir: string, name: string): string {
+  return join(dir, name, "AGENT.md");
+}
+
+async function ensureAgentsDir(dir: string): Promise<void> {
+  await mkdir(dir, { recursive: true });
+}
+
+async function resolveAgentsDir(
+  scope: string,
+  repoId: string | null,
+): Promise<string> {
+  if (scope === "repo" && repoId) {
+    const repos = await readRepos();
+    const repo = repos.find((r) => r.id === repoId);
+    if (!repo) throw new Error("Repo not found");
+    return join(repo.path, ".claude", "agents");
+  }
+  return globalAgentsDir();
+}
+
+function parseAgentFile(raw: string, name: string): Agent {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!m) return { name, description: "", content: raw.trim() };
+  const front = m[1];
+  const body = m[2].trim();
+  const descMatch = front.match(/^description:\s*(.+)$/m);
+  return {
+    name,
+    description: descMatch ? descMatch[1].trim() : "",
+    content: body,
+  };
+}
+
+function serializeAgentFile(agent: Agent): string {
+  return `---\nname: ${agent.name}\ndescription: ${agent.description}\n---\n\n${agent.content}`;
+}
+
+async function listAgents(
+  dir: string,
+): Promise<{ name: string; description: string }[]> {
+  await ensureAgentsDir(dir);
+  const entries = await readdir(dir, { withFileTypes: true });
+  const results: { name: string; description: string }[] = [];
+  await Promise.all(
+    entries
+      .filter((e) => e.isDirectory())
+      .map(async (e) => {
+        try {
+          const raw = await readFile(join(dir, e.name, "AGENT.md"), "utf8");
+          const parsed = parseAgentFile(raw, e.name);
+          results.push({ name: parsed.name || e.name, description: parsed.description });
+        } catch {
+          // directory exists but no AGENT.md — skip
+        }
+      }),
+  );
+  return results.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function readAgent(dir: string, name: string): Promise<Agent | null> {
+  try {
+    const raw = await readFile(agentFile(dir, name), "utf8");
+    return parseAgentFile(raw, name);
+  } catch {
+    return null;
+  }
+}
+
+async function writeAgent(dir: string, agent: Agent): Promise<void> {
+  await mkdir(join(dir, agent.name), { recursive: true });
+  await writeFile(agentFile(dir, agent.name), serializeAgentFile(agent), "utf8");
+}
+
+async function deleteAgent(dir: string, name: string): Promise<void> {
+  await rm(join(dir, name), { recursive: true, force: true });
 }
 
 function repoSpecsDir(repoId: string): string {
@@ -619,9 +761,24 @@ app
             return;
           }
           const sessionId = randomUUID();
-          // Flatten newlines to spaces so the entire spec is submitted as a
-          // single PTY line when injected into Claude's interactive REPL.
-          const specText = task.spec.replace(/\n+/g, " ").trim();
+          // Build the prompt: title + spec body (extracted from Lexical JSON
+          // or passed through as plain text).
+          const plainSpec = extractTextFromLexical(task.spec);
+          const specText = `${task.title}\n\n${plainSpec}`.trim();
+
+          // Empty spec — nothing for Claude to do; advance straight to Review.
+          if (!specText) {
+            const reviewTask: Task = {
+              ...task,
+              status: "Review",
+              updatedAt: new Date().toISOString(),
+            };
+            await writeTask(reviewTask);
+            broadcastTaskEvent("task:updated", reviewTask);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(reviewTask));
+            return;
+          }
 
           // Look up the repo path for this task
           const repos = await readRepos();
@@ -630,12 +787,12 @@ app
 
           let ptyProcess: pty.IPty;
           try {
-            // Spawn interactively (no spec arg) so Claude enters its REPL.
-            // The spec is injected via PTY write once Claude reaches its first
-            // idle state (detected by scheduleIdleStatus state machine).
+            // Pass the spec directly as a CLI argument so Claude starts
+            // processing immediately — no need to wait for the REPL idle
+            // state and inject via PTY write.
             ptyProcess = pty.spawn(
               command,
-              ["--dangerously-skip-permissions"],
+              ["--dangerously-skip-permissions", specText],
               {
                 name: "xterm-color",
                 cols: 80,
@@ -657,9 +814,10 @@ app
             activeWs: null,
             statusDebounceTimer: null,
             currentStatus: "connecting",
-            handoverPhase: "waiting_for_idle",
+            // Spec is already passed via CLI arg — skip waiting_for_idle.
+            handoverPhase: "spec_sent",
             handoverSpec: specText,
-            specSentAt: 0,
+            specSentAt: Date.now(),
             hadMeaningfulBusy: false,
           };
           sessions.set(sessionId, entry);
@@ -754,9 +912,18 @@ app
 
         // GET /api/skills
         if (req.method === "GET" && parsedUrl.pathname === "/api/skills") {
-          const names = await listSkillNames();
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveSkillsDir(scope, repoId);
+          const skills = await listSkills(dir);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ skills: names.map((name) => ({ name })) }));
+          res.end(JSON.stringify({ skills }));
           return;
         }
 
@@ -772,14 +939,23 @@ app
             res.end(JSON.stringify({ error: "Invalid skill name" }));
             return;
           }
-          const content = await readSkillContent(name);
-          if (content === null) {
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveSkillsDir(scope, repoId);
+          const skill = await readSkill(dir, name);
+          if (skill === null) {
             res.writeHead(404);
             res.end();
             return;
           }
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ name, content }));
+          res.end(JSON.stringify(skill));
           return;
         }
 
@@ -788,6 +964,8 @@ app
           const body = await readBody(req);
           const name =
             typeof body["name"] === "string" ? body["name"].trim() : "";
+          const description =
+            typeof body["description"] === "string" ? body["description"] : "";
           const content =
             typeof body["content"] === "string" ? body["content"] : "";
           if (!SKILL_NAME_RE.test(name)) {
@@ -795,15 +973,25 @@ app
             res.end(JSON.stringify({ error: "Invalid skill name" }));
             return;
           }
-          const existing = await readSkillContent(name);
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveSkillsDir(scope, repoId);
+          const existing = await readSkill(dir, name);
           if (existing !== null) {
             res.writeHead(409, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: "Skill already exists" }));
             return;
           }
-          await writeSkillContent(name, content);
+          const skill: Skill = { name, description, content };
+          await writeSkill(dir, skill);
           res.writeHead(201, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ name, content }));
+          res.end(JSON.stringify(skill));
           return;
         }
 
@@ -819,18 +1007,32 @@ app
             res.end(JSON.stringify({ error: "Invalid skill name" }));
             return;
           }
-          const existing = await readSkillContent(name);
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveSkillsDir(scope, repoId);
+          const existing = await readSkill(dir, name);
           if (existing === null) {
             res.writeHead(404);
             res.end();
             return;
           }
           const body = await readBody(req);
+          const description =
+            typeof body["description"] === "string"
+              ? body["description"]
+              : existing.description;
           const content =
-            typeof body["content"] === "string" ? body["content"] : "";
-          await writeSkillContent(name, content);
+            typeof body["content"] === "string" ? body["content"] : existing.content;
+          const skill: Skill = { name, description, content };
+          await writeSkill(dir, skill);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ name, content }));
+          res.end(JSON.stringify(skill));
           return;
         }
 
@@ -846,13 +1048,181 @@ app
             res.end(JSON.stringify({ error: "Invalid skill name" }));
             return;
           }
-          const existing = await readSkillContent(name);
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveSkillsDir(scope, repoId);
+          const existing = await readSkill(dir, name);
           if (existing === null) {
             res.writeHead(404);
             res.end();
             return;
           }
-          await deleteSkillContent(name);
+          await deleteSkill(dir, name);
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        // GET /api/agents
+        if (req.method === "GET" && parsedUrl.pathname === "/api/agents") {
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveAgentsDir(scope, repoId);
+          const agents = await listAgents(dir);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ agents }));
+          return;
+        }
+
+        // GET /api/agents/:name
+        if (
+          req.method === "GET" &&
+          parsedUrl.pathname?.startsWith("/api/agents/") &&
+          parsedUrl.pathname !== "/api/agents/"
+        ) {
+          const name = parsedUrl.pathname.slice("/api/agents/".length);
+          if (!AGENT_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid agent name" }));
+            return;
+          }
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveAgentsDir(scope, repoId);
+          const agent = await readAgent(dir, name);
+          if (agent === null) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(agent));
+          return;
+        }
+
+        // POST /api/agents
+        if (req.method === "POST" && parsedUrl.pathname === "/api/agents") {
+          const body = await readBody(req);
+          const name =
+            typeof body["name"] === "string" ? body["name"].trim() : "";
+          const description =
+            typeof body["description"] === "string" ? body["description"] : "";
+          const content =
+            typeof body["content"] === "string" ? body["content"] : "";
+          if (!AGENT_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid agent name" }));
+            return;
+          }
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveAgentsDir(scope, repoId);
+          const existing = await readAgent(dir, name);
+          if (existing !== null) {
+            res.writeHead(409, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Agent already exists" }));
+            return;
+          }
+          const agent: Agent = { name, description, content };
+          await writeAgent(dir, agent);
+          res.writeHead(201, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(agent));
+          return;
+        }
+
+        // PUT /api/agents/:name
+        if (
+          req.method === "PUT" &&
+          parsedUrl.pathname?.startsWith("/api/agents/") &&
+          parsedUrl.pathname !== "/api/agents/"
+        ) {
+          const name = parsedUrl.pathname.slice("/api/agents/".length);
+          if (!AGENT_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid agent name" }));
+            return;
+          }
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveAgentsDir(scope, repoId);
+          const existing = await readAgent(dir, name);
+          if (existing === null) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          const body = await readBody(req);
+          const description =
+            typeof body["description"] === "string"
+              ? body["description"]
+              : existing.description;
+          const content =
+            typeof body["content"] === "string" ? body["content"] : existing.content;
+          const agent: Agent = { name, description, content };
+          await writeAgent(dir, agent);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(agent));
+          return;
+        }
+
+        // DELETE /api/agents/:name
+        if (
+          req.method === "DELETE" &&
+          parsedUrl.pathname?.startsWith("/api/agents/") &&
+          parsedUrl.pathname !== "/api/agents/"
+        ) {
+          const name = parsedUrl.pathname.slice("/api/agents/".length);
+          if (!AGENT_NAME_RE.test(name)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Invalid agent name" }));
+            return;
+          }
+          const scope =
+            typeof parsedUrl.query["scope"] === "string"
+              ? parsedUrl.query["scope"]
+              : "global";
+          const repoId =
+            typeof parsedUrl.query["repoId"] === "string"
+              ? parsedUrl.query["repoId"]
+              : null;
+          const dir = await resolveAgentsDir(scope, repoId);
+          const existing = await readAgent(dir, name);
+          if (existing === null) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          await deleteAgent(dir, name);
           res.writeHead(204);
           res.end();
           return;

@@ -145,6 +145,12 @@ function MarkdownStateLoader({ value }: { value?: string }) {
     editor.update(() => {
       $convertFromMarkdownString(value, TRANSFORMERS);
     });
+    // Clear undo history so Ctrl+Z starts from the loaded content,
+    // not from before it was loaded.
+    const unregister = editor.registerUpdateListener(() => {
+      unregister();
+      editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
+    });
   }, [editor, value]);
   return null;
 }

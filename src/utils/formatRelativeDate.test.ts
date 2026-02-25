@@ -31,15 +31,15 @@ describe("formatRelativeDate", () => {
   });
 
   it('returns "X minutes ago" for multiple minutes', () => {
-    expect(
-      formatRelativeDate(new Date(NOW - 45 * 60_000).toISOString()),
-    ).toBe("45 minutes ago");
+    expect(formatRelativeDate(new Date(NOW - 45 * 60_000).toISOString())).toBe(
+      "45 minutes ago",
+    );
   });
 
   it('returns "1 hour ago" at exactly 60 minutes', () => {
-    expect(
-      formatRelativeDate(new Date(NOW - 60 * 60_000).toISOString()),
-    ).toBe("1 hour ago");
+    expect(formatRelativeDate(new Date(NOW - 60 * 60_000).toISOString())).toBe(
+      "1 hour ago",
+    );
   });
 
   it('returns "X hours ago" for multiple hours', () => {

@@ -155,4 +155,57 @@ describe("Backlog", () => {
     );
     expect(handoverMutate).toHaveBeenCalledWith("1");
   });
+
+  it("calls onSelectTask when a task row is clicked", async () => {
+    const onSelectTask = jest.fn();
+    render(
+      <Backlog repoId="repo1" onSelectTask={onSelectTask} onNewTask={jest.fn()} />,
+    );
+    await userEvent.click(screen.getByText("Fix login bug"));
+    expect(onSelectTask).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "1", title: "Fix login bug" }),
+    );
+  });
+
+  it("calls deleteTask when Delete menu item is selected", async () => {
+    const deleteMutate = jest.fn();
+    (useDeleteTask as jest.Mock).mockReturnValue({ mutate: deleteMutate });
+    render(
+      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /more actions for fix login bug/i }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: /delete/i }));
+    expect(deleteMutate).toHaveBeenCalledWith("1");
+  });
+
+  it("shows different empty state when backlog has no tasks at all", () => {
+    (useTasks as jest.Mock).mockReturnValue({ data: [] });
+    render(
+      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+    );
+    expect(
+      screen.getByText(/no issues in the backlog/i),
+    ).toBeInTheDocument();
+  });
+
+  it("search and sort work together", async () => {
+    render(
+      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+    );
+    // Filter to only "Add dark mode" by searching
+    await userEvent.type(
+      screen.getByPlaceholderText("Search issues..."),
+      "dark",
+    );
+    expect(screen.getByText("Add dark mode")).toBeInTheDocument();
+    expect(screen.queryByText("Fix login bug")).not.toBeInTheDocument();
+
+    // Change sort — filtered result should still be the single match
+    await userEvent.click(screen.getByRole("combobox", { name: /sort/i }));
+    await userEvent.click(await screen.findByRole("option", { name: "A → Z" }));
+    expect(screen.getByText("Add dark mode")).toBeInTheDocument();
+    expect(screen.queryByText("Fix login bug")).not.toBeInTheDocument();
+  });
 });

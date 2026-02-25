@@ -1,8 +1,8 @@
-// src/components/Playbooks/PlaybookEditor/PlaybookEditor.test.tsx
+// src/components/Skills/SkillEditor/SkillEditor.test.tsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { PlaybookEditor } from "./PlaybookEditor";
+import { SkillEditor } from "./SkillEditor";
 
 beforeAll(() => {
   Object.defineProperty(window, "getSelection", {
@@ -11,26 +11,28 @@ beforeAll(() => {
   });
 });
 
-describe("PlaybookEditor", () => {
-  it("renders with the playbook name in the name input", () => {
+describe("SkillEditor", () => {
+  it("renders with the skill name in the name input", () => {
     render(
-      <PlaybookEditor
+      <SkillEditor
         name="bugfix"
+        description=""
         content=""
         onChange={jest.fn()}
         onRename={jest.fn()}
         onDelete={jest.fn()}
       />,
     );
-    expect(
-      screen.getByRole("textbox", { name: "Playbook name" }),
-    ).toHaveValue("bugfix");
+    expect(screen.getByRole("textbox", { name: "Skill name" })).toHaveValue(
+      "bugfix",
+    );
   });
 
   it("renders the Lexical editor body", () => {
     render(
-      <PlaybookEditor
+      <SkillEditor
         name="bugfix"
+        description=""
         content=""
         onChange={jest.fn()}
         onRename={jest.fn()}
@@ -44,8 +46,9 @@ describe("PlaybookEditor", () => {
   it("calls onDelete when the delete button is clicked", async () => {
     const onDelete = jest.fn();
     render(
-      <PlaybookEditor
+      <SkillEditor
         name="bugfix"
+        description=""
         content=""
         onChange={jest.fn()}
         onRename={jest.fn()}
@@ -53,7 +56,7 @@ describe("PlaybookEditor", () => {
       />,
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "Delete playbook" }),
+      screen.getByRole("button", { name: "Delete skill" }),
     );
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
@@ -61,15 +64,16 @@ describe("PlaybookEditor", () => {
   it("calls onRename with sanitized name on blur when name changes", async () => {
     const onRename = jest.fn();
     render(
-      <PlaybookEditor
+      <SkillEditor
         name="bugfix"
+        description=""
         content=""
         onChange={jest.fn()}
         onRename={onRename}
         onDelete={jest.fn()}
       />,
     );
-    const nameInput = screen.getByRole("textbox", { name: "Playbook name" });
+    const nameInput = screen.getByRole("textbox", { name: "Skill name" });
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, "New Feature");
     await userEvent.tab();
@@ -79,15 +83,16 @@ describe("PlaybookEditor", () => {
   it("does not call onRename when name is unchanged", async () => {
     const onRename = jest.fn();
     render(
-      <PlaybookEditor
+      <SkillEditor
         name="bugfix"
+        description=""
         content=""
         onChange={jest.fn()}
         onRename={onRename}
         onDelete={jest.fn()}
       />,
     );
-    const nameInput = screen.getByRole("textbox", { name: "Playbook name" });
+    const nameInput = screen.getByRole("textbox", { name: "Skill name" });
     await userEvent.click(nameInput);
     await userEvent.tab();
     expect(onRename).not.toHaveBeenCalled();
