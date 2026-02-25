@@ -22,12 +22,16 @@ export const Connecting: Story = {
   args: { status: "connecting" },
 };
 
-export const Busy: Story = {
-  args: { status: "busy" },
+export const Thinking: Story = {
+  args: { status: "thinking" },
 };
 
-export const Idle: Story = {
-  args: { status: "idle" },
+export const Typing: Story = {
+  args: { status: "typing" },
+};
+
+export const Waiting: Story = {
+  args: { status: "waiting" },
 };
 
 export const Exited: Story = {

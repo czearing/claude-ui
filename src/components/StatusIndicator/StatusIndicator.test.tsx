@@ -5,15 +5,16 @@ import type { ClaudeStatus } from "./StatusIndicator.types";
 
 const statuses: Array<{ status: ClaudeStatus; label: string }> = [
   { status: "connecting", label: "Connecting" },
-  { status: "busy", label: "Working" },
-  { status: "idle", label: "Waiting" },
+  { status: "thinking", label: "Thinking" },
+  { status: "typing", label: "Typing" },
+  { status: "waiting", label: "Waiting" },
   { status: "exited", label: "Exited" },
   { status: "disconnected", label: "Disconnected" },
 ];
 
 describe("StatusIndicator", () => {
   it("has role status", () => {
-    render(<StatusIndicator status="idle" />);
+    render(<StatusIndicator status="waiting" />);
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 

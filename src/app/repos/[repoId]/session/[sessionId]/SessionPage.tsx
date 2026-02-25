@@ -24,7 +24,10 @@ export const SessionPage = ({ params }: SessionPageProps) => {
 
   function handleStatus(newStatus: ClaudeStatus) {
     setStatus(newStatus);
-    if (newStatus === "busy" && task?.status === "Review") {
+    if (
+      (newStatus === "thinking" || newStatus === "typing") &&
+      task?.status === "Review"
+    ) {
       updateTask({ id: task.id, status: "In Progress" });
     }
   }

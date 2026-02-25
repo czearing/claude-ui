@@ -1,6 +1,7 @@
 export type ClaudeStatus =
   | "connecting"
-  | "busy"
-  | "idle"
+  | "thinking"
+  | "typing"
+  | "waiting"
   | "exited"
   | "disconnected";

@@ -5,8 +5,9 @@ import type { StatusIndicatorProps } from "./StatusIndicator.types";
 
 const LABELS: Record<ClaudeStatus, string> = {
   connecting: "Connecting",
-  busy: "Working",
-  idle: "Waiting",
+  thinking: "Thinking",
+  typing: "Typing",
+  waiting: "Waiting",
   exited: "Exited",
   disconnected: "Disconnected",
 };
