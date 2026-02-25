@@ -20,6 +20,11 @@ const command = process.platform === "win32" ? "claude.cmd" : "claude";
 const BUFFER_CAP = 500 * 1024; // 500 KB rolling buffer per session
 
 const STATUS_DEBOUNCE_MS = 500;
+// Extra delay after going idle before advancing a handover task to Review.
+// This filters out the startup gap that occurs before Claude's ● Working spinner
+// begins — startup output pauses for ~1s while the API call initialises, which
+// would otherwise trigger a premature Review transition.
+const REVIEW_CONFIRM_DELAY_MS = 2000;
 
 type ClaudeStatus = "connecting" | "busy" | "idle" | "exited" | "disconnected";
 
@@ -30,6 +35,7 @@ type SessionEntry = {
   activeWs: WebSocket | null;
   statusDebounceTimer: ReturnType<typeof setTimeout> | null;
   currentStatus: ClaudeStatus;
+  isHandover: boolean;
 };
 
 const sessions = new Map<string, SessionEntry>();
@@ -52,6 +58,7 @@ interface Task {
   sessionId?: string;
   createdAt: string;
   updatedAt: string;
+  archivedAt?: string;
 }
 
 interface Repo {
@@ -196,6 +203,31 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
     e.currentStatus = "idle";
     e.statusDebounceTimer = null;
     emitStatus(e.activeWs, "idle");
+
+    // Auto-advance handover task to Review — but only after an extra delay to
+    // confirm Claude is genuinely idle and not just in a startup gap before the
+    // ● Working spinner begins.
+    if (e.isHandover) {
+      setTimeout(() => {
+        const latestE = sessions.get(sessionId);
+        if (!latestE || latestE.currentStatus !== "idle") {
+          return; // went busy again (spinner resumed) — not the real idle
+        }
+        void readTasks().then((current) => {
+          const taskIdx = current.findIndex((t) => t.sessionId === sessionId);
+          if (taskIdx !== -1 && current[taskIdx].status === "In Progress") {
+            current[taskIdx] = {
+              ...current[taskIdx],
+              status: "Review",
+              updatedAt: new Date().toISOString(),
+            };
+            void writeTasks(current).then(() =>
+              broadcastTaskEvent("task:updated", current[taskIdx]),
+            );
+          }
+        });
+      }, REVIEW_CONFIRM_DELAY_MS);
+    }
   }, STATUS_DEBOUNCE_MS);
 }
 
@@ -259,11 +291,23 @@ app
             res.end();
             return;
           }
+          const now = new Date().toISOString();
+          const becomingDone = body.status === "Done";
+          const leavingDone =
+            body.status !== undefined &&
+            body.status !== "Done" &&
+            tasks[idx].status === "Done";
+
           tasks[idx] = {
             ...tasks[idx],
             ...body,
             id,
-            updatedAt: new Date().toISOString(),
+            updatedAt: now,
+            archivedAt: becomingDone
+              ? (tasks[idx].archivedAt ?? now) // stamp once; don't overwrite if already set
+              : leavingDone
+                ? undefined // clear when restoring
+                : tasks[idx].archivedAt, // unchanged
           } as Task;
           await writeTasks(tasks);
           broadcastTaskEvent("task:updated", tasks[idx]);
@@ -353,6 +397,12 @@ app
           const task = tasks[idx];
           const sessionId = randomUUID();
           const specText = extractTextFromLexical(task.spec);
+          // Pass spec as a positional CLI argument so Claude receives it
+          // immediately on startup without any timing dependency.
+          const specLine = specText.replace(/\n+/g, " ").trim();
+          const spawnArgs = specLine
+            ? ["--dangerously-skip-permissions", specLine]
+            : ["--dangerously-skip-permissions"];
 
           // Look up the repo path for this task
           const repos = await readRepos();
@@ -361,17 +411,13 @@ app
 
           let ptyProcess: pty.IPty;
           try {
-            ptyProcess = pty.spawn(
-              command,
-              ["--dangerously-skip-permissions"],
-              {
-                name: "xterm-color",
-                cols: 80,
-                rows: 24,
-                cwd,
-                env: process.env as Record<string, string>,
-              },
-            );
+            ptyProcess = pty.spawn(command, spawnArgs, {
+              name: "xterm-color",
+              cols: 80,
+              rows: 24,
+              cwd,
+              env: process.env as Record<string, string>,
+            });
           } catch (err) {
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: String(err) }));
@@ -385,17 +431,9 @@ app
             activeWs: null,
             statusDebounceTimer: null,
             currentStatus: "connecting",
+            isHandover: true,
           };
           sessions.set(sessionId, entry);
-
-          // Send spec as initial prompt after Claude initialises (~2 s)
-          if (specText.trim()) {
-            setTimeout(() => {
-              if (sessions.has(sessionId)) {
-                ptyProcess.write(`${specText}\n`);
-              }
-            }, 2000);
-          }
 
           ptyProcess.onData((data) => {
             const chunk = Buffer.from(data);
@@ -646,6 +684,7 @@ app
           activeWs: ws,
           statusDebounceTimer: null,
           currentStatus: "connecting",
+          isHandover: false,
         };
         sessions.set(sessionId, entry);
         emitStatus(ws, "connecting");
