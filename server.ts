@@ -262,6 +262,29 @@ async function ensureDefaultRepo(): Promise<void> {
     );
     await writeTasks(migrated);
   }
+
+  // Migrate tasks.json → individual markdown files
+  const tasksFilePath = join(process.cwd(), "tasks.json");
+  try {
+    const raw = await readFile(tasksFilePath, "utf8");
+    const legacyTasks = JSON.parse(raw) as Task[];
+    for (const t of legacyTasks) {
+      const existing = await readTask(t.id, t.repoId);
+      if (existing) continue; // already migrated
+      const migratedTask: Task = {
+        ...t,
+        spec: extractTextFromLexical(t.spec), // convert Lexical JSON → plain text
+      };
+      await writeTask(migratedTask);
+    }
+    // Rename tasks.json → tasks.json.bak so migration doesn't re-run
+    await rename(tasksFilePath, tasksFilePath + ".bak");
+    console.log(
+      `[tasks] Migrated ${legacyTasks.length} tasks to markdown files`,
+    );
+  } catch {
+    // tasks.json doesn't exist — nothing to migrate
+  }
 }
 
 function broadcastTaskEvent(event: string, data: unknown): void {
