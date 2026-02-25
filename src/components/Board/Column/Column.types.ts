@@ -7,4 +7,5 @@ export interface ColumnProps {
   onRemoveTask?: (id: string) => void;
   onRecall?: (id: string) => void;
   onHandover?: (taskId: string) => void;
+  isDropDisabled?: boolean;
 }

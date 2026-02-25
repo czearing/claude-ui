@@ -136,7 +136,6 @@ export function TaskCard({
           <span>Agent Processing...</span>
         </div>
       )}
-
     </div>
   );
 }

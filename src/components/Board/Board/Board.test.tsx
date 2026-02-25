@@ -21,9 +21,7 @@ jest.mock("@dnd-kit/core", () => ({
     capturedDragEnd = onDragEnd;
     return <>{children}</>;
   },
-  DragOverlay: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
+  DragOverlay: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   PointerSensor: class {},
   KeyboardSensor: class {},
   closestCorners: jest.fn(),
@@ -108,9 +106,7 @@ describe("Board", () => {
     expect(
       screen.getByRole("heading", { name: "In Progress" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Review" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Done" })).toBeInTheDocument();
   });
 

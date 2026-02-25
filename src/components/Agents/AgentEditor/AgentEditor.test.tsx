@@ -1,8 +1,8 @@
-// src/components/Skills/SkillEditor/SkillEditor.test.tsx
+// src/components/Agents/AgentEditor/AgentEditor.test.tsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { SkillEditor } from "./SkillEditor";
+import { AgentEditor } from "./AgentEditor";
 
 beforeAll(() => {
   Object.defineProperty(window, "getSelection", {
@@ -11,11 +11,11 @@ beforeAll(() => {
   });
 });
 
-describe("SkillEditor", () => {
-  it("renders with the skill name in the name input", () => {
+describe("AgentEditor", () => {
+  it("renders with the agent name in the name input", () => {
     render(
-      <SkillEditor
-        name="bugfix"
+      <AgentEditor
+        name="code-reviewer"
         description=""
         content=""
         onChange={jest.fn()}
@@ -24,14 +24,14 @@ describe("SkillEditor", () => {
       />,
     );
     expect(screen.getByRole("textbox", { name: "Skill name" })).toHaveValue(
-      "bugfix",
+      "code-reviewer",
     );
   });
 
   it("renders the Lexical editor body", () => {
     render(
-      <SkillEditor
-        name="bugfix"
+      <AgentEditor
+        name="code-reviewer"
         description=""
         content=""
         onChange={jest.fn()}
@@ -46,8 +46,8 @@ describe("SkillEditor", () => {
   it("calls onDelete when the delete button is clicked", async () => {
     const onDelete = jest.fn();
     render(
-      <SkillEditor
-        name="bugfix"
+      <AgentEditor
+        name="code-reviewer"
         description=""
         content=""
         onChange={jest.fn()}
@@ -62,8 +62,8 @@ describe("SkillEditor", () => {
   it("calls onRename with sanitized name on blur when name changes", async () => {
     const onRename = jest.fn();
     render(
-      <SkillEditor
-        name="bugfix"
+      <AgentEditor
+        name="code-reviewer"
         description=""
         content=""
         onChange={jest.fn()}
@@ -73,16 +73,16 @@ describe("SkillEditor", () => {
     );
     const nameInput = screen.getByRole("textbox", { name: "Skill name" });
     await userEvent.clear(nameInput);
-    await userEvent.type(nameInput, "New Feature");
+    await userEvent.type(nameInput, "My Custom Agent");
     await userEvent.tab();
-    expect(onRename).toHaveBeenCalledWith("new-feature");
+    expect(onRename).toHaveBeenCalledWith("my-custom-agent");
   });
 
   it("does not call onRename when name is unchanged", async () => {
     const onRename = jest.fn();
     render(
-      <SkillEditor
-        name="bugfix"
+      <AgentEditor
+        name="code-reviewer"
         description=""
         content=""
         onChange={jest.fn()}

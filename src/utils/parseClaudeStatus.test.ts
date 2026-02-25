@@ -46,8 +46,17 @@ describe("parseClaudeStatus", () => {
       ).toBe("waiting");
     });
 
-    it("❯ prompt takes priority over spinner pattern", () => {
-      expect(parseClaudeStatus(`\r✻ Thinking...\n❯ `)).toBe("waiting");
+    it("❯ prompt with spinner in same chunk returns 'thinking' (active repaint guard)", () => {
+      // When ❯ and a spinner appear together it is a full-screen repaint
+      // during active processing — the ❯ input area is always visible at the
+      // bottom of the terminal.  The spinner wins so we don't false-advance.
+      expect(parseClaudeStatus(`\r✻ Thinking...\n❯ `)).toBe("thinking");
+    });
+
+    it("❯ prompt without spinner returns 'waiting' (Claude is truly done)", () => {
+      expect(parseClaudeStatus(`❯ Try "how does <filepath> work?"`)).toBe(
+        "waiting",
+      );
     });
   });
 

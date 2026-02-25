@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 
-import { Terminal } from "@/components";
 import { useTerminalSocket } from "@/hooks/useTerminalSocket";
 import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
 import styles from "./TerminalPage.module.css";
 import type { TerminalPageState } from "./TerminalPage.types";
+
+const Terminal = dynamic(
+  () => import("@/components/Terminal").then((m) => m.Terminal),
+  { ssr: false },
+);
 
 type TerminalPageProps = {
   sessionId: string;

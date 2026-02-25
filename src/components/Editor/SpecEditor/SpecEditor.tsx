@@ -19,7 +19,7 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
   const [title, setTitle] = useState(task?.title ?? "");
   const titleRef = useRef<HTMLInputElement>(null);
   const [scheduleSpecSave, cancelSpecSave] = useDebouncedCallback(
-    (json: string) => updateTask({ id: task?.id ?? "", spec: json }),
+    (markdown: string) => updateTask({ id: task?.id ?? "", spec: markdown }),
     300,
   );
   const [scheduleTitleSave, cancelTitleSave] = useDebouncedCallback(
@@ -43,9 +43,11 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
   const isBacklog = task.status === "Backlog";
   const isReview = task.status === "Review";
 
-  const handleSpecChange = (json: string) => {
-    setSpec(json);
-    scheduleSpecSave(json);
+  const handleSpecChange = (markdown: string) => {
+    setSpec(markdown);
+    // Skip if content hasn't actually changed (e.g. initial ContentLoader round-trip).
+    if (markdown === (task?.spec ?? "")) return;
+    scheduleSpecSave(markdown);
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +99,7 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
         </div>
         <LexicalEditor
           key={`${task.id}-${isBacklog ? "edit" : "read"}`}
+          format="markdown"
           value={spec}
           onChange={isBacklog ? handleSpecChange : undefined}
           readOnly={!isBacklog}

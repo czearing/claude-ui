@@ -1,17 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import { Backlog } from "@/components/Board/Backlog";
 import { Board } from "@/components/Board/Board";
-import { SpecEditor } from "@/components/Editor/SpecEditor";
 import { Sidebar, type View } from "@/components/Layout/Sidebar";
 import { TopBar } from "@/components/Layout/TopBar";
 import { useCreateTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./AppShell.module.css";
+
+const SpecEditor = dynamic(
+  () => import("@/components/Editor/SpecEditor").then((m) => m.SpecEditor),
+  { ssr: false },
+);
 
 const MIN_LEFT = 320;
 const MIN_RIGHT = 340;
@@ -101,7 +106,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
     setSelectedTask(task);
   }
 
-  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+  function handleDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault();
     const contentEl = contentRef.current;
     const leftEl = leftRef.current;
@@ -135,7 +140,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
 
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
-  }, []);
+  }
 
   return (
     <div className={styles.shell}>
@@ -146,11 +151,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
       />
 
       <main className={styles.main}>
-        <TopBar
-          repoId={repoId}
-          currentView={currentView}
-          onNewTask={handleNewTask}
-        />
+        <TopBar repoId={repoId} currentView={currentView} />
 
         <div ref={contentRef} className={styles.content}>
           <div

@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 
 import { useTerminalSocket } from "./useTerminalSocket";
 
@@ -16,9 +16,10 @@ const mockXterm = {
   rows: 24,
 };
 
-// WebSocket mock
+// WebSocket mock — keeps an instance registry so tests can retrieve any WS
 class MockWebSocket {
   static OPEN = 1;
+  static instances: MockWebSocket[] = [];
   readyState = MockWebSocket.OPEN;
   binaryType = "";
   onopen: (() => void) | null = null;
@@ -29,9 +30,11 @@ class MockWebSocket {
   url: string;
   constructor(url: string) {
     this.url = url;
-    MockWebSocket.lastInstance = this;
+    MockWebSocket.instances.push(this);
   }
-  static lastInstance: MockWebSocket;
+  static get lastInstance() {
+    return MockWebSocket.instances[MockWebSocket.instances.length - 1];
+  }
 }
 
 Object.defineProperty(window, "WebSocket", {
@@ -42,7 +45,13 @@ Object.defineProperty(window, "WebSocket", {
 
 describe("useTerminalSocket", () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
+    MockWebSocket.instances = [];
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("connects to the terminal WS endpoint with sessionId in the URL", () => {
@@ -87,12 +96,23 @@ describe("useTerminalSocket", () => {
     );
   });
 
+  it("writes a 'resuming' notice on resumed message", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    MockWebSocket.lastInstance.onmessage?.({
+      data: JSON.stringify({ type: "resumed" }),
+    } as MessageEvent);
+
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining("Resuming previous conversation"),
+    );
+  });
+
   it("does not open WebSocket when xterm is null", () => {
-    const urlBefore = MockWebSocket.lastInstance?.url;
+    const countBefore = MockWebSocket.instances.length;
     renderHook(() => useTerminalSocket(null, "session-abc"));
 
-    // No new instance created — lastInstance URL unchanged
-    expect(MockWebSocket.lastInstance?.url).toBe(urlBefore);
+    expect(MockWebSocket.instances.length).toBe(countBefore);
   });
 
   it("calls onStatus('connecting') immediately when xterm is provided", () => {
@@ -130,14 +150,75 @@ describe("useTerminalSocket", () => {
     expect(onStatus).toHaveBeenCalledWith("exited");
   });
 
-  it("calls onStatus('disconnected') on WS close", () => {
+  it("calls onStatus('disconnected') and schedules reconnect on WS close", () => {
     const onStatus = jest.fn();
     renderHook(() =>
       useTerminalSocket(mockXterm as never, "session-abc", onStatus),
     );
 
-    MockWebSocket.lastInstance.onclose?.();
+    const firstWs = MockWebSocket.lastInstance;
+    act(() => {
+      firstWs.onclose?.();
+    });
 
     expect(onStatus).toHaveBeenCalledWith("disconnected");
+
+    // Advance past the 1s reconnect delay
+    act(() => {
+      jest.advanceTimersByTime(1_500);
+    });
+
+    // A new WS should have been created
+    expect(MockWebSocket.instances.length).toBe(2);
+    expect(MockWebSocket.lastInstance.url).toBe(
+      "ws://localhost/ws/terminal?sessionId=session-abc",
+    );
+  });
+
+  it("does not reconnect after component unmounts", () => {
+    const { unmount } = renderHook(() =>
+      useTerminalSocket(mockXterm as never, "session-abc"),
+    );
+
+    const firstWs = MockWebSocket.lastInstance;
+
+    // Simulate WS close coming in right before unmount
+    act(() => {
+      firstWs.onclose?.();
+    });
+
+    unmount();
+
+    // Advance time — should NOT create a second WS
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it("uses exponential backoff on repeated disconnects", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    // First disconnect → 1s delay
+    act(() => {
+      MockWebSocket.lastInstance.onclose?.();
+      jest.advanceTimersByTime(1_000);
+    });
+
+    // Second disconnect → 2s delay
+    act(() => {
+      MockWebSocket.lastInstance.onclose?.();
+      jest.advanceTimersByTime(2_000);
+    });
+
+    // Third disconnect → 4s delay (need >4s to fire)
+    act(() => {
+      MockWebSocket.lastInstance.onclose?.();
+      jest.advanceTimersByTime(4_000);
+    });
+
+    // Three reconnect attempts = 4 total WS instances (original + 3 reconnects)
+    expect(MockWebSocket.instances.length).toBe(4);
   });
 });

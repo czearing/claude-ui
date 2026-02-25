@@ -159,7 +159,11 @@ describe("Backlog", () => {
   it("calls onSelectTask when a task row is clicked", async () => {
     const onSelectTask = jest.fn();
     render(
-      <Backlog repoId="repo1" onSelectTask={onSelectTask} onNewTask={jest.fn()} />,
+      <Backlog
+        repoId="repo1"
+        onSelectTask={onSelectTask}
+        onNewTask={jest.fn()}
+      />,
     );
     await userEvent.click(screen.getByText("Fix login bug"));
     expect(onSelectTask).toHaveBeenCalledWith(
@@ -176,7 +180,9 @@ describe("Backlog", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /more actions for fix login bug/i }),
     );
-    await userEvent.click(await screen.findByRole("menuitem", { name: /delete/i }));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: /delete/i }),
+    );
     expect(deleteMutate).toHaveBeenCalledWith("1");
   });
 
@@ -185,9 +191,7 @@ describe("Backlog", () => {
     render(
       <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
-    expect(
-      screen.getByText(/no issues in the backlog/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/no issues in the backlog/i)).toBeInTheDocument();
   });
 
   it("search and sort work together", async () => {

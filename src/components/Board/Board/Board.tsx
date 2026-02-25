@@ -15,7 +15,6 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
 import { useDeleteTask, useRecallTask, useUpdateTask } from "@/hooks/useTasks";
-import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task, TaskStatus } from "@/utils/tasks.types";
 import styles from "./Board.module.css";
 import { Column } from "../Column";
@@ -31,8 +30,6 @@ interface BoardProps {
 }
 
 export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
-  useTasksSocket();
-
   const { mutate: updateTask } = useUpdateTask(repoId);
   const { mutate: deleteTask } = useDeleteTask(repoId);
   const { mutate: recallTask } = useRecallTask(repoId);
@@ -60,9 +57,20 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
       ? (overId as TaskStatus)
       : (tasks.find((t) => t.id === overId)?.status ?? null);
 
-    if (targetStatus && active.id !== over.id) {
-      updateTask({ id: active.id as string, status: targetStatus });
+    if (!targetStatus || active.id === over.id) {
+      return;
     }
+
+    const sourceStatus = tasks.find((t) => t.id === active.id)?.status;
+    // Only Review can move to Done; Review cannot move back to In Progress
+    if (targetStatus === "Done" && sourceStatus !== "Review") {
+      return;
+    }
+    if (sourceStatus === "Review" && targetStatus === "In Progress") {
+      return;
+    }
+
+    updateTask({ id: active.id as string, status: targetStatus });
   };
 
   return (
@@ -74,21 +82,27 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
         onDragEnd={handleDragEnd}
       >
         <div className={styles.columns}>
-          {BOARD_COLUMNS.map((status) => (
-            <Column
-              key={status}
-              status={status}
-              tasks={
-                status === "Done"
-                  ? []
-                  : tasks.filter((t) => t.status === status)
-              }
-              onSelectTask={onSelectTask}
-              onRemoveTask={deleteTask}
-              onRecall={recallTask}
-              onHandover={onHandover}
-            />
-          ))}
+          {BOARD_COLUMNS.map((status) => {
+            const isDropDisabled =
+              (status === "Done" && activeTask?.status !== "Review") ||
+              (status === "In Progress" && activeTask?.status === "Review");
+            return (
+              <Column
+                key={status}
+                status={status}
+                tasks={
+                  status === "Done"
+                    ? []
+                    : tasks.filter((t) => t.status === status)
+                }
+                onSelectTask={onSelectTask}
+                onRemoveTask={deleteTask}
+                onRecall={recallTask}
+                onHandover={onHandover}
+                isDropDisabled={!!activeTask && isDropDisabled}
+              />
+            );
+          })}
         </div>
 
         <DragOverlay>

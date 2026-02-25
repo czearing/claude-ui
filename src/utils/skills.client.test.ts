@@ -21,12 +21,18 @@ function ok(body: unknown, status = 200) {
 }
 
 function err(status: number) {
-  return Promise.resolve({ ok: false, status, json: () => Promise.resolve({}) } as Response);
+  return Promise.resolve({
+    ok: false,
+    status,
+    json: () => Promise.resolve({}),
+  } as Response);
 }
 
 describe("fetchSkills", () => {
   it("fetches skills with no scope query for global", async () => {
-    mockFetch.mockReturnValue(ok({ skills: [{ name: "bugfix", description: "Fix bugs" }] }));
+    mockFetch.mockReturnValue(
+      ok({ skills: [{ name: "bugfix", description: "Fix bugs" }] }),
+    );
     const result = await fetchSkills();
     expect(mockFetch).toHaveBeenCalledWith("/api/skills");
     expect(result).toEqual([{ name: "bugfix", description: "Fix bugs" }]);
@@ -56,7 +62,11 @@ describe("fetchSkills", () => {
 
 describe("fetchSkill", () => {
   it("fetches a single skill by name", async () => {
-    const skill = { name: "bugfix", description: "Fix bugs", content: "# Bugfix" };
+    const skill = {
+      name: "bugfix",
+      description: "Fix bugs",
+      content: "# Bugfix",
+    };
     mockFetch.mockReturnValue(ok(skill));
     const result = await fetchSkill("bugfix");
     expect(mockFetch).toHaveBeenCalledWith("/api/skills/bugfix");
@@ -64,7 +74,9 @@ describe("fetchSkill", () => {
   });
 
   it("encodes the skill name in the URL", async () => {
-    mockFetch.mockReturnValue(ok({ name: "my skill", description: "", content: "" }));
+    mockFetch.mockReturnValue(
+      ok({ name: "my skill", description: "", content: "" }),
+    );
     await fetchSkill("my skill");
     expect(mockFetch).toHaveBeenCalledWith("/api/skills/my%20skill");
   });
@@ -85,7 +97,11 @@ describe("createSkill", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/skills", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "new", description: "New skill", content: "# New" }),
+      body: JSON.stringify({
+        name: "new",
+        description: "New skill",
+        content: "# New",
+      }),
     });
     expect(result).toEqual(skill);
   });
@@ -100,7 +116,11 @@ describe("createSkill", () => {
 
 describe("updateSkill", () => {
   it("puts description and content to the skill URL", async () => {
-    const skill = { name: "bugfix", description: "Updated", content: "# Updated" };
+    const skill = {
+      name: "bugfix",
+      description: "Updated",
+      content: "# Updated",
+    };
     mockFetch.mockReturnValue(ok(skill));
     const result = await updateSkill("bugfix", "Updated", "# Updated");
     expect(mockFetch).toHaveBeenCalledWith("/api/skills/bugfix", {

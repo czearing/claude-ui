@@ -20,7 +20,9 @@ export async function fetchAgents(
   repoId?: string,
 ): Promise<{ name: string; description: string }[]> {
   const res = await fetch(`/api/agents${scopeQuery(scope, repoId)}`);
-  if (!res.ok) { throw new Error("Failed to fetch agents"); }
+  if (!res.ok) {
+    throw new Error("Failed to fetch agents");
+  }
   const data = (await res.json()) as {
     agents: { name: string; description: string }[];
   };
@@ -35,7 +37,9 @@ export async function fetchAgent(
   const res = await fetch(
     `/api/agents/${encodeURIComponent(name)}${scopeQuery(scope, repoId)}`,
   );
-  if (!res.ok) { throw new Error(`Failed to fetch agent: ${name}`); }
+  if (!res.ok) {
+    throw new Error(`Failed to fetch agent: ${name}`);
+  }
   return res.json() as Promise<Agent>;
 }
 
@@ -51,7 +55,9 @@ export async function createAgent(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, description, content }),
   });
-  if (!res.ok) { throw new Error("Failed to create agent"); }
+  if (!res.ok) {
+    throw new Error("Failed to create agent");
+  }
   return res.json() as Promise<Agent>;
 }
 
@@ -70,7 +76,9 @@ export async function updateAgent(
       body: JSON.stringify({ description, content }),
     },
   );
-  if (!res.ok) { throw new Error("Failed to update agent"); }
+  if (!res.ok) {
+    throw new Error("Failed to update agent");
+  }
   return res.json() as Promise<Agent>;
 }
 
@@ -83,5 +91,7 @@ export async function deleteAgent(
     `/api/agents/${encodeURIComponent(name)}${scopeQuery(scope, repoId)}`,
     { method: "DELETE" },
   );
-  if (!res.ok && res.status !== 404) { throw new Error("Failed to delete agent"); }
+  if (!res.ok && res.status !== 404) {
+    throw new Error("Failed to delete agent");
+  }
 }

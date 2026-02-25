@@ -74,9 +74,7 @@ describe("Column", () => {
   });
 
   it("renders with different statuses", () => {
-    render(
-      <Column status="In Progress" tasks={[]} onSelectTask={jest.fn()} />,
-    );
+    render(<Column status="In Progress" tasks={[]} onSelectTask={jest.fn()} />);
     expect(
       screen.getByRole("heading", { name: "In Progress" }),
     ).toBeInTheDocument();

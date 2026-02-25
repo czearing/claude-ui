@@ -21,12 +21,18 @@ function ok(body: unknown, status = 200) {
 }
 
 function err(status: number) {
-  return Promise.resolve({ ok: false, status, json: () => Promise.resolve({}) } as Response);
+  return Promise.resolve({
+    ok: false,
+    status,
+    json: () => Promise.resolve({}),
+  } as Response);
 }
 
 describe("fetchAgents", () => {
   it("fetches agents with no scope query for global", async () => {
-    mockFetch.mockReturnValue(ok({ agents: [{ name: "reviewer", description: "Reviews code" }] }));
+    mockFetch.mockReturnValue(
+      ok({ agents: [{ name: "reviewer", description: "Reviews code" }] }),
+    );
     const result = await fetchAgents();
     expect(mockFetch).toHaveBeenCalledWith("/api/agents");
     expect(result).toEqual([{ name: "reviewer", description: "Reviews code" }]);
@@ -56,7 +62,11 @@ describe("fetchAgents", () => {
 
 describe("fetchAgent", () => {
   it("fetches a single agent by name", async () => {
-    const agent = { name: "reviewer", description: "Reviews code", content: "# Reviewer" };
+    const agent = {
+      name: "reviewer",
+      description: "Reviews code",
+      content: "# Reviewer",
+    };
     mockFetch.mockReturnValue(ok(agent));
     const result = await fetchAgent("reviewer");
     expect(mockFetch).toHaveBeenCalledWith("/api/agents/reviewer");
@@ -64,7 +74,9 @@ describe("fetchAgent", () => {
   });
 
   it("encodes the agent name in the URL", async () => {
-    mockFetch.mockReturnValue(ok({ name: "my agent", description: "", content: "" }));
+    mockFetch.mockReturnValue(
+      ok({ name: "my agent", description: "", content: "" }),
+    );
     await fetchAgent("my agent");
     expect(mockFetch).toHaveBeenCalledWith("/api/agents/my%20agent");
   });
@@ -85,7 +97,11 @@ describe("createAgent", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/agents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "new", description: "New agent", content: "# New" }),
+      body: JSON.stringify({
+        name: "new",
+        description: "New agent",
+        content: "# New",
+      }),
     });
     expect(result).toEqual(agent);
   });
@@ -100,7 +116,11 @@ describe("createAgent", () => {
 
 describe("updateAgent", () => {
   it("puts description and content to the agent URL", async () => {
-    const agent = { name: "reviewer", description: "Updated", content: "# Updated" };
+    const agent = {
+      name: "reviewer",
+      description: "Updated",
+      content: "# Updated",
+    };
     mockFetch.mockReturnValue(ok(agent));
     const result = await updateAgent("reviewer", "Updated", "# Updated");
     expect(mockFetch).toHaveBeenCalledWith("/api/agents/reviewer", {

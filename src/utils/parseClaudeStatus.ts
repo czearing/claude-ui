@@ -74,7 +74,17 @@ export function parseClaudeStatus(chunk: string): ParsedStatus | null {
   // 1b. Claude Code v2 ❯ input prompt character = waiting for user input.
   //     Takes priority over typing because the hint text after ❯ is ≥8 chars
   //     and would otherwise be mis-classified as "typing".
-  if (chunk.includes(INPUT_PROMPT_CHAR)) {
+  //
+  //     GUARD: if the same chunk also contains a spinner pattern or "(thinking)",
+  //     this is a full-screen repaint during active processing — Claude Code
+  //     always renders the ❯ input area at the bottom of the terminal, so it
+  //     appears in re-render chunks even while Claude is working.  Only treat
+  //     ❯ as "waiting" when there are no active-work indicators in the chunk.
+  if (
+    chunk.includes(INPUT_PROMPT_CHAR) &&
+    !SPINNER_RE.test(chunk) &&
+    !chunk.includes(THINKING_TEXT)
+  ) {
     return "waiting";
   }
 

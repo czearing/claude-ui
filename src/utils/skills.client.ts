@@ -20,7 +20,9 @@ export async function fetchSkills(
   repoId?: string,
 ): Promise<{ name: string; description: string }[]> {
   const res = await fetch(`/api/skills${scopeQuery(scope, repoId)}`);
-  if (!res.ok) { throw new Error("Failed to fetch skills"); }
+  if (!res.ok) {
+    throw new Error("Failed to fetch skills");
+  }
   const data = (await res.json()) as {
     skills: { name: string; description: string }[];
   };
@@ -35,7 +37,9 @@ export async function fetchSkill(
   const res = await fetch(
     `/api/skills/${encodeURIComponent(name)}${scopeQuery(scope, repoId)}`,
   );
-  if (!res.ok) { throw new Error(`Failed to fetch skill: ${name}`); }
+  if (!res.ok) {
+    throw new Error(`Failed to fetch skill: ${name}`);
+  }
   return res.json() as Promise<Skill>;
 }
 
@@ -51,7 +55,9 @@ export async function createSkill(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, description, content }),
   });
-  if (!res.ok) { throw new Error("Failed to create skill"); }
+  if (!res.ok) {
+    throw new Error("Failed to create skill");
+  }
   return res.json() as Promise<Skill>;
 }
 
@@ -70,7 +76,9 @@ export async function updateSkill(
       body: JSON.stringify({ description, content }),
     },
   );
-  if (!res.ok) { throw new Error("Failed to update skill"); }
+  if (!res.ok) {
+    throw new Error("Failed to update skill");
+  }
   return res.json() as Promise<Skill>;
 }
 
@@ -83,5 +91,7 @@ export async function deleteSkill(
     `/api/skills/${encodeURIComponent(name)}${scopeQuery(scope, repoId)}`,
     { method: "DELETE" },
   );
-  if (!res.ok && res.status !== 404) { throw new Error("Failed to delete skill"); }
+  if (!res.ok && res.status !== 404) {
+    throw new Error("Failed to delete skill");
+  }
 }

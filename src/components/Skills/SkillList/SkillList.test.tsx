@@ -44,7 +44,9 @@ describe("SkillList", () => {
   });
 
   it("renders the selected item", () => {
-    render(<SkillList {...defaultProps} skills={skills} selectedName="bugfix" />);
+    render(
+      <SkillList {...defaultProps} skills={skills} selectedName="bugfix" />,
+    );
     expect(screen.getByRole("button", { name: "bugfix" })).toBeInTheDocument();
   });
 

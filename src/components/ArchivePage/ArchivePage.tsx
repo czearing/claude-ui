@@ -50,11 +50,7 @@ export function ArchivePage({ repoId }: ArchivePageProps) {
       />
 
       <main className={styles.main}>
-        <TopBar
-          repoId={repoId}
-          currentView="Archive"
-          onNewTask={() => undefined}
-        />
+        <TopBar repoId={repoId} currentView="Archive" />
 
         <div className={styles.content}>
           <div className={styles.inner}>

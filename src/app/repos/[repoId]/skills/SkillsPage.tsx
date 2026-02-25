@@ -28,7 +28,11 @@ export function SkillsPage({ repoId }: SkillsPageProps) {
   const effectiveRepoId = scope === "repo" ? repoId : undefined;
 
   const { data: skills = [] } = useSkills(scope, effectiveRepoId);
-  const { data: selectedSkill } = useSkill(selectedName, scope, effectiveRepoId);
+  const { data: selectedSkill } = useSkill(
+    selectedName,
+    scope,
+    effectiveRepoId,
+  );
   const { mutate: createSkill } = useCreateSkill(scope, effectiveRepoId);
   const { mutate: updateSkill } = useUpdateSkill(scope, effectiveRepoId);
   const { mutate: deleteSkill } = useDeleteSkill(scope, effectiveRepoId);

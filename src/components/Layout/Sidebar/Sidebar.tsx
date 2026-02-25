@@ -91,15 +91,16 @@ export function Sidebar({
             onClick={() => repoId && router.push(`/repos/${repoId}/${path}`)}
           />
         ))}
-      </nav>
-
-      <div className={styles.footer}>
+        <div className={styles.navSpacer} />
         <NavItem
           icon={<Archive size={16} />}
           label="Archives"
           active={currentView === "Archive"}
           onClick={() => router.push(`/repos/${repoId}/archive`)}
         />
+      </nav>
+
+      <div className={styles.footer}>
         <div className={styles.agentStatus}>
           <span className={styles.agentLabel}>Agent Status</span>
           <div className={styles.agentIndicator}>

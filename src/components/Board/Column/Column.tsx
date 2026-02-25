@@ -6,6 +6,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import clsx from "clsx";
+import { Archive } from "@phosphor-icons/react";
 
 import type { TaskStatus } from "@/utils/tasks.types";
 import styles from "./Column.module.css";
@@ -20,6 +21,14 @@ const DOT_CLASS: Record<TaskStatus, string> = {
   Done: styles.dotGreen,
 };
 
+const DROP_OVER_CLASS: Record<TaskStatus, string | undefined> = {
+  Backlog: undefined,
+  "Not Started": undefined,
+  "In Progress": styles.dropZoneOverInProgress,
+  Review: styles.dropZoneOverReview,
+  Done: styles.dropZoneOverDone,
+};
+
 export function Column({
   status,
   tasks,
@@ -27,8 +36,12 @@ export function Column({
   onRemoveTask,
   onRecall,
   onHandover: _onHandover,
+  isDropDisabled = false,
 }: ColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const { setNodeRef, isOver } = useDroppable({
+    id: status,
+    disabled: isDropDisabled,
+  });
 
   return (
     <div className={styles.column}>
@@ -42,8 +55,18 @@ export function Column({
 
       <div
         ref={setNodeRef}
-        className={clsx(styles.dropZone, isOver && styles.dropZoneOver)}
+        className={clsx(styles.dropZone, isOver && DROP_OVER_CLASS[status])}
       >
+        {isOver && status === "Done" && (
+          <div className={styles.archiveOverlay}>
+            <Archive
+              className={styles.archiveOverlayIcon}
+              size={28}
+              weight="duotone"
+            />
+            <span className={styles.archiveOverlayText}>Move to Archives</span>
+          </div>
+        )}
         <SortableContext
           items={tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}

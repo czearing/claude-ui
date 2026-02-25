@@ -27,7 +27,11 @@ export function AgentsPage({ repoId }: AgentsPageProps) {
   const effectiveRepoId = scope === "repo" ? repoId : undefined;
 
   const { data: agents = [] } = useAgents(scope, effectiveRepoId);
-  const { data: selectedAgent } = useAgent(selectedName, scope, effectiveRepoId);
+  const { data: selectedAgent } = useAgent(
+    selectedName,
+    scope,
+    effectiveRepoId,
+  );
   const { mutate: createAgent } = useCreateAgent(scope, effectiveRepoId);
   const { mutate: updateAgent } = useUpdateAgent(scope, effectiveRepoId);
   const { mutate: deleteAgent } = useDeleteAgent(scope, effectiveRepoId);

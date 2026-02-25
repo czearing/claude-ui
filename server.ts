@@ -1,16 +1,5 @@
 import next from "next";
-import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
-
-import {
-  parseClaudeStatus,
-  type ParsedStatus,
-} from "./src/utils/parseClaudeStatus";
-import {
-  loadRegistry,
-  saveRegistry,
-  type SessionRegistryEntry,
-} from "./src/utils/sessionRegistry";
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -32,69 +21,9 @@ import { parse } from "node:url";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
+const PTY_MANAGER_PORT = parseInt(process.env.PTY_MANAGER_PORT ?? "3001", 10);
 const app = next({ dev });
 const handle = app.getRequestHandler();
-
-const command = process.platform === "win32" ? "claude.cmd" : "claude";
-
-const BUFFER_CAP = 500 * 1024; // 500 KB rolling buffer per session
-
-// Window after writing the spec to the PTY during which output is treated as
-// echo/startup noise rather than meaningful Claude activity.  Any onData event
-// that fires more than this many ms after spec injection is counted as
-// "meaningful activity", which gates the waiting → Review transition.
-const SPEC_ECHO_WINDOW_MS = 500;
-
-// How long the PTY must be silent before we treat it as "waiting for input".
-// Must be longer than Claude's longest internal API-call pause (~3 s observed)
-// to avoid false-positives during processing gaps.
-const SESSION_IDLE_MS = 5000;
-
-type ClaudeStatus =
-  | "connecting"
-  | "thinking"
-  | "typing"
-  | "waiting"
-  | "exited"
-  | "disconnected";
-
-type HandoverPhase = "spec_sent" | "done";
-
-type SessionEntry = {
-  pty: pty.IPty;
-  outputBuffer: Buffer[];
-  bufferSize: number;
-  activeWs: WebSocket | null;
-  currentStatus: ClaudeStatus;
-  idleTimer: ReturnType<typeof setTimeout> | null;
-  // null for non-handover sessions
-  handoverPhase: HandoverPhase | null;
-  handoverSpec: string;
-  specSentAt: number;
-  hadMeaningfulActivity: boolean;
-  /** Last non-null status from parseClaudeStatus. Used to distinguish
-   *  tool-use silences (last=thinking) from response-complete silences
-   *  (last=typing) so advanceToReview only fires after a real response. */
-  lastMeaningfulStatus: ParsedStatus | null;
-};
-
-const sessions = new Map<string, SessionEntry>();
-
-// ─── Session Registry (persistent across server restarts) ────────────────────
-
-const SESSIONS_REGISTRY_FILE = join(process.cwd(), "sessions-registry.json");
-
-const sessionRegistry = new Map<string, SessionRegistryEntry>();
-
-async function loadSessionRegistry(): Promise<void> {
-  const loaded = await loadRegistry(SESSIONS_REGISTRY_FILE);
-  for (const [k, v] of loaded) {
-    sessionRegistry.set(k, v);
-  }
-}
-
-const saveSessionRegistry = (): Promise<void> =>
-  saveRegistry(SESSIONS_REGISTRY_FILE, sessionRegistry);
 
 // ─── Tasks ─────────────────────────────────────────────────────────────────────────────────
 
@@ -594,81 +523,11 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 
-function appendToBuffer(entry: SessionEntry, chunk: Buffer): void {
-  entry.outputBuffer.push(chunk);
-  entry.bufferSize += chunk.byteLength;
-  while (entry.bufferSize > BUFFER_CAP && entry.outputBuffer.length > 1) {
-    const removed = entry.outputBuffer.shift()!;
-    entry.bufferSize -= removed.byteLength;
-  }
-}
-
-function emitStatus(ws: WebSocket | null, status: ClaudeStatus): void {
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "status", value: status }));
-  }
-}
-
-/**
- * Schedule a "waiting" status transition after PTY silence.
- *
- * Called on every onData chunk. Resets the timer so it only fires after
- * SESSION_IDLE_MS ms of continuous silence — long enough to outlast
- * Claude's internal API-call pauses while still detecting when Claude
- * actually returns to its input prompt.
- */
-function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
-  if (entry.idleTimer !== null) {
-    clearTimeout(entry.idleTimer);
-  }
-  entry.idleTimer = setTimeout(() => {
-    const e = sessions.get(sessionId);
-    if (!e) {
-      return;
-    }
-    e.idleTimer = null;
-    if (e.currentStatus !== "waiting") {
-      e.currentStatus = "waiting";
-      emitStatus(e.activeWs, "waiting");
-    }
-    // Only advance when:
-    //  - hadMeaningfulActivity: we saw the thinking spinner (Claude actually
-    //    processed the spec), guarding against startup splash text that also
-    //    looks like typing
-    //  - lastMeaningfulStatus === "typing": silence followed streamed response,
-    //    not a tool-use gap (thinking → silence = bash/file/API still running)
-    if (
-      e.handoverPhase === "spec_sent" &&
-      e.hadMeaningfulActivity &&
-      e.lastMeaningfulStatus === "typing"
-    ) {
-      e.handoverPhase = "done";
-      advanceToReview(sessionId);
-    }
-  }, SESSION_IDLE_MS);
-}
-
-function advanceToReview(sessionId: string): void {
-  void readAllTasks().then((current) => {
-    const task = current.find((t) => t.sessionId === sessionId);
-    if (task && task.status === "In Progress") {
-      const updated: Task = {
-        ...task,
-        status: "Review",
-        updatedAt: new Date().toISOString(),
-      };
-      void writeTask(updated).then(() =>
-        broadcastTaskEvent("task:updated", updated),
-      );
-    }
-  });
-}
 
 app
   .prepare()
   .then(async () => {
     await ensureDefaultRepo();
-    await loadSessionRegistry();
 
     const server = createServer(async (req, res) => {
       try {
@@ -742,23 +601,16 @@ app
                 ? undefined // clear when restoring
                 : existing.archivedAt, // unchanged
           } as Task;
-          if (becomingDone) {
+          if (becomingDone || leavingDone) {
             delete updated.sessionId;
           }
           await writeTask(updated);
           broadcastTaskEvent("task:updated", updated);
           if (becomingDone && existing.sessionId) {
-            const entry = sessions.get(existing.sessionId);
-            if (entry) {
-              if (entry.idleTimer !== null) {
-                clearTimeout(entry.idleTimer);
-              }
-              entry.activeWs = null;
-              entry.pty.kill();
-              sessions.delete(existing.sessionId);
-            }
-            sessionRegistry.delete(existing.sessionId);
-            void saveSessionRegistry();
+            await fetch(
+              `http://localhost:${PTY_MANAGER_PORT}/sessions/${existing.sessionId}/kill`,
+              { method: "POST" },
+            ).catch(() => {});
           }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(updated));
@@ -814,17 +666,10 @@ app
           await writeTask(updatedTask);
           broadcastTaskEvent("task:updated", updatedTask);
           if (oldSessionId) {
-            const entry = sessions.get(oldSessionId);
-            if (entry) {
-              if (entry.idleTimer !== null) {
-                clearTimeout(entry.idleTimer);
-              }
-              entry.activeWs = null;
-              entry.pty.kill();
-              sessions.delete(oldSessionId);
-            }
-            sessionRegistry.delete(oldSessionId);
-            void saveSessionRegistry();
+            await fetch(
+              `http://localhost:${PTY_MANAGER_PORT}/sessions/${oldSessionId}/kill`,
+              { method: "POST" },
+            ).catch(() => {});
           }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(updatedTask));
@@ -873,133 +718,33 @@ app
           const repo = repos.find((r) => r.id === task.repoId);
           const cwd = repo?.path ?? process.cwd();
 
-          let ptyProcess: pty.IPty;
+          // Delegate PTY spawning to the long-lived pty-manager process so the
+          // Claude session survives future hot-reloads of this server.
+          let ptymgrRes: Response;
           try {
-            // Pass the spec directly as a CLI argument so Claude starts
-            // processing immediately — no need to wait for the REPL idle
-            // state and inject via PTY write.
-            ptyProcess = pty.spawn(
-              command,
-              ["--dangerously-skip-permissions", specText],
+            ptymgrRes = await fetch(
+              `http://localhost:${PTY_MANAGER_PORT}/sessions`,
               {
-                name: "xterm-color",
-                cols: 80,
-                rows: 24,
-                cwd,
-                env: process.env as Record<string, string>,
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId, spec: specText, cwd }),
               },
             );
           } catch (err) {
             res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: String(err) }));
+            res.end(
+              JSON.stringify({
+                error: `Failed to reach pty-manager: ${String(err)}`,
+              }),
+            );
             return;
           }
-
-          const entry: SessionEntry = {
-            pty: ptyProcess,
-            outputBuffer: [],
-            bufferSize: 0,
-            activeWs: null,
-            currentStatus: "connecting",
-            idleTimer: null,
-            handoverPhase: "spec_sent",
-            handoverSpec: specText,
-            specSentAt: Date.now(),
-            hadMeaningfulActivity: false,
-            lastMeaningfulStatus: null,
-          };
-          sessions.set(sessionId, entry);
-          sessionRegistry.set(sessionId, {
-            id: sessionId,
-            cwd,
-            taskId: task.id,
-            createdAt: new Date().toISOString(),
-          });
-          void saveSessionRegistry();
-
-          ptyProcess.onData((data) => {
-            const chunk = Buffer.from(data);
-            const e = sessions.get(sessionId);
-            if (!e) {
-              return;
-            }
-
-            appendToBuffer(e, chunk);
-            if (e.activeWs?.readyState === WebSocket.OPEN) {
-              e.activeWs.send(chunk);
-            }
-
-            const parsed = parseClaudeStatus(data);
-            if (parsed !== null) {
-              e.lastMeaningfulStatus = parsed;
-              if (parsed !== e.currentStatus) {
-                e.currentStatus = parsed;
-                emitStatus(e.activeWs, parsed);
-              }
-            }
-
-            // thinking spinner OR ⎿ prefix (tool results, "Interrupted" message,
-            // etc.) = Claude Code is actively working. "⎿" never appears in the
-            // startup splash so it's safe to use as a meaningful-activity signal
-            // even when no spinner was detected (e.g. the task was interrupted
-            // before thinking started).
-            if (
-              e.handoverPhase === "spec_sent" &&
-              !e.hadMeaningfulActivity &&
-              (parsed === "thinking" || data.includes("⎿")) &&
-              Date.now() - e.specSentAt > SPEC_ECHO_WINDOW_MS
-            ) {
-              e.hadMeaningfulActivity = true;
-            }
-
-            // Fast path: ❯ prompt detected = Claude is done (task complete or
-            // question asked). Advance to Review immediately without waiting for
-            // the idle timer to fire.
-            if (
-              parsed === "waiting" &&
-              e.handoverPhase === "spec_sent" &&
-              e.hadMeaningfulActivity
-            ) {
-              if (e.idleTimer !== null) {
-                clearTimeout(e.idleTimer);
-                e.idleTimer = null;
-              }
-              e.handoverPhase = "done";
-              advanceToReview(sessionId);
-              return;
-            }
-
-            // Fallback: schedule waiting detection after PTY silence
-            scheduleIdleStatus(e, sessionId);
-          });
-
-          ptyProcess.onExit(({ exitCode }) => {
-            const e = sessions.get(sessionId);
-            // Use explicit undefined check: `undefined !== null` would
-            // spuriously set isHandover=true when the session was already
-            // removed (e.g. by recall before the process exited).
-            const isHandover = e !== undefined && e.handoverPhase !== null;
-            const wasHandoverDone = e?.handoverPhase === "done";
-            if (e) {
-              if (e.idleTimer !== null) {
-                clearTimeout(e.idleTimer);
-              }
-              e.currentStatus = "exited";
-              if (e.activeWs?.readyState === WebSocket.OPEN) {
-                e.activeWs.send(
-                  JSON.stringify({ type: "exit", code: exitCode }),
-                );
-                e.activeWs.close();
-              }
-            }
-            sessions.delete(sessionId);
-
-            // Fallback: if the process exits before the state machine could
-            // advance to Review (e.g. Claude crashed), do it now.
-            if (isHandover && !wasHandoverDone) {
-              advanceToReview(sessionId);
-            }
-          });
+          if (!ptymgrRes.ok) {
+            const errText = await ptymgrRes.text();
+            res.writeHead(502, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: errText }));
+            return;
+          }
 
           const inProgressTask: Task = {
             ...task,
@@ -1015,23 +760,42 @@ app
           return;
         }
 
-        // Handle DELETE /api/sessions/:id — kill the pty and remove from registry
+        // Handle DELETE /api/sessions/:id — proxy kill to pty-manager
         if (
           req.method === "DELETE" &&
           parsedUrl.pathname?.startsWith("/api/sessions/")
         ) {
           const id = parsedUrl.pathname.slice("/api/sessions/".length);
-          const entry = sessions.get(id);
-          if (entry) {
-            if (entry.idleTimer !== null) {
-              clearTimeout(entry.idleTimer);
-            }
-            entry.activeWs = null;
-            entry.pty.kill();
-            sessions.delete(id);
+          await fetch(`http://localhost:${PTY_MANAGER_PORT}/sessions/${id}`, {
+            method: "DELETE",
+          }).catch(() => {});
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        // POST /api/internal/sessions/:id/advance-to-review
+        // Called by pty-manager when it detects a session is ready for review.
+        if (
+          req.method === "POST" &&
+          parsedUrl.pathname?.startsWith("/api/internal/sessions/") &&
+          parsedUrl.pathname.endsWith("/advance-to-review")
+        ) {
+          const id = parsedUrl.pathname.slice(
+            "/api/internal/sessions/".length,
+            -"/advance-to-review".length,
+          );
+          const current = await readAllTasks();
+          const task = current.find((t) => t.sessionId === id);
+          if (task && task.status === "In Progress") {
+            const updated: Task = {
+              ...task,
+              status: "Review",
+              updatedAt: new Date().toISOString(),
+            };
+            await writeTask(updated);
+            broadcastTaskEvent("task:updated", updated);
           }
-          sessionRegistry.delete(id);
-          void saveSessionRegistry();
           res.writeHead(204);
           res.end();
           return;
@@ -1452,15 +1216,67 @@ app
       }
     });
 
-    const wss = new WebSocketServer({ noServer: true });
+    // WebSocket server for board broadcasts (task events)
     const boardWss = new WebSocketServer({ noServer: true });
+    // Separate no-handler WSS used only to upgrade terminal connections before
+    // proxying them to pty-manager.
+    const terminalWss = new WebSocketServer({ noServer: true });
 
     server.on("upgrade", (req, socket, head) => {
       const url = parse(req.url ?? "", true);
       if (url.pathname === "/ws/terminal") {
-        wss.handleUpgrade(req, socket, head, (ws) =>
-          wss.emit("connection", ws, req),
-        );
+        terminalWss.handleUpgrade(req, socket, head, (browserWs) => {
+          const sessionId = url.query["sessionId"] as string | undefined;
+          if (!sessionId) {
+            browserWs.send(
+              JSON.stringify({ type: "error", message: "Missing sessionId" }),
+            );
+            browserWs.close();
+            return;
+          }
+
+          // Proxy: bridge this browser WS to the pty-manager WS.
+          const ptymgrWs = new WebSocket(
+            `ws://localhost:${PTY_MANAGER_PORT}/session?sessionId=${encodeURIComponent(sessionId)}`,
+          );
+
+          // Buffer messages that arrive before the upstream connection opens.
+          const pending: Array<{ data: Buffer | string; isBinary: boolean }> =
+            [];
+
+          browserWs.on("message", (data, isBinary) => {
+            if (ptymgrWs.readyState === WebSocket.OPEN) {
+              ptymgrWs.send(data, { binary: isBinary });
+            } else {
+              pending.push({ data: data as Buffer | string, isBinary });
+            }
+          });
+
+          ptymgrWs.on("open", () => {
+            for (const { data, isBinary } of pending) {
+              ptymgrWs.send(data, { binary: isBinary });
+            }
+            pending.length = 0;
+          });
+
+          ptymgrWs.on("message", (data, isBinary) => {
+            if (browserWs.readyState === WebSocket.OPEN) {
+              browserWs.send(data, { binary: isBinary });
+            }
+          });
+
+          ptymgrWs.on("close", () => browserWs.close());
+          ptymgrWs.on("error", (err) => {
+            if (browserWs.readyState === WebSocket.OPEN) {
+              browserWs.send(
+                JSON.stringify({ type: "error", message: String(err) }),
+              );
+            }
+            browserWs.close();
+          });
+
+          browserWs.on("close", () => ptymgrWs.close());
+        });
       } else if (url.pathname === "/ws/board") {
         boardWss.handleUpgrade(req, socket, head, (ws) =>
           boardWss.emit("connection", ws, req),
@@ -1473,170 +1289,6 @@ app
     boardWss.on("connection", (ws) => {
       boardClients.add(ws);
       ws.on("close", () => boardClients.delete(ws));
-    });
-
-    wss.on("connection", (ws, req) => {
-      const url = parse(req.url ?? "", true);
-      const sessionId = url.query["sessionId"] as string | undefined;
-
-      if (!sessionId) {
-        ws.send(
-          JSON.stringify({ type: "error", message: "Missing sessionId" }),
-        );
-        ws.close();
-        return;
-      }
-
-      let entry = sessions.get(sessionId);
-
-      if (entry) {
-        // Reconnect: attach this WS, replay buffer, resync status
-        entry.activeWs = ws;
-        if (entry.outputBuffer.length > 0) {
-          const replay = Buffer.concat(entry.outputBuffer);
-          ws.send(
-            JSON.stringify({ type: "replay", data: replay.toString("base64") }),
-          );
-        }
-        emitStatus(ws, entry.currentStatus);
-      } else {
-        // New or resumed session: spawn pty
-        const registryEntry = sessionRegistry.get(sessionId);
-        const sessionCwd = registryEntry?.cwd ?? process.cwd();
-        const spawnArgs = registryEntry
-          ? ["--dangerously-skip-permissions", "--continue"]
-          : ["--dangerously-skip-permissions"];
-
-        let ptyProcess: pty.IPty;
-        try {
-          ptyProcess = pty.spawn(command, spawnArgs, {
-            name: "xterm-color",
-            cols: 80,
-            rows: 24,
-            cwd: sessionCwd,
-            env: process.env as Record<string, string>,
-          });
-        } catch (err) {
-          ws.send(JSON.stringify({ type: "error", message: String(err) }));
-          ws.close();
-          return;
-        }
-
-        // Track in registry so the session survives future server restarts
-        if (!registryEntry) {
-          sessionRegistry.set(sessionId, {
-            id: sessionId,
-            cwd: process.cwd(),
-            createdAt: new Date().toISOString(),
-          });
-          void saveSessionRegistry();
-        } else {
-          // Notify the client that --continue was used to resume the conversation
-          ws.send(JSON.stringify({ type: "resumed" }));
-        }
-
-        entry = {
-          pty: ptyProcess,
-          outputBuffer: [],
-          bufferSize: 0,
-          activeWs: ws,
-          currentStatus: "connecting",
-          idleTimer: null,
-          handoverPhase: null,
-          handoverSpec: "",
-          specSentAt: 0,
-          hadMeaningfulActivity: false,
-          lastMeaningfulStatus: null,
-        };
-        sessions.set(sessionId, entry);
-        emitStatus(ws, "connecting");
-
-        ptyProcess.onData((data) => {
-          const chunk = Buffer.from(data);
-          const e = sessions.get(sessionId)!;
-          appendToBuffer(e, chunk);
-          if (e.activeWs?.readyState === WebSocket.OPEN) {
-            e.activeWs.send(chunk);
-          }
-
-          const parsed = parseClaudeStatus(data);
-          if (parsed !== null) {
-            e.lastMeaningfulStatus = parsed;
-            if (parsed !== e.currentStatus) {
-              e.currentStatus = parsed;
-              emitStatus(e.activeWs, parsed);
-            }
-          }
-
-          // Track meaningful activity: thinking spinner or ⎿ prefix (tool
-          // results, "Interrupted" message). Recalled sessions also need this
-          // so the ❯ fast-path below can fire for In-Progress tasks.
-          if (
-            !e.hadMeaningfulActivity &&
-            (parsed === "thinking" || data.includes("⎿"))
-          ) {
-            e.hadMeaningfulActivity = true;
-          }
-
-          // Fast path for recalled sessions: ❯ prompt + meaningful activity
-          // means the task needs user attention — advance to Review if it is
-          // still "In Progress". advanceToReview checks status before moving.
-          if (parsed === "waiting" && e.hadMeaningfulActivity) {
-            void advanceToReview(sessionId);
-          }
-
-          scheduleIdleStatus(e, sessionId);
-        });
-
-        ptyProcess.onExit(({ exitCode }) => {
-          const e = sessions.get(sessionId);
-          if (e) {
-            if (e.idleTimer !== null) {
-              clearTimeout(e.idleTimer);
-            }
-            e.currentStatus = "exited";
-            if (e.activeWs?.readyState === WebSocket.OPEN) {
-              e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
-              e.activeWs.close();
-            }
-          }
-          sessions.delete(sessionId);
-        });
-      }
-
-      ws.on("message", (data, isBinary) => {
-        const e = sessions.get(sessionId);
-        if (!e) {
-          return;
-        }
-        if (isBinary) {
-          e.pty.write(Buffer.from(data as ArrayBuffer).toString());
-        } else {
-          const text = (data as Buffer).toString("utf8");
-          try {
-            const msg = JSON.parse(text) as {
-              type: string;
-              cols?: number;
-              rows?: number;
-            };
-            if (msg.type === "resize" && msg.cols && msg.rows) {
-              e.pty.resize(msg.cols, msg.rows);
-              return;
-            }
-          } catch {
-            // not JSON — write raw to PTY
-          }
-          e.pty.write(text);
-        }
-      });
-
-      ws.on("close", () => {
-        const e = sessions.get(sessionId);
-        if (e) {
-          e.activeWs = null;
-          // Do NOT kill pty — session stays alive
-        }
-      });
     });
 
     server.listen(port, () => {

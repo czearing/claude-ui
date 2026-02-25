@@ -56,18 +56,28 @@ describe("useDebouncedCallback", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it("clears the pending timer on unmount", () => {
+  it("flushes the pending callback immediately on unmount", () => {
     const fn = jest.fn();
-    const { result, unmount } = renderHook(() =>
-      useDebouncedCallback(fn, 300),
-    );
+    const { result, unmount } = renderHook(() => useDebouncedCallback(fn, 300));
     const [schedule] = result.current;
 
-    act(() => schedule("will be cleared"));
+    act(() => schedule("flush on unmount"));
     unmount();
-    act(() => jest.advanceTimersByTime(300));
 
-    expect(fn).not.toHaveBeenCalled();
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenCalledWith("flush on unmount");
+  });
+
+  it("does not double-fire when unmounting after the timer already fired", () => {
+    const fn = jest.fn();
+    const { result, unmount } = renderHook(() => useDebouncedCallback(fn, 300));
+    const [schedule] = result.current;
+
+    act(() => schedule("only once"));
+    act(() => jest.advanceTimersByTime(300));
+    unmount();
+
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it("uses the latest callback ref without requiring stable identity", () => {

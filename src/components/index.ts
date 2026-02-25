@@ -1,4 +1,4 @@
-export { ArchivePage } from "./ArchivePage";
+export * from "./ArchivePage";
 export * from "./Board/Backlog";
 export * from "./Board/Board";
 export * from "./Board/Column";
@@ -8,7 +8,6 @@ export * from "./Editor/SpecEditor";
 export * from "./InstanceCard";
 export * from "./Layout/Sidebar";
 export * from "./Layout/TopBar";
-export * from "./Modals/NewIssueModal";
 export * from "./Agents/AgentEditor";
 export * from "./Agents/AgentList";
 export * from "./Skills/SkillEditor";

@@ -109,3 +109,7 @@ package-manifest.json
 tasks.json
 repos.json
 task-logs/
+sessions-registry.json
+
+# Specs (local task specs, not tracked in git)
+specs/

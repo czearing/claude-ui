@@ -1,12 +1,10 @@
 "use client";
 
-import { Plus } from "@phosphor-icons/react";
-
 import { useRepos } from "@/hooks/useRepos";
 import styles from "./TopBar.module.css";
 import type { TopBarProps } from "./TopBar.types";
 
-export function TopBar({ repoId, currentView, onNewTask }: TopBarProps) {
+export function TopBar({ repoId, currentView }: TopBarProps) {
   const { data: repos = [] } = useRepos();
   const repoName = repos.find((r) => r.id === repoId)?.name ?? "…";
 
@@ -16,15 +14,6 @@ export function TopBar({ repoId, currentView, onNewTask }: TopBarProps) {
         <span>{repoName}</span>
         <span>/</span>
         <span className={styles.breadcrumbCurrent}>{currentView}</span>
-      </div>
-
-      <div className={styles.actions}>
-        {currentView === "Tasks" && (
-          <button className={styles.newIssueButton} onClick={onNewTask}>
-            <Plus size={16} weight="bold" />
-            <span>New Task</span>
-          </button>
-        )}
       </div>
     </header>
   );

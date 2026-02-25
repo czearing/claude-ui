@@ -27,7 +27,7 @@ export function SkillEditor({
   const [scheduleSave] = useDebouncedCallback(
     (newDescription: string, newContent: string) =>
       onChange(newDescription, newContent),
-    800,
+    300,
   );
 
   useEffect(() => {
@@ -45,6 +45,9 @@ export function SkillEditor({
   }
 
   function handleContentChange(val: string) {
+    // Skip if the editor round-tripped to the same markdown that was loaded
+    // (e.g. OnChangePlugin firing immediately after ContentLoader).
+    if (val === content) return;
     scheduleSave(localDescription, val);
   }
 
@@ -77,9 +80,8 @@ export function SkillEditor({
   function handleDescriptionKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      const ce = editorBodyRef.current?.querySelector<HTMLElement>(
-        "[contenteditable]",
-      );
+      const ce =
+        editorBodyRef.current?.querySelector<HTMLElement>("[contenteditable]");
       ce?.focus();
     }
   }
