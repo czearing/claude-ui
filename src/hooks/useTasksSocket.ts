@@ -1,8 +1,8 @@
 // src/hooks/useTasksSocket.ts
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type { Task } from "@/utils/tasks.types";
 

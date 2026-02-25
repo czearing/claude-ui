@@ -1,15 +1,15 @@
 // src/components/Layout/Sidebar/RepoSwitcher/RepoSwitcher.tsx
 "use client";
 
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { CaretUpDown, Check, Plus } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CaretUpDown, Check, Plus } from "@phosphor-icons/react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { useRouter } from "next/navigation";
 
 import { useRepos } from "@/hooks/useRepos";
 import { AddRepoDialog } from "./AddRepoDialog";
-import type { RepoSwitcherProps } from "./RepoSwitcher.types";
 import styles from "./RepoSwitcher.module.css";
+import type { RepoSwitcherProps } from "./RepoSwitcher.types";
 
 export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
   const { data: repos = [] } = useRepos();

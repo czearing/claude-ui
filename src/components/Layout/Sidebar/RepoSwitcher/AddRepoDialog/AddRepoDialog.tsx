@@ -1,12 +1,12 @@
 // src/components/Layout/Sidebar/RepoSwitcher/AddRepoDialog/AddRepoDialog.tsx
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 import { useCreateRepo } from "@/hooks/useRepos";
-import type { AddRepoDialogProps } from "./AddRepoDialog.types";
 import styles from "./AddRepoDialog.module.css";
+import type { AddRepoDialogProps } from "./AddRepoDialog.types";
 
 export function AddRepoDialog({
   open,

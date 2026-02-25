@@ -1,28 +1,25 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
-import { X } from "@phosphor-icons/react";
 import { useState } from "react";
+import { X } from "@phosphor-icons/react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 import { useCreateTask } from "@/hooks/useTasks";
-import type { Priority } from "@/utils/tasks.types";
-import type { NewIssueModalProps } from "./NewIssueModal.types";
 import styles from "./NewIssueModal.module.css";
+import type { NewIssueModalProps } from "./NewIssueModal.types";
 
 export function NewIssueModal({ repoId, open, onClose }: NewIssueModalProps) {
   const { mutate: createTask } = useCreateTask(repoId);
   const [title, setTitle] = useState("");
-  const [priority, setPriority] = useState<Priority>("Medium");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {return;}
     createTask(
-      { title: title.trim(), priority, status: "Backlog" },
+      { title: title.trim(), status: "Backlog" },
       {
         onSuccess: () => {
           setTitle("");
-          setPriority("Medium");
           onClose();
         },
       },
@@ -54,20 +51,6 @@ export function NewIssueModal({ repoId, open, onClose }: NewIssueModalProps) {
                   placeholder="What needs to be done?"
                   className={styles.input}
                 />
-              </div>
-
-              <div className={styles.field}>
-                <label className={styles.label}>Priority</label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as Priority)}
-                  className={styles.select}
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
               </div>
 
               <div className={styles.formFooter}>

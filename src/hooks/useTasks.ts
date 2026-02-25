@@ -13,7 +13,7 @@ function tasksKey(repoId: string) {
 
 async function fetchTasks(repoId: string): Promise<Task[]> {
   const res = await fetch(`/api/tasks?repoId=${encodeURIComponent(repoId)}`);
-  if (!res.ok) throw new Error("Failed to fetch tasks");
+  if (!res.ok) {throw new Error("Failed to fetch tasks");}
   return res.json() as Promise<Task[]>;
 }
 
@@ -21,7 +21,7 @@ export function useTasks(repoId: string) {
   return useQuery({
     queryKey: tasksKey(repoId),
     queryFn: () => fetchTasks(repoId),
-    enabled: !!repoId,
+    enabled: Boolean(repoId),
   });
 }
 
@@ -62,7 +62,7 @@ export function useUpdateTask(repoId: string) {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous)
-        queryClient.setQueryData(tasksKey(repoId), context.previous);
+        {queryClient.setQueryData(tasksKey(repoId), context.previous);}
     },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
@@ -83,7 +83,7 @@ export function useDeleteTask(repoId: string) {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous)
-        queryClient.setQueryData(tasksKey(repoId), context.previous);
+        {queryClient.setQueryData(tasksKey(repoId), context.previous);}
     },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
