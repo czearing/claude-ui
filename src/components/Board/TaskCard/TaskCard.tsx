@@ -5,6 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowCounterClockwise,
+  ArrowRight,
   DotsThree,
   Eye,
   FileText,
@@ -39,16 +40,6 @@ export function TaskCard({
   const isAgentActive = task.status === "In Progress";
   const isReview = task.status === "Review";
   const isDone = task.status === "Done";
-
-  const handleRecall = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onRecall?.(task.id);
-  };
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onRemove?.(task.id);
-  };
 
   return (
     <div
@@ -91,54 +82,46 @@ export function TaskCard({
                 align="end"
                 sideOffset={4}
                 onCloseAutoFocus={(e) => e.preventDefault()}
+                onClick={(e) => e.stopPropagation()}
               >
-                <DropdownMenu.Item asChild>
-                  <button
-                    className={styles.menuItem}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelect(task);
-                    }}
-                  >
-                    <span className={styles.menuItemLabel}>
-                      <Eye size={13} />
-                      View prompt
-                    </span>
-                  </button>
+                <DropdownMenu.Item
+                  className={styles.menuItem}
+                  onSelect={() => onSelect(task)}
+                >
+                  <span className={styles.menuItemLabel}>
+                    <Eye size={13} />
+                    View prompt
+                  </span>
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className={styles.menuSeparator} />
-                {onRecall && (
+                {isAgentActive && onRecall && (
                   <>
-                    <DropdownMenu.Item asChild>
-                      <button
-                        className={styles.menuItem}
-                        onClick={handleRecall}
-                      >
-                        <span className={styles.menuItemLabel}>
-                          <ArrowCounterClockwise size={13} />
-                          Move to Backlog
+                    <DropdownMenu.Item
+                      className={styles.menuItem}
+                      onSelect={() => onRecall?.(task.id)}
+                    >
+                      <span className={styles.menuItemLabel}>
+                        <ArrowCounterClockwise size={13} />
+                        Move to Backlog
+                      </span>
+                      {isAgentActive && (
+                        <span className={styles.menuItemSubtext}>
+                          stops the running agent
                         </span>
-                        {isAgentActive && (
-                          <span className={styles.menuItemSubtext}>
-                            stops the running agent
-                          </span>
-                        )}
-                      </button>
+                      )}
                     </DropdownMenu.Item>
                     <DropdownMenu.Separator className={styles.menuSeparator} />
                   </>
                 )}
                 {onRemove && (
-                  <DropdownMenu.Item asChild>
-                    <button
-                      className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                      onClick={handleDelete}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <Trash size={13} />
-                        Delete
-                      </span>
-                    </button>
+                  <DropdownMenu.Item
+                    className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                    onSelect={() => onRemove?.(task.id)}
+                  >
+                    <span className={styles.menuItemLabel}>
+                      <Trash size={13} />
+                      Delete
+                    </span>
                   </DropdownMenu.Item>
                 )}
               </DropdownMenu.Content>
@@ -157,6 +140,16 @@ export function TaskCard({
 
       <div className={styles.footer}>
         <div className={styles.meta} />
+        {task.sessionId && (
+          <a
+            href={`/repos/${task.repoId}/session/${task.sessionId}`}
+            className={styles.sessionLink}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span>Terminal</span>
+            <ArrowRight size={10} />
+          </a>
+        )}
       </div>
     </div>
   );

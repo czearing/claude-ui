@@ -130,6 +130,20 @@ describe("Backlog", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not delete a task when Space opens the ... menu (keyup-bleed guard)", async () => {
+    const deleteMutate = jest.fn();
+    (useDeleteTask as jest.Mock).mockReturnValue({ mutate: deleteMutate });
+    render(
+      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+    );
+    const trigger = screen.getByRole("button", {
+      name: /more actions for fix login bug/i,
+    });
+    trigger.focus();
+    await userEvent.keyboard(" ");
+    expect(deleteMutate).not.toHaveBeenCalled();
+  });
+
   it("calls handoverTask when Send to Agent is clicked", async () => {
     const handoverMutate = jest.fn();
     (useHandoverTask as jest.Mock).mockReturnValue({ mutate: handoverMutate });

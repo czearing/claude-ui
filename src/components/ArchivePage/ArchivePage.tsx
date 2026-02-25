@@ -123,19 +123,14 @@ export function ArchivePage({ repoId }: ArchivePageProps) {
                         sideOffset={4}
                         onCloseAutoFocus={(e) => e.preventDefault()}
                       >
-                        <DropdownMenu.Item asChild>
-                          <button
-                            className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteTask(task.id);
-                            }}
-                          >
-                            <span className={styles.menuItemLabel}>
-                              <Trash size={13} />
-                              Delete
-                            </span>
-                          </button>
+                        <DropdownMenu.Item
+                          className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                          onSelect={() => deleteTask(task.id)}
+                        >
+                          <span className={styles.menuItemLabel}>
+                            <Trash size={13} />
+                            Delete
+                          </span>
                         </DropdownMenu.Item>
                       </DropdownMenu.Content>
                     </DropdownMenu.Root>
