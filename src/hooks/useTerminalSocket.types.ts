@@ -1,1 +1,6 @@
-export type ClaudeStatus = "connecting" | "busy" | "idle" | "exited" | "disconnected";
+export type ClaudeStatus =
+  | "connecting"
+  | "busy"
+  | "idle"
+  | "exited"
+  | "disconnected";

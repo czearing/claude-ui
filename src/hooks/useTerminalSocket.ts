@@ -8,7 +8,7 @@ import type { ClaudeStatus } from "./useTerminalSocket.types";
 export const useTerminalSocket = (
   xterm: XTerm | null,
   sessionId: string,
-  onStatus?: (status: ClaudeStatus) => void
+  onStatus?: (status: ClaudeStatus) => void,
 ) => {
   useEffect(() => {
     if (!xterm) {

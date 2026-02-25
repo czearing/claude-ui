@@ -97,14 +97,18 @@ describe("useTerminalSocket", () => {
 
   it("calls onStatus('connecting') immediately when xterm is provided", () => {
     const onStatus = jest.fn();
-    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+    renderHook(() =>
+      useTerminalSocket(mockXterm as never, "session-abc", onStatus),
+    );
 
     expect(onStatus).toHaveBeenCalledWith("connecting");
   });
 
   it("calls onStatus with the value from a status frame", () => {
     const onStatus = jest.fn();
-    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+    renderHook(() =>
+      useTerminalSocket(mockXterm as never, "session-abc", onStatus),
+    );
 
     MockWebSocket.lastInstance.onmessage?.({
       data: JSON.stringify({ type: "status", value: "busy" }),
@@ -115,7 +119,9 @@ describe("useTerminalSocket", () => {
 
   it("calls onStatus('exited') on exit message", () => {
     const onStatus = jest.fn();
-    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+    renderHook(() =>
+      useTerminalSocket(mockXterm as never, "session-abc", onStatus),
+    );
 
     MockWebSocket.lastInstance.onmessage?.({
       data: JSON.stringify({ type: "exit" }),
@@ -126,7 +132,9 @@ describe("useTerminalSocket", () => {
 
   it("calls onStatus('disconnected') on WS close", () => {
     const onStatus = jest.fn();
-    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+    renderHook(() =>
+      useTerminalSocket(mockXterm as never, "session-abc", onStatus),
+    );
 
     MockWebSocket.lastInstance.onclose?.();
 

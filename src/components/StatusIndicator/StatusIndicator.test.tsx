@@ -17,10 +17,13 @@ describe("StatusIndicator", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it.each(statuses)("renders the correct label for status $status", ({ status, label }) => {
-    render(<StatusIndicator status={status} />);
-    expect(screen.getByText(label)).toBeInTheDocument();
-  });
+  it.each(statuses)(
+    "renders the correct label for status $status",
+    ({ status, label }) => {
+      render(<StatusIndicator status={status} />);
+      expect(screen.getByText(label)).toBeInTheDocument();
+    },
+  );
 
   it.each(statuses)(
     "has correct aria-label for status $status",
@@ -28,9 +31,9 @@ describe("StatusIndicator", () => {
       render(<StatusIndicator status={status} />);
       expect(screen.getByRole("status")).toHaveAttribute(
         "aria-label",
-        `Claude status: ${label}`
+        `Claude status: ${label}`,
       );
-    }
+    },
   );
 
   it.each(statuses)(
@@ -39,6 +42,6 @@ describe("StatusIndicator", () => {
       render(<StatusIndicator status={status} />);
       const el = screen.getByRole("status");
       expect(el.className).toContain(status);
-    }
+    },
   );
 });

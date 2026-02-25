@@ -311,7 +311,9 @@ app
               }
               e.currentStatus = "exited";
               if (e.activeWs?.readyState === WebSocket.OPEN) {
-                e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+                e.activeWs.send(
+                  JSON.stringify({ type: "exit", code: exitCode }),
+                );
                 e.activeWs.close();
               }
             }
