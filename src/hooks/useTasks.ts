@@ -7,32 +7,39 @@ import type {
   UpdateTaskInput,
 } from "@/utils/tasks.types";
 
-const TASKS_KEY = ["tasks"] as const;
+function tasksKey(repoId: string) {
+  return ["tasks", repoId] as const;
+}
 
-async function fetchTasks(): Promise<Task[]> {
-  const res = await fetch("/api/tasks");
+async function fetchTasks(repoId: string): Promise<Task[]> {
+  const res = await fetch(`/api/tasks?repoId=${encodeURIComponent(repoId)}`);
   if (!res.ok) throw new Error("Failed to fetch tasks");
   return res.json() as Promise<Task[]>;
 }
 
-export function useTasks() {
-  return useQuery({ queryKey: TASKS_KEY, queryFn: fetchTasks });
-}
-
-export function useCreateTask() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateTaskInput) =>
-      fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      }).then((r) => r.json()) as Promise<Task>,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+export function useTasks(repoId: string) {
+  return useQuery({
+    queryKey: tasksKey(repoId),
+    queryFn: () => fetchTasks(repoId),
+    enabled: !!repoId,
   });
 }
 
-export function useUpdateTask() {
+export function useCreateTask(repoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<CreateTaskInput, "repoId">) =>
+      fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...input, repoId }),
+      }).then((r) => r.json()) as Promise<Task>,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+  });
+}
+
+export function useUpdateTask(repoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateTaskInput & { id: string }) =>
@@ -42,9 +49,9 @@ export function useUpdateTask() {
         body: JSON.stringify(input),
       }).then((r) => r.json()) as Promise<Task>,
     onMutate: async ({ id, ...input }) => {
-      await queryClient.cancelQueries({ queryKey: TASKS_KEY });
-      const previous = queryClient.getQueryData<Task[]>(TASKS_KEY);
-      queryClient.setQueryData<Task[]>(TASKS_KEY, (old) =>
+      await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
+      const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
+      queryClient.setQueryData<Task[]>(tasksKey(repoId), (old) =>
         (old ?? []).map((t) =>
           t.id === id
             ? { ...t, ...input, updatedAt: new Date().toISOString() }
@@ -55,39 +62,42 @@ export function useUpdateTask() {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous)
-        queryClient.setQueryData(TASKS_KEY, context.previous);
+        queryClient.setQueryData(tasksKey(repoId), context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
   });
 }
 
-export function useDeleteTask() {
+export function useDeleteTask(repoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => fetch(`/api/tasks/${id}`, { method: "DELETE" }),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: TASKS_KEY });
-      const previous = queryClient.getQueryData<Task[]>(TASKS_KEY);
-      queryClient.setQueryData<Task[]>(TASKS_KEY, (old) =>
+      await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
+      const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
+      queryClient.setQueryData<Task[]>(tasksKey(repoId), (old) =>
         (old ?? []).filter((t) => t.id !== id),
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous)
-        queryClient.setQueryData(TASKS_KEY, context.previous);
+        queryClient.setQueryData(tasksKey(repoId), context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
   });
 }
 
-export function useHandoverTask() {
+export function useHandoverTask(repoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       fetch(`/api/tasks/${id}/handover`, { method: "POST" }).then((r) =>
         r.json(),
       ) as Promise<Task>,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
   });
 }

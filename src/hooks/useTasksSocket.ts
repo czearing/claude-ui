@@ -4,7 +4,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-const TASK_EVENTS = new Set(["task:created", "task:updated", "task:deleted"]);
+import type { Task } from "@/utils/tasks.types";
+
+type TaskEvent =
+  | { type: "task:created"; data: Task }
+  | { type: "task:updated"; data: Task }
+  | { type: "task:deleted"; data: { id: string; repoId?: string } }
+  | { type: "repo:created" | "repo:deleted"; data: unknown };
 
 export function useTasksSocket() {
   const queryClient = useQueryClient();
@@ -15,9 +21,21 @@ export function useTasksSocket() {
 
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data as string) as { type: string };
-        if (TASK_EVENTS.has(msg.type)) {
-          void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        const msg = JSON.parse(event.data as string) as TaskEvent;
+        if (msg.type === "task:created" || msg.type === "task:updated") {
+          void queryClient.invalidateQueries({
+            queryKey: ["tasks", msg.data.repoId],
+          });
+        } else if (msg.type === "task:deleted") {
+          if (msg.data.repoId) {
+            void queryClient.invalidateQueries({
+              queryKey: ["tasks", msg.data.repoId],
+            });
+          } else {
+            void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+          }
+        } else if (msg.type === "repo:created" || msg.type === "repo:deleted") {
+          void queryClient.invalidateQueries({ queryKey: ["repos"] });
         }
       } catch {
         // ignore non-JSON messages
