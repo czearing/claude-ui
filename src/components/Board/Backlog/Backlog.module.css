@@ -83,7 +83,9 @@
   border: none;
   cursor: pointer;
   background: transparent;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   color: var(--color-text-muted);
 }
 

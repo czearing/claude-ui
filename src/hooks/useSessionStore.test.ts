@@ -6,9 +6,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
   };
 })();
 
@@ -34,10 +40,9 @@ describe("useSessionStore", () => {
       await result.current.deleteSession(session!.id);
     });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `/api/sessions/${session!.id}`,
-      { method: "DELETE" }
-    );
+    expect(global.fetch).toHaveBeenCalledWith(`/api/sessions/${session!.id}`, {
+      method: "DELETE",
+    });
   });
 
   it("deleteSession removes session from state", async () => {
@@ -60,7 +65,9 @@ describe("useSessionStore", () => {
   });
 
   it("deleteSession removes session even if fetch throws", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+    (global.fetch as jest.Mock).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
     const { result } = renderHook(() => useSessionStore());
 
     let session: ReturnType<typeof result.current.addSession>;

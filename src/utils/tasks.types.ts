@@ -1,7 +1,12 @@
 // src/utils/tasks.types.ts
-export type TaskStatus = 'Backlog' | 'Not Started' | 'In Progress' | 'Review' | 'Done';
-export type TaskType = 'Spec' | 'Develop';
-export type Priority = 'Low' | 'Medium' | 'High' | 'Urgent';
+export type TaskStatus =
+  | "Backlog"
+  | "Not Started"
+  | "In Progress"
+  | "Review"
+  | "Done";
+export type TaskType = "Spec" | "Develop";
+export type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 export interface Task {
   id: string;
@@ -15,5 +20,9 @@ export interface Task {
   updatedAt: string; // ISO timestamp
 }
 
-export type CreateTaskInput = Pick<Task, 'title' | 'type' | 'priority'> & { status?: TaskStatus };
-export type UpdateTaskInput = Partial<Pick<Task, 'title' | 'type' | 'status' | 'priority' | 'spec' | 'sessionId'>>;
+export type CreateTaskInput = Pick<Task, "title" | "type" | "priority"> & {
+  status?: TaskStatus;
+};
+export type UpdateTaskInput = Partial<
+  Pick<Task, "title" | "type" | "status" | "priority" | "spec" | "sessionId">
+>;

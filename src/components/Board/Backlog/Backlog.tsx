@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { Code, FileText, Plus } from '@phosphor-icons/react';
-import clsx from 'clsx';
-import { useState } from 'react';
+import { Code, FileText, Plus } from "@phosphor-icons/react";
+import clsx from "clsx";
+import { useState } from "react";
 
-import { useCreateTask, useTasks } from '@/hooks/useTasks';
-import { useTasksSocket } from '@/hooks/useTasksSocket';
-import type { Task, TaskType } from '@/utils/tasks.types';
-import { TaskCard } from '../TaskCard';
-import styles from './Backlog.module.css';
+import { useCreateTask, useTasks } from "@/hooks/useTasks";
+import { useTasksSocket } from "@/hooks/useTasksSocket";
+import type { Task, TaskType } from "@/utils/tasks.types";
+import { TaskCard } from "../TaskCard";
+import styles from "./Backlog.module.css";
 
 interface BacklogProps {
   onSelectTask: (task: Task) => void;
@@ -19,16 +19,21 @@ export function Backlog({ onSelectTask }: BacklogProps) {
 
   const { data: allTasks = [] } = useTasks();
   const { mutate: createTask } = useCreateTask();
-  const backlogTasks = allTasks.filter(t => t.status === 'Backlog');
+  const backlogTasks = allTasks.filter((t) => t.status === "Backlog");
 
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftType, setDraftType] = useState<TaskType>('Spec');
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftType, setDraftType] = useState<TaskType>("Spec");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!draftTitle.trim()) return;
-    createTask({ title: draftTitle.trim(), type: draftType, priority: 'Medium', status: 'Backlog' });
-    setDraftTitle('');
+    createTask({
+      title: draftTitle.trim(),
+      type: draftType,
+      priority: "Medium",
+      status: "Backlog",
+    });
+    setDraftTitle("");
   };
 
   return (
@@ -44,34 +49,43 @@ export function Backlog({ onSelectTask }: BacklogProps) {
           <input
             type="text"
             value={draftTitle}
-            onChange={e => setDraftTitle(e.target.value)}
+            onChange={(e) => setDraftTitle(e.target.value)}
             placeholder="Create a new draft..."
             className={styles.createInput}
           />
           <div className={styles.typeToggle}>
-            {(['Spec', 'Develop'] as TaskType[]).map(t => (
+            {(["Spec", "Develop"] as TaskType[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setDraftType(t)}
-                className={clsx(styles.typeButton, draftType === t && styles.typeButtonActive)}
+                className={clsx(
+                  styles.typeButton,
+                  draftType === t && styles.typeButtonActive,
+                )}
               >
-                {t === 'Spec' ? <FileText size={12} /> : <Code size={12} />}
+                {t === "Spec" ? <FileText size={12} /> : <Code size={12} />}
                 {t}
               </button>
             ))}
           </div>
-          <button type="submit" disabled={!draftTitle.trim()} className={styles.addButton}>
+          <button
+            type="submit"
+            disabled={!draftTitle.trim()}
+            className={styles.addButton}
+          >
             Add
           </button>
         </form>
 
         <div className={styles.list}>
-          {backlogTasks.map(task => (
+          {backlogTasks.map((task) => (
             <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
           ))}
           {backlogTasks.length === 0 && (
-            <div className={styles.emptyState}>No issues in the backlog. Create a draft above to get started.</div>
+            <div className={styles.emptyState}>
+              No issues in the backlog. Create a draft above to get started.
+            </div>
           )}
         </div>
       </div>

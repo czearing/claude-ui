@@ -10,12 +10,14 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
     }
 
     const ws = new WebSocket(
-      `ws://${window.location.host}/ws/terminal?sessionId=${encodeURIComponent(sessionId)}`
+      `ws://${window.location.host}/ws/terminal?sessionId=${encodeURIComponent(sessionId)}`,
     );
     ws.binaryType = "arraybuffer";
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "resize", cols: xterm.cols, rows: xterm.rows }));
+      ws.send(
+        JSON.stringify({ type: "resize", cols: xterm.cols, rows: xterm.rows }),
+      );
     };
 
     ws.onmessage = (event: MessageEvent) => {
@@ -34,7 +36,9 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
           xterm.clear();
           xterm.write(Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0)));
         } else if (msg.type === "exit") {
-          xterm.write("\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n");
+          xterm.write(
+            "\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n",
+          );
         } else if (msg.type === "error") {
           xterm.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
         }

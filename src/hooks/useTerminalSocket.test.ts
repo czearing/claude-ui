@@ -34,7 +34,10 @@ class MockWebSocket {
   static lastInstance: MockWebSocket;
 }
 
-Object.defineProperty(window, "WebSocket", { value: MockWebSocket, writable: true });
+Object.defineProperty(window, "WebSocket", {
+  value: MockWebSocket,
+  writable: true,
+});
 // jsdom default URL is http://localhost/ so window.location.host === "localhost"
 
 describe("useTerminalSocket", () => {
@@ -46,7 +49,7 @@ describe("useTerminalSocket", () => {
     renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
 
     expect(MockWebSocket.lastInstance.url).toBe(
-      "ws://localhost/ws/terminal?sessionId=session-abc"
+      "ws://localhost/ws/terminal?sessionId=session-abc",
     );
   });
 
@@ -56,7 +59,7 @@ describe("useTerminalSocket", () => {
     MockWebSocket.lastInstance.onopen?.();
 
     expect(MockWebSocket.lastInstance.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: "resize", cols: 80, rows: 24 })
+      JSON.stringify({ type: "resize", cols: 80, rows: 24 }),
     );
   });
 
@@ -80,7 +83,7 @@ describe("useTerminalSocket", () => {
 
     expect(mockClear).toHaveBeenCalled();
     expect(mockWrite).toHaveBeenCalledWith(
-      Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))
+      Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
     );
   });
 

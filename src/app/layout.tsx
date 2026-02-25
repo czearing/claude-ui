@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import "@/app/global.css";
-import { Providers } from './Providers';
+import { Providers } from "./Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,7 +19,11 @@ export const metadata: Metadata = {
   description: "Claude Code UI",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>

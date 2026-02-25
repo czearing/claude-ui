@@ -13,7 +13,11 @@ const mockSession: InstanceCardProps["session"] = {
 describe("InstanceCard", () => {
   it("renders the session name", () => {
     render(
-      <InstanceCard session={mockSession} onOpen={jest.fn()} onDelete={jest.fn()} />
+      <InstanceCard
+        session={mockSession}
+        onOpen={jest.fn()}
+        onDelete={jest.fn()}
+      />,
     );
 
     expect(screen.getByText("Instance 1")).toBeInTheDocument();
@@ -21,7 +25,11 @@ describe("InstanceCard", () => {
 
   it("renders a relative date", () => {
     render(
-      <InstanceCard session={mockSession} onOpen={jest.fn()} onDelete={jest.fn()} />
+      <InstanceCard
+        session={mockSession}
+        onOpen={jest.fn()}
+        onDelete={jest.fn()}
+      />,
     );
 
     expect(screen.getByText("just now")).toBeInTheDocument();
@@ -30,10 +38,16 @@ describe("InstanceCard", () => {
   it("calls onOpen with the session when the card is clicked", async () => {
     const onOpen = jest.fn();
     render(
-      <InstanceCard session={mockSession} onOpen={onOpen} onDelete={jest.fn()} />
+      <InstanceCard
+        session={mockSession}
+        onOpen={onOpen}
+        onDelete={jest.fn()}
+      />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Open Instance 1" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open Instance 1" }),
+    );
 
     expect(onOpen).toHaveBeenCalledWith(mockSession);
   });
@@ -41,10 +55,16 @@ describe("InstanceCard", () => {
   it("calls onDelete with the session id when the delete button is clicked", async () => {
     const onDelete = jest.fn();
     render(
-      <InstanceCard session={mockSession} onOpen={jest.fn()} onDelete={onDelete} />
+      <InstanceCard
+        session={mockSession}
+        onOpen={jest.fn()}
+        onDelete={onDelete}
+      />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete Instance 1" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete Instance 1" }),
+    );
 
     expect(onDelete).toHaveBeenCalledWith("test-id-1");
   });
@@ -52,10 +72,16 @@ describe("InstanceCard", () => {
   it("does not call onOpen when the delete button is clicked", async () => {
     const onOpen = jest.fn();
     render(
-      <InstanceCard session={mockSession} onOpen={onOpen} onDelete={jest.fn()} />
+      <InstanceCard
+        session={mockSession}
+        onOpen={onOpen}
+        onDelete={jest.fn()}
+      />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete Instance 1" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete Instance 1" }),
+    );
 
     expect(onOpen).not.toHaveBeenCalled();
   });

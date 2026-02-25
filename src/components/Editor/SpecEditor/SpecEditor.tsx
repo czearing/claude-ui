@@ -1,24 +1,24 @@
-'use client';
+"use client";
 
-import { PaperPlaneTilt, Robot, User, X } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { PaperPlaneTilt, Robot, User, X } from "@phosphor-icons/react";
+import { useState } from "react";
 
-import { useHandoverTask, useUpdateTask } from '@/hooks/useTasks';
-import { LexicalEditor } from '../LexicalEditor';
-import type { SpecEditorProps } from './SpecEditor.types';
-import styles from './SpecEditor.module.css';
+import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
+import { LexicalEditor } from "../LexicalEditor";
+import type { SpecEditorProps } from "./SpecEditor.types";
+import styles from "./SpecEditor.module.css";
 
 export function SpecEditor({ task, onClose }: SpecEditorProps) {
   const { mutate: updateTask } = useUpdateTask();
   const { mutate: handoverTask, isPending: isHandingOver } = useHandoverTask();
 
-  const [spec, setSpec] = useState(task?.spec ?? '');
+  const [spec, setSpec] = useState(task?.spec ?? "");
   const [isEditing, setIsEditing] = useState(!task?.spec);
 
   if (!task) return null;
 
-  const isBacklog = task.status === 'Backlog';
-  const isReview = task.status === 'Review';
+  const isBacklog = task.status === "Backlog";
+  const isReview = task.status === "Review";
 
   const handleSave = () => {
     updateTask({ id: task.id, spec });
@@ -37,7 +37,11 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
           <span className={styles.taskId}>{task.id}</span>
           <h2 className={styles.taskTitle}>{task.title}</h2>
         </div>
-        <button className={styles.closeButton} onClick={onClose} aria-label="Close">
+        <button
+          className={styles.closeButton}
+          onClick={onClose}
+          aria-label="Close"
+        >
           <X size={20} />
         </button>
       </div>
@@ -58,14 +62,17 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
           <div className={styles.editorToolbar}>
             <span className={styles.editorLabel}>Specification</span>
             {isBacklog && (
-              <button className={styles.editToggle} onClick={() => setIsEditing(v => !v)}>
-                {isEditing ? 'Preview' : 'Edit'}
+              <button
+                className={styles.editToggle}
+                onClick={() => setIsEditing((v) => !v)}
+              >
+                {isEditing ? "Preview" : "Edit"}
               </button>
             )}
           </div>
           <div className={styles.editorBody}>
             <LexicalEditor
-              key={`${task.id}-${isEditing ? 'edit' : 'read'}`}
+              key={`${task.id}-${isEditing ? "edit" : "read"}`}
               value={spec}
               onChange={isEditing ? setSpec : undefined}
               readOnly={!isEditing}
@@ -80,10 +87,15 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
               <span>Agent Notes</span>
             </div>
             <p className={styles.agentNotesText}>
-              Implementation complete according to the spec. Please review the changes in the terminal.
+              Implementation complete according to the spec. Please review the
+              changes in the terminal.
             </p>
             {task.sessionId && (
-              <a href={`/session/${task.sessionId}`} className={styles.viewDiffButton} style={{ textDecoration: 'none', display: 'inline-block' }}>
+              <a
+                href={`/session/${task.sessionId}`}
+                className={styles.viewDiffButton}
+                style={{ textDecoration: "none", display: "inline-block" }}
+              >
                 Open Terminal
               </a>
             )}
@@ -103,9 +115,15 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
             </button>
           )}
           {isBacklog && (
-            <button className={styles.handoverButton} onClick={handleHandover} disabled={isHandingOver}>
+            <button
+              className={styles.handoverButton}
+              onClick={handleHandover}
+              disabled={isHandingOver}
+            >
               <PaperPlaneTilt size={16} />
-              <span>{isHandingOver ? 'Starting...' : 'Handover to Claude'}</span>
+              <span>
+                {isHandingOver ? "Starting..." : "Handover to Claude"}
+              </span>
             </button>
           )}
         </div>

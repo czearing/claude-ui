@@ -26,11 +26,21 @@
   border-radius: 50%;
 }
 
-.dotGray { background-color: #6b7280; }
-.dotLight { background-color: #d1d5db; }
-.dotAgent { background-color: var(--color-agent); }
-.dotOrange { background-color: #f97316; }
-.dotGreen { background-color: #22c55e; }
+.dotGray {
+  background-color: #6b7280;
+}
+.dotLight {
+  background-color: #d1d5db;
+}
+.dotAgent {
+  background-color: var(--color-agent);
+}
+.dotOrange {
+  background-color: #f97316;
+}
+.dotGreen {
+  background-color: #22c55e;
+}
 
 .statusTitle {
   font-size: var(--text-sm);

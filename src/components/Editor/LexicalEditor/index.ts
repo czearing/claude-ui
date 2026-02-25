@@ -1,2 +1,2 @@
-export { LexicalEditor } from './LexicalEditor';
-export type { LexicalEditorProps } from './LexicalEditor.types';
+export { LexicalEditor } from "./LexicalEditor";
+export type { LexicalEditorProps } from "./LexicalEditor.types";

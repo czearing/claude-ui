@@ -36,8 +36,14 @@ export const Terminal = ({ onReady }: TerminalProps) => {
       onReady(null);
       xterm.dispose();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- onReady is a stable setState setter
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onReady is a stable setState setter
   }, []);
 
-  return <div ref={containerRef} data-testid="terminal-container" className={styles.container} />;
+  return (
+    <div
+      ref={containerRef}
+      data-testid="terminal-container"
+      className={styles.container}
+    />
+  );
 };

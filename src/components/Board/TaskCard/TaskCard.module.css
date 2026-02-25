@@ -8,7 +8,11 @@
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
   cursor: grab;
-  transition: border-color 150ms, opacity 150ms, transform 150ms, box-shadow 150ms;
+  transition:
+    border-color 150ms,
+    opacity 150ms,
+    transform 150ms,
+    box-shadow 150ms;
 }
 
 .card:active {
@@ -95,7 +99,12 @@
 .shimmer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
   animation: shimmer 2s infinite;
 }
 
@@ -118,10 +127,18 @@
   color: var(--color-text-muted);
 }
 
-.priorityLow { color: #9ca3af; }
-.priorityMedium { color: #60a5fa; }
-.priorityHigh { color: #fb923c; }
-.priorityUrgent { color: #ef4444; }
+.priorityLow {
+  color: #9ca3af;
+}
+.priorityMedium {
+  color: #60a5fa;
+}
+.priorityHigh {
+  color: #fb923c;
+}
+.priorityUrgent {
+  color: #ef4444;
+}
 
 .avatar {
   width: 20px;

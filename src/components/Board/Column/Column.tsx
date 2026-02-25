@@ -1,16 +1,19 @@
-import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import clsx from 'clsx';
+import { useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import clsx from "clsx";
 
-import type { TaskStatus } from '@/utils/tasks.types';
-import { TaskCard } from '../TaskCard';
-import type { ColumnProps } from './Column.types';
-import styles from './Column.module.css';
+import type { TaskStatus } from "@/utils/tasks.types";
+import { TaskCard } from "../TaskCard";
+import type { ColumnProps } from "./Column.types";
+import styles from "./Column.module.css";
 
 const DOT_CLASS: Record<TaskStatus, string> = {
   Backlog: styles.dotGray,
-  'Not Started': styles.dotLight,
-  'In Progress': styles.dotAgent,
+  "Not Started": styles.dotLight,
+  "In Progress": styles.dotAgent,
   Review: styles.dotOrange,
   Done: styles.dotGreen,
 };
@@ -28,9 +31,15 @@ export function Column({ status, tasks, onSelectTask }: ColumnProps) {
         </div>
       </div>
 
-      <div ref={setNodeRef} className={clsx(styles.dropZone, isOver && styles.dropZoneOver)}>
-        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map(task => (
+      <div
+        ref={setNodeRef}
+        className={clsx(styles.dropZone, isOver && styles.dropZoneOver)}
+      >
+        <SortableContext
+          items={tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {tasks.map((task) => (
             <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
           ))}
         </SortableContext>

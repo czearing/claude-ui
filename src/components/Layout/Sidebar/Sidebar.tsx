@@ -1,8 +1,14 @@
-import { Archive, CheckSquare, Gear, Kanban, SquaresFour } from '@phosphor-icons/react';
-import clsx from 'clsx';
+import {
+  Archive,
+  CheckSquare,
+  Gear,
+  Kanban,
+  SquaresFour,
+} from "@phosphor-icons/react";
+import clsx from "clsx";
 
-import type { SidebarProps, View } from './Sidebar.types';
-import styles from './Sidebar.module.css';
+import type { SidebarProps, View } from "./Sidebar.types";
+import styles from "./Sidebar.module.css";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -15,7 +21,10 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={clsx(styles.navItem, active ? styles.navItemActive : styles.navItemInactive)}
+      className={clsx(
+        styles.navItem,
+        active ? styles.navItemActive : styles.navItemInactive,
+      )}
     >
       {icon}
       <span>{label}</span>
@@ -24,11 +33,15 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
 }
 
 const NAV_VIEWS: { view: View; label: string; icon: React.ReactNode }[] = [
-  { view: 'Board', label: 'Board', icon: <SquaresFour size={16} /> },
-  { view: 'Backlog', label: 'Backlog', icon: <CheckSquare size={16} /> },
+  { view: "Board", label: "Board", icon: <SquaresFour size={16} /> },
+  { view: "Backlog", label: "Backlog", icon: <CheckSquare size={16} /> },
 ];
 
-export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps) {
+export function Sidebar({
+  currentView,
+  agentActive,
+  onViewChange,
+}: SidebarProps) {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
@@ -40,7 +53,13 @@ export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps
 
       <nav className={styles.nav}>
         {NAV_VIEWS.map(({ view, label, icon }) => (
-          <NavItem key={view} icon={icon} label={label} active={currentView === view} onClick={() => onViewChange(view)} />
+          <NavItem
+            key={view}
+            icon={icon}
+            label={label}
+            active={currentView === view}
+            onClick={() => onViewChange(view)}
+          />
         ))}
         <NavItem icon={<Archive size={16} />} label="Archives" />
       </nav>
@@ -49,8 +68,15 @@ export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps
         <div className={styles.agentStatus}>
           <span className={styles.agentLabel}>Agent Status</span>
           <div className={styles.agentIndicator}>
-            <span className={styles.agentIndicatorText}>{agentActive ? 'Active' : 'Idle'}</span>
-            <div className={clsx(styles.dot, agentActive ? styles.dotActive : styles.dotIdle)} />
+            <span className={styles.agentIndicatorText}>
+              {agentActive ? "Active" : "Idle"}
+            </span>
+            <div
+              className={clsx(
+                styles.dot,
+                agentActive ? styles.dotActive : styles.dotIdle,
+              )}
+            />
           </div>
         </div>
         <NavItem icon={<Gear size={16} />} label="Settings" />

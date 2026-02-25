@@ -4,7 +4,9 @@
   border: 1px solid #30363d;
   border-radius: 8px;
   overflow: hidden;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .card:hover {
@@ -59,7 +61,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .deleteButton:hover {

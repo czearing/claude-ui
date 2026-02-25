@@ -5,7 +5,11 @@ import { formatRelativeDate } from "../../utils/formatRelativeDate";
 import styles from "./InstanceCard.module.css";
 import type { InstanceCardProps } from "./InstanceCard.types";
 
-export const InstanceCard = ({ session, onOpen, onDelete }: InstanceCardProps) => {
+export const InstanceCard = ({
+  session,
+  onOpen,
+  onDelete,
+}: InstanceCardProps) => {
   function handleDelete(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     onDelete(session.id);

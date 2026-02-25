@@ -13,6 +13,7 @@
 ## Task 1: Install Lexical dependencies
 
 **Files:**
+
 - Modify: `package.json` (via yarn)
 
 **Step 1: Install packages**
@@ -41,6 +42,7 @@ git commit -m "feat: add lexical rich text editor dependencies"
 ## Task 2: Add QueryClientProvider to layout
 
 **Files:**
+
 - Create: `src/app/Providers.tsx`
 - Modify: `src/app/layout.tsx`
 
@@ -48,10 +50,10 @@ git commit -m "feat: add lexical rich text editor dependencies"
 
 ```tsx
 // src/app/Providers.tsx
-'use client';
+"use client";
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -66,7 +68,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 }
 ```
 
@@ -75,7 +79,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 Open `src/app/layout.tsx`. Replace:
 
 ```tsx
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>{children}</body>
@@ -87,9 +95,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 With:
 
 ```tsx
-import { Providers } from './Providers';
+import { Providers } from "./Providers";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>
@@ -120,6 +132,7 @@ git commit -m "feat: add TanStack Query client provider to layout"
 ## Task 3: Update global.css — add spacing, radius, typography tokens and shimmer animation
 
 **Files:**
+
 - Modify: `src/app/global.css`
 
 **Step 1: Add tokens and shimmer to the `:root` block and animations section**
@@ -127,28 +140,28 @@ git commit -m "feat: add TanStack Query client provider to layout"
 Open `src/app/global.css`. After the existing `:root` block (after line 60), add to `:root`:
 
 ```css
-  /* Spacing */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
+/* Spacing */
+--space-1: 4px;
+--space-2: 8px;
+--space-3: 12px;
+--space-4: 16px;
+--space-5: 20px;
+--space-6: 24px;
+--space-8: 32px;
 
-  /* Border radius */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
+/* Border radius */
+--radius-sm: 4px;
+--radius-md: 6px;
+--radius-lg: 10px;
+--radius-xl: 12px;
 
-  /* Typography scale */
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-lg: 16px;
-  --text-xl: 18px;
-  --text-2xl: 22px;
+/* Typography scale */
+--text-xs: 11px;
+--text-sm: 13px;
+--text-base: 14px;
+--text-lg: 16px;
+--text-xl: 18px;
+--text-2xl: 22px;
 ```
 
 After the `agentPulse` keyframe, add:
@@ -186,15 +199,21 @@ git commit -m "feat: add spacing, radius, typography tokens and shimmer animatio
 ## Task 4: Create task types
 
 **Files:**
+
 - Create: `src/utils/tasks.types.ts`
 
 **Step 1: Write the types file**
 
 ```ts
 // src/utils/tasks.types.ts
-export type TaskStatus = 'Backlog' | 'Not Started' | 'In Progress' | 'Review' | 'Done';
-export type TaskType = 'Spec' | 'Develop';
-export type Priority = 'Low' | 'Medium' | 'High' | 'Urgent';
+export type TaskStatus =
+  | "Backlog"
+  | "Not Started"
+  | "In Progress"
+  | "Review"
+  | "Done";
+export type TaskType = "Spec" | "Develop";
+export type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 export interface Task {
   id: string;
@@ -208,8 +227,12 @@ export interface Task {
   updatedAt: string; // ISO timestamp
 }
 
-export type CreateTaskInput = Pick<Task, 'title' | 'type' | 'priority'> & { status?: TaskStatus };
-export type UpdateTaskInput = Partial<Pick<Task, 'title' | 'type' | 'status' | 'priority' | 'spec' | 'sessionId'>>;
+export type CreateTaskInput = Pick<Task, "title" | "type" | "priority"> & {
+  status?: TaskStatus;
+};
+export type UpdateTaskInput = Partial<
+  Pick<Task, "title" | "type" | "status" | "priority" | "spec" | "sessionId">
+>;
 ```
 
 **Step 2: Commit**
@@ -224,6 +247,7 @@ git commit -m "feat: add Task type definitions"
 ## Task 5: Add task utilities and REST endpoints to server.ts
 
 **Files:**
+
 - Modify: `server.ts`
 
 **Step 1: Read the file first**
@@ -235,10 +259,10 @@ Read `server.ts` to understand the current structure. Then apply changes.
 After the existing imports, add:
 
 ```ts
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
-import type { IncomingMessage } from 'node:http';
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import type { IncomingMessage } from "node:http";
 ```
 
 **Step 3: Add task types and utilities after the `sessions` Map declaration**
@@ -246,11 +270,11 @@ import type { IncomingMessage } from 'node:http';
 ```ts
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
-const TASKS_FILE = join(process.cwd(), 'tasks.json');
+const TASKS_FILE = join(process.cwd(), "tasks.json");
 
-type TaskStatus = 'Backlog' | 'Not Started' | 'In Progress' | 'Review' | 'Done';
-type TaskType = 'Spec' | 'Develop';
-type Priority = 'Low' | 'Medium' | 'High' | 'Urgent';
+type TaskStatus = "Backlog" | "Not Started" | "In Progress" | "Review" | "Done";
+type TaskType = "Spec" | "Develop";
+type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 interface Task {
   id: string;
@@ -268,7 +292,7 @@ const boardClients = new Set<WebSocket>();
 
 async function readTasks(): Promise<Task[]> {
   try {
-    const raw = await readFile(TASKS_FILE, 'utf8');
+    const raw = await readFile(TASKS_FILE, "utf8");
     return JSON.parse(raw) as Task[];
   } catch {
     return [];
@@ -276,12 +300,12 @@ async function readTasks(): Promise<Task[]> {
 }
 
 async function writeTasks(tasks: Task[]): Promise<void> {
-  await writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), 'utf8');
+  await writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf8");
 }
 
 function broadcastTaskEvent(event: string, data: unknown): void {
   const message = JSON.stringify({ type: event, data });
-  boardClients.forEach(client => {
+  boardClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
     }
@@ -290,10 +314,10 @@ function broadcastTaskEvent(event: string, data: unknown): void {
 
 function generateTaskId(tasks: Task[]): string {
   const maxNum = tasks.reduce((max, t) => {
-    const num = parseInt(t.id.replace('TASK-', ''), 10);
+    const num = parseInt(t.id.replace("TASK-", ""), 10);
     return isNaN(num) ? max : Math.max(max, num);
   }, 0);
-  return `TASK-${String(maxNum + 1).padStart(3, '0')}`;
+  return `TASK-${String(maxNum + 1).padStart(3, "0")}`;
 }
 
 function extractTextFromLexical(specJson: string): string {
@@ -301,17 +325,17 @@ function extractTextFromLexical(specJson: string): string {
     const state = JSON.parse(specJson) as { root: { children: unknown[] } };
     const texts: string[] = [];
     function walk(node: unknown): void {
-      if (typeof node !== 'object' || node === null) return;
+      if (typeof node !== "object" || node === null) return;
       const n = node as Record<string, unknown>;
-      if (n['type'] === 'text' && typeof n['text'] === 'string') {
-        texts.push(n['text'] as string);
+      if (n["type"] === "text" && typeof n["text"] === "string") {
+        texts.push(n["text"] as string);
       }
-      if (Array.isArray(n['children'])) {
-        (n['children'] as unknown[]).forEach(walk);
+      if (Array.isArray(n["children"])) {
+        (n["children"] as unknown[]).forEach(walk);
       }
     }
     walk(state.root);
-    return texts.join('\n');
+    return texts.join("\n");
   } catch {
     return specJson;
   }
@@ -319,16 +343,16 @@ function extractTextFromLexical(specJson: string): string {
 
 function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => (body += String(chunk)));
-    req.on('end', () => {
+    let body = "";
+    req.on("data", (chunk) => (body += String(chunk)));
+    req.on("end", () => {
       try {
-        resolve(JSON.parse(body || '{}') as Record<string, unknown>);
+        resolve(JSON.parse(body || "{}") as Record<string, unknown>);
       } catch {
-        reject(new Error('Invalid JSON body'));
+        reject(new Error("Invalid JSON body"));
       }
     });
-    req.on('error', reject);
+    req.on("error", reject);
   });
 }
 ```
@@ -351,73 +375,78 @@ const server = createServer(async (req, res) => {
 And add the task endpoints **before** the existing `DELETE /api/sessions/:id` block:
 
 ```ts
-    const parsedUrl = parse(req.url!, true);
+const parsedUrl = parse(req.url!, true);
 
-    // GET /api/tasks
-    if (req.method === 'GET' && parsedUrl.pathname === '/api/tasks') {
-      const tasks = await readTasks();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(tasks));
-      return;
-    }
+// GET /api/tasks
+if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
+  const tasks = await readTasks();
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(tasks));
+  return;
+}
 
-    // POST /api/tasks
-    if (req.method === 'POST' && parsedUrl.pathname === '/api/tasks') {
-      const body = await readBody(req);
-      const tasks = await readTasks();
-      const now = new Date().toISOString();
-      const task: Task = {
-        id: generateTaskId(tasks),
-        title: String(body['title'] ?? ''),
-        type: (body['type'] as TaskType) ?? 'Spec',
-        status: (body['status'] as TaskStatus) ?? 'Backlog',
-        priority: (body['priority'] as Priority) ?? 'Medium',
-        spec: String(body['spec'] ?? ''),
-        createdAt: now,
-        updatedAt: now,
-      };
-      tasks.push(task);
-      await writeTasks(tasks);
-      broadcastTaskEvent('task:created', task);
-      res.writeHead(201, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(task));
-      return;
-    }
+// POST /api/tasks
+if (req.method === "POST" && parsedUrl.pathname === "/api/tasks") {
+  const body = await readBody(req);
+  const tasks = await readTasks();
+  const now = new Date().toISOString();
+  const task: Task = {
+    id: generateTaskId(tasks),
+    title: String(body["title"] ?? ""),
+    type: (body["type"] as TaskType) ?? "Spec",
+    status: (body["status"] as TaskStatus) ?? "Backlog",
+    priority: (body["priority"] as Priority) ?? "Medium",
+    spec: String(body["spec"] ?? ""),
+    createdAt: now,
+    updatedAt: now,
+  };
+  tasks.push(task);
+  await writeTasks(tasks);
+  broadcastTaskEvent("task:created", task);
+  res.writeHead(201, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(task));
+  return;
+}
 
-    // PATCH /api/tasks/:id
-    if (
-      req.method === 'PATCH' &&
-      parsedUrl.pathname?.startsWith('/api/tasks/') &&
-      !parsedUrl.pathname.endsWith('/handover')
-    ) {
-      const id = parsedUrl.pathname.slice('/api/tasks/'.length);
-      const body = await readBody(req);
-      const tasks = await readTasks();
-      const idx = tasks.findIndex(t => t.id === id);
-      if (idx === -1) {
-        res.writeHead(404);
-        res.end();
-        return;
-      }
-      tasks[idx] = { ...tasks[idx]!, ...body, id, updatedAt: new Date().toISOString() } as Task;
-      await writeTasks(tasks);
-      broadcastTaskEvent('task:updated', tasks[idx]);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(tasks[idx]));
-      return;
-    }
+// PATCH /api/tasks/:id
+if (
+  req.method === "PATCH" &&
+  parsedUrl.pathname?.startsWith("/api/tasks/") &&
+  !parsedUrl.pathname.endsWith("/handover")
+) {
+  const id = parsedUrl.pathname.slice("/api/tasks/".length);
+  const body = await readBody(req);
+  const tasks = await readTasks();
+  const idx = tasks.findIndex((t) => t.id === id);
+  if (idx === -1) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  tasks[idx] = {
+    ...tasks[idx]!,
+    ...body,
+    id,
+    updatedAt: new Date().toISOString(),
+  } as Task;
+  await writeTasks(tasks);
+  broadcastTaskEvent("task:updated", tasks[idx]);
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(tasks[idx]));
+  return;
+}
 
-    // DELETE /api/tasks/:id
-    if (req.method === 'DELETE' && parsedUrl.pathname?.startsWith('/api/tasks/')) {
-      const id = parsedUrl.pathname.slice('/api/tasks/'.length);
-      const tasks = await readTasks();
-      const filtered = tasks.filter(t => t.id !== id);
-      await writeTasks(filtered);
-      broadcastTaskEvent('task:deleted', { id });
-      res.writeHead(204);
-      res.end();
-      return;
-    }
+// DELETE /api/tasks/:id
+if (req.method === "DELETE" && parsedUrl.pathname?.startsWith("/api/tasks/")) {
+  const id = parsedUrl.pathname.slice("/api/tasks/".length);
+  const tasks = await readTasks();
+  const filtered = tasks.filter((t) => t.id !== id);
+  await writeTasks(filtered);
+  broadcastTaskEvent("task:deleted", { id });
+  res.writeHead(204);
+  res.end();
+  return;
+}
 ```
 
 Close the try-catch at the end (before `server.listen`):
@@ -464,88 +493,108 @@ git commit -m "feat: add task REST endpoints (GET, POST, PATCH, DELETE) to serve
 ## Task 6: Add handover endpoint and board WebSocket to server.ts
 
 **Files:**
+
 - Modify: `server.ts`
 
 **Step 1: Add handover endpoint after the DELETE /api/tasks/:id block (still inside the try block)**
 
 ```ts
-    // POST /api/tasks/:id/handover
-    if (req.method === 'POST' && parsedUrl.pathname?.endsWith('/handover')) {
-      const id = parsedUrl.pathname.slice('/api/tasks/'.length, -'/handover'.length);
-      const tasks = await readTasks();
-      const idx = tasks.findIndex(t => t.id === id);
-      if (idx === -1) {
-        res.writeHead(404);
-        res.end();
-        return;
+// POST /api/tasks/:id/handover
+if (req.method === "POST" && parsedUrl.pathname?.endsWith("/handover")) {
+  const id = parsedUrl.pathname.slice(
+    "/api/tasks/".length,
+    -"/handover".length,
+  );
+  const tasks = await readTasks();
+  const idx = tasks.findIndex((t) => t.id === id);
+  if (idx === -1) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  const task = tasks[idx]!;
+  const sessionId = randomUUID();
+  const specText = extractTextFromLexical(task.spec);
+
+  let ptyProcess: pty.IPty;
+  try {
+    ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
+      name: "xterm-color",
+      cols: 80,
+      rows: 24,
+      cwd: process.cwd(),
+      env: process.env as Record<string, string>,
+    });
+  } catch (err) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: String(err) }));
+    return;
+  }
+
+  const entry: SessionEntry = {
+    pty: ptyProcess,
+    outputBuffer: [],
+    bufferSize: 0,
+    activeWs: null,
+  };
+  sessions.set(sessionId, entry);
+
+  // Send spec as initial prompt after Claude initialises (~2 s)
+  if (specText.trim()) {
+    setTimeout(() => {
+      if (sessions.has(sessionId)) {
+        ptyProcess.write(specText + "\n");
       }
-      const task = tasks[idx]!;
-      const sessionId = randomUUID();
-      const specText = extractTextFromLexical(task.spec);
+    }, 2000);
+  }
 
-      let ptyProcess: pty.IPty;
-      try {
-        ptyProcess = pty.spawn(command, ['--dangerously-skip-permissions'], {
-          name: 'xterm-color',
-          cols: 80,
-          rows: 24,
-          cwd: process.cwd(),
-          env: process.env as Record<string, string>,
-        });
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: String(err) }));
-        return;
-      }
-
-      const entry: SessionEntry = { pty: ptyProcess, outputBuffer: [], bufferSize: 0, activeWs: null };
-      sessions.set(sessionId, entry);
-
-      // Send spec as initial prompt after Claude initialises (~2 s)
-      if (specText.trim()) {
-        setTimeout(() => {
-          if (sessions.has(sessionId)) {
-            ptyProcess.write(specText + '\n');
-          }
-        }, 2000);
-      }
-
-      ptyProcess.onData(data => {
-        const chunk = Buffer.from(data);
-        const e = sessions.get(sessionId);
-        if (!e) return;
-        appendToBuffer(e, chunk);
-        if (e.activeWs?.readyState === WebSocket.OPEN) {
-          e.activeWs.send(chunk);
-        }
-      });
-
-      ptyProcess.onExit(({ exitCode }) => {
-        const e = sessions.get(sessionId);
-        if (e?.activeWs?.readyState === WebSocket.OPEN) {
-          e.activeWs.send(JSON.stringify({ type: 'exit', code: exitCode }));
-          e.activeWs.close();
-        }
-        sessions.delete(sessionId);
-
-        // Auto-advance to Review
-        void readTasks().then(current => {
-          const taskIdx = current.findIndex(t => t.sessionId === sessionId);
-          if (taskIdx !== -1 && current[taskIdx]!.status === 'In Progress') {
-            current[taskIdx] = { ...current[taskIdx]!, status: 'Review', updatedAt: new Date().toISOString() };
-            void writeTasks(current).then(() => broadcastTaskEvent('task:updated', current[taskIdx]));
-          }
-        });
-      });
-
-      tasks[idx] = { ...task, sessionId, status: 'In Progress', updatedAt: new Date().toISOString() };
-      await writeTasks(tasks);
-      broadcastTaskEvent('task:updated', tasks[idx]);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(tasks[idx]));
-      return;
+  ptyProcess.onData((data) => {
+    const chunk = Buffer.from(data);
+    const e = sessions.get(sessionId);
+    if (!e) return;
+    appendToBuffer(e, chunk);
+    if (e.activeWs?.readyState === WebSocket.OPEN) {
+      e.activeWs.send(chunk);
     }
+  });
+
+  ptyProcess.onExit(({ exitCode }) => {
+    const e = sessions.get(sessionId);
+    if (e?.activeWs?.readyState === WebSocket.OPEN) {
+      e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+      e.activeWs.close();
+    }
+    sessions.delete(sessionId);
+
+    // Auto-advance to Review
+    void readTasks().then((current) => {
+      const taskIdx = current.findIndex((t) => t.sessionId === sessionId);
+      if (taskIdx !== -1 && current[taskIdx]!.status === "In Progress") {
+        current[taskIdx] = {
+          ...current[taskIdx]!,
+          status: "Review",
+          updatedAt: new Date().toISOString(),
+        };
+        void writeTasks(current).then(() =>
+          broadcastTaskEvent("task:updated", current[taskIdx]),
+        );
+      }
+    });
+  });
+
+  tasks[idx] = {
+    ...task,
+    sessionId,
+    status: "In Progress",
+    updatedAt: new Date().toISOString(),
+  };
+  await writeTasks(tasks);
+  broadcastTaskEvent("task:updated", tasks[idx]);
+
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(tasks[idx]));
+  return;
+}
 ```
 
 **Step 2: Switch WebSocket server to noServer mode and add board WS**
@@ -554,7 +603,7 @@ Find and replace the WebSocketServer creation line:
 
 ```ts
 // OLD:
-const wss = new WebSocketServer({ server, path: '/ws/terminal' });
+const wss = new WebSocketServer({ server, path: "/ws/terminal" });
 ```
 
 ```ts
@@ -562,20 +611,24 @@ const wss = new WebSocketServer({ server, path: '/ws/terminal' });
 const wss = new WebSocketServer({ noServer: true });
 const boardWss = new WebSocketServer({ noServer: true });
 
-server.on('upgrade', (req, socket, head) => {
-  const url = parse(req.url ?? '', true);
-  if (url.pathname === '/ws/terminal') {
-    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
-  } else if (url.pathname === '/ws/board') {
-    boardWss.handleUpgrade(req, socket, head, ws => boardWss.emit('connection', ws, req));
+server.on("upgrade", (req, socket, head) => {
+  const url = parse(req.url ?? "", true);
+  if (url.pathname === "/ws/terminal") {
+    wss.handleUpgrade(req, socket, head, (ws) =>
+      wss.emit("connection", ws, req),
+    );
+  } else if (url.pathname === "/ws/board") {
+    boardWss.handleUpgrade(req, socket, head, (ws) =>
+      boardWss.emit("connection", ws, req),
+    );
   } else {
     socket.destroy();
   }
 });
 
-boardWss.on('connection', ws => {
+boardWss.on("connection", (ws) => {
   boardClients.add(ws);
-  ws.on('close', () => boardClients.delete(ws));
+  ws.on("close", () => boardClients.delete(ws));
 });
 ```
 
@@ -608,21 +661,26 @@ git commit -m "feat: add task handover endpoint and board WebSocket broadcast"
 ## Task 7: Create useTasks hooks
 
 **Files:**
+
 - Create: `src/hooks/useTasks.ts`
 
 **Step 1: Write the hooks file**
 
 ```ts
 // src/hooks/useTasks.ts
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { CreateTaskInput, Task, UpdateTaskInput } from '@/utils/tasks.types';
+import type {
+  CreateTaskInput,
+  Task,
+  UpdateTaskInput,
+} from "@/utils/tasks.types";
 
-const TASKS_KEY = ['tasks'] as const;
+const TASKS_KEY = ["tasks"] as const;
 
 async function fetchTasks(): Promise<Task[]> {
-  const res = await fetch('/api/tasks');
-  if (!res.ok) throw new Error('Failed to fetch tasks');
+  const res = await fetch("/api/tasks");
+  if (!res.ok) throw new Error("Failed to fetch tasks");
   return res.json() as Promise<Task[]>;
 }
 
@@ -634,11 +692,11 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateTaskInput) =>
-      fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      }).then(r => r.json()) as Promise<Task>,
+      }).then((r) => r.json()) as Promise<Task>,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   });
 }
@@ -648,20 +706,25 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateTaskInput & { id: string }) =>
       fetch(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      }).then(r => r.json()) as Promise<Task>,
+      }).then((r) => r.json()) as Promise<Task>,
     onMutate: async ({ id, ...input }) => {
       await queryClient.cancelQueries({ queryKey: TASKS_KEY });
       const previous = queryClient.getQueryData<Task[]>(TASKS_KEY);
-      queryClient.setQueryData<Task[]>(TASKS_KEY, old =>
-        (old ?? []).map(t => (t.id === id ? { ...t, ...input, updatedAt: new Date().toISOString() } : t)),
+      queryClient.setQueryData<Task[]>(TASKS_KEY, (old) =>
+        (old ?? []).map((t) =>
+          t.id === id
+            ? { ...t, ...input, updatedAt: new Date().toISOString() }
+            : t,
+        ),
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(TASKS_KEY, context.previous);
+      if (context?.previous)
+        queryClient.setQueryData(TASKS_KEY, context.previous);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   });
@@ -670,15 +733,18 @@ export function useUpdateTask() {
 export function useDeleteTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => fetch(`/api/tasks/${id}`, { method: 'DELETE' }),
-    onMutate: async id => {
+    mutationFn: (id: string) => fetch(`/api/tasks/${id}`, { method: "DELETE" }),
+    onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: TASKS_KEY });
       const previous = queryClient.getQueryData<Task[]>(TASKS_KEY);
-      queryClient.setQueryData<Task[]>(TASKS_KEY, old => (old ?? []).filter(t => t.id !== id));
+      queryClient.setQueryData<Task[]>(TASKS_KEY, (old) =>
+        (old ?? []).filter((t) => t.id !== id),
+      );
       return { previous };
     },
     onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(TASKS_KEY, context.previous);
+      if (context?.previous)
+        queryClient.setQueryData(TASKS_KEY, context.previous);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   });
@@ -688,7 +754,9 @@ export function useHandoverTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      fetch(`/api/tasks/${id}/handover`, { method: 'POST' }).then(r => r.json()) as Promise<Task>,
+      fetch(`/api/tasks/${id}/handover`, { method: "POST" }).then((r) =>
+        r.json(),
+      ) as Promise<Task>,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TASKS_KEY }),
   });
 }
@@ -706,31 +774,32 @@ git commit -m "feat: add TanStack Query hooks for tasks CRUD and handover"
 ## Task 8: Create useTasksSocket hook
 
 **Files:**
+
 - Create: `src/hooks/useTasksSocket.ts`
 
 **Step 1: Write the hook**
 
 ```ts
 // src/hooks/useTasksSocket.ts
-'use client';
+"use client";
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
-const TASK_EVENTS = new Set(['task:created', 'task:updated', 'task:deleted']);
+const TASK_EVENTS = new Set(["task:created", "task:updated", "task:deleted"]);
 
 export function useTasksSocket() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws/board`);
 
-    ws.onmessage = event => {
+    ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data as string) as { type: string };
         if (TASK_EVENTS.has(msg.type)) {
-          void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          void queryClient.invalidateQueries({ queryKey: ["tasks"] });
         }
       } catch {
         // ignore non-JSON messages
@@ -754,6 +823,7 @@ git commit -m "feat: add useTasksSocket hook for live task board updates"
 ## Task 9: Create Layout/Sidebar component
 
 **Files:**
+
 - Create: `src/components/Layout/Sidebar/index.ts`
 - Create: `src/components/Layout/Sidebar/Sidebar.tsx`
 - Create: `src/components/Layout/Sidebar/Sidebar.module.css`
@@ -763,7 +833,7 @@ git commit -m "feat: add useTasksSocket hook for live task board updates"
 
 ```ts
 // src/components/Layout/Sidebar/Sidebar.types.ts
-export type View = 'Board' | 'Backlog';
+export type View = "Board" | "Backlog";
 
 export interface SidebarProps {
   currentView: View;
@@ -829,7 +899,9 @@ export interface SidebarProps {
   font-size: var(--text-sm);
   border: none;
   cursor: pointer;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   text-align: left;
   background: transparent;
 }
@@ -901,11 +973,17 @@ export interface SidebarProps {
 
 ```tsx
 // src/components/Layout/Sidebar/Sidebar.tsx
-import { Activity, Archive, CheckSquare, Gear, SquaresFour } from '@phosphor-icons/react';
-import clsx from 'clsx';
+import {
+  Activity,
+  Archive,
+  CheckSquare,
+  Gear,
+  SquaresFour,
+} from "@phosphor-icons/react";
+import clsx from "clsx";
 
-import type { SidebarProps, View } from './Sidebar.types';
-import styles from './Sidebar.module.css';
+import type { SidebarProps, View } from "./Sidebar.types";
+import styles from "./Sidebar.module.css";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -918,7 +996,10 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={clsx(styles.navItem, active ? styles.navItemActive : styles.navItemInactive)}
+      className={clsx(
+        styles.navItem,
+        active ? styles.navItemActive : styles.navItemInactive,
+      )}
     >
       {icon}
       <span>{label}</span>
@@ -927,11 +1008,15 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
 }
 
 const NAV_VIEWS: { view: View; label: string; icon: React.ReactNode }[] = [
-  { view: 'Board', label: 'Board', icon: <SquaresFour size={16} /> },
-  { view: 'Backlog', label: 'Backlog', icon: <CheckSquare size={16} /> },
+  { view: "Board", label: "Board", icon: <SquaresFour size={16} /> },
+  { view: "Backlog", label: "Backlog", icon: <CheckSquare size={16} /> },
 ];
 
-export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps) {
+export function Sidebar({
+  currentView,
+  agentActive,
+  onViewChange,
+}: SidebarProps) {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
@@ -943,7 +1028,13 @@ export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps
 
       <nav className={styles.nav}>
         {NAV_VIEWS.map(({ view, label, icon }) => (
-          <NavItem key={view} icon={icon} label={label} active={currentView === view} onClick={() => onViewChange(view)} />
+          <NavItem
+            key={view}
+            icon={icon}
+            label={label}
+            active={currentView === view}
+            onClick={() => onViewChange(view)}
+          />
         ))}
         <NavItem icon={<Archive size={16} />} label="Archives" />
       </nav>
@@ -952,8 +1043,15 @@ export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps
         <div className={styles.agentStatus}>
           <span className={styles.agentLabel}>Agent Status</span>
           <div className={styles.agentIndicator}>
-            <span className={styles.agentIndicatorText}>{agentActive ? 'Active' : 'Idle'}</span>
-            <div className={clsx(styles.dot, agentActive ? styles.dotActive : styles.dotIdle)} />
+            <span className={styles.agentIndicatorText}>
+              {agentActive ? "Active" : "Idle"}
+            </span>
+            <div
+              className={clsx(
+                styles.dot,
+                agentActive ? styles.dotActive : styles.dotIdle,
+              )}
+            />
           </div>
         </div>
         <NavItem icon={<Gear size={16} />} label="Settings" />
@@ -967,8 +1065,8 @@ export function Sidebar({ currentView, agentActive, onViewChange }: SidebarProps
 
 ```ts
 // src/components/Layout/Sidebar/index.ts
-export { Sidebar } from './Sidebar';
-export type { SidebarProps, View } from './Sidebar.types';
+export { Sidebar } from "./Sidebar";
+export type { SidebarProps, View } from "./Sidebar.types";
 ```
 
 **Step 5: Commit**
@@ -983,6 +1081,7 @@ git commit -m "feat: add Sidebar layout component"
 ## Task 10: Create Layout/TopBar component
 
 **Files:**
+
 - Create: `src/components/Layout/TopBar/index.ts`
 - Create: `src/components/Layout/TopBar/TopBar.tsx`
 - Create: `src/components/Layout/TopBar/TopBar.module.css`
@@ -992,7 +1091,7 @@ git commit -m "feat: add Sidebar layout component"
 
 ```ts
 // src/components/Layout/TopBar/TopBar.types.ts
-import type { View } from '../Sidebar/Sidebar.types';
+import type { View } from "../Sidebar/Sidebar.types";
 
 export interface TopBarProps {
   currentView: View;
@@ -1077,7 +1176,9 @@ export interface TopBarProps {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
 }
 
 .iconButton:hover {
@@ -1115,10 +1216,10 @@ export interface TopBarProps {
 
 ```tsx
 // src/components/Layout/TopBar/TopBar.tsx
-import { Funnel, MagnifyingGlass, Plus, Rows } from '@phosphor-icons/react';
+import { Funnel, MagnifyingGlass, Plus, Rows } from "@phosphor-icons/react";
 
-import type { TopBarProps } from './TopBar.types';
-import styles from './TopBar.module.css';
+import type { TopBarProps } from "./TopBar.types";
+import styles from "./TopBar.module.css";
 
 export function TopBar({ currentView, onNewIssue }: TopBarProps) {
   return (
@@ -1132,7 +1233,11 @@ export function TopBar({ currentView, onNewIssue }: TopBarProps) {
       <div className={styles.actions}>
         <div className={styles.searchWrapper}>
           <MagnifyingGlass size={16} className={styles.searchIcon} />
-          <input type="text" placeholder="Search..." className={styles.searchInput} />
+          <input
+            type="text"
+            placeholder="Search..."
+            className={styles.searchInput}
+          />
         </div>
 
         <button className={styles.iconButton} aria-label="Filter">
@@ -1158,8 +1263,8 @@ export function TopBar({ currentView, onNewIssue }: TopBarProps) {
 
 ```ts
 // src/components/Layout/TopBar/index.ts
-export { TopBar } from './TopBar';
-export type { TopBarProps } from './TopBar.types';
+export { TopBar } from "./TopBar";
+export type { TopBarProps } from "./TopBar.types";
 ```
 
 **Step 5: Commit**
@@ -1174,6 +1279,7 @@ git commit -m "feat: add TopBar layout component"
 ## Task 11: Create Board/Column component
 
 **Files:**
+
 - Create: `src/components/Board/Column/index.ts`
 - Create: `src/components/Board/Column/Column.tsx`
 - Create: `src/components/Board/Column/Column.module.css`
@@ -1183,7 +1289,7 @@ git commit -m "feat: add TopBar layout component"
 
 ```ts
 // src/components/Board/Column/Column.types.ts
-import type { Task, TaskStatus } from '@/utils/tasks.types';
+import type { Task, TaskStatus } from "@/utils/tasks.types";
 
 export interface ColumnProps {
   status: TaskStatus;
@@ -1223,11 +1329,21 @@ export interface ColumnProps {
   border-radius: 50%;
 }
 
-.dotGray { background-color: #6b7280; }
-.dotLight { background-color: #d1d5db; }
-.dotAgent { background-color: var(--color-agent); }
-.dotOrange { background-color: #f97316; }
-.dotGreen { background-color: #22c55e; }
+.dotGray {
+  background-color: #6b7280;
+}
+.dotLight {
+  background-color: #d1d5db;
+}
+.dotAgent {
+  background-color: var(--color-agent);
+}
+.dotOrange {
+  background-color: #f97316;
+}
+.dotGreen {
+  background-color: #22c55e;
+}
 
 .statusTitle {
   font-size: var(--text-sm);
@@ -1264,19 +1380,22 @@ export interface ColumnProps {
 
 ```tsx
 // src/components/Board/Column/Column.tsx
-import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import clsx from 'clsx';
+import { useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import clsx from "clsx";
 
-import type { TaskStatus } from '@/utils/tasks.types';
-import { TaskCard } from '../TaskCard';
-import type { ColumnProps } from './Column.types';
-import styles from './Column.module.css';
+import type { TaskStatus } from "@/utils/tasks.types";
+import { TaskCard } from "../TaskCard";
+import type { ColumnProps } from "./Column.types";
+import styles from "./Column.module.css";
 
 const DOT_CLASS: Record<TaskStatus, string> = {
   Backlog: styles.dotGray,
-  'Not Started': styles.dotLight,
-  'In Progress': styles.dotAgent,
+  "Not Started": styles.dotLight,
+  "In Progress": styles.dotAgent,
   Review: styles.dotOrange,
   Done: styles.dotGreen,
 };
@@ -1294,9 +1413,15 @@ export function Column({ status, tasks }: ColumnProps) {
         </div>
       </div>
 
-      <div ref={setNodeRef} className={clsx(styles.dropZone, isOver && styles.dropZoneOver)}>
-        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map(task => (
+      <div
+        ref={setNodeRef}
+        className={clsx(styles.dropZone, isOver && styles.dropZoneOver)}
+      >
+        <SortableContext
+          items={tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {tasks.map((task) => (
             <TaskCard key={task.id} task={task} />
           ))}
         </SortableContext>
@@ -1310,8 +1435,8 @@ export function Column({ status, tasks }: ColumnProps) {
 
 ```ts
 // src/components/Board/Column/index.ts
-export { Column } from './Column';
-export type { ColumnProps } from './Column.types';
+export { Column } from "./Column";
+export type { ColumnProps } from "./Column.types";
 ```
 
 **Step 5: Commit**
@@ -1326,6 +1451,7 @@ git commit -m "feat: add Board Column component with DnD droppable"
 ## Task 12: Create Board/TaskCard component
 
 **Files:**
+
 - Create: `src/components/Board/TaskCard/index.ts`
 - Create: `src/components/Board/TaskCard/TaskCard.tsx`
 - Create: `src/components/Board/TaskCard/TaskCard.module.css`
@@ -1335,7 +1461,7 @@ git commit -m "feat: add Board Column component with DnD droppable"
 
 ```ts
 // src/components/Board/TaskCard/TaskCard.types.ts
-import type { Task } from '@/utils/tasks.types';
+import type { Task } from "@/utils/tasks.types";
 
 export interface TaskCardProps {
   task: Task;
@@ -1357,7 +1483,11 @@ export interface TaskCardProps {
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
   cursor: grab;
-  transition: border-color 150ms, opacity 150ms, transform 150ms, box-shadow 150ms;
+  transition:
+    border-color 150ms,
+    opacity 150ms,
+    transform 150ms,
+    box-shadow 150ms;
 }
 
 .card:active {
@@ -1444,7 +1574,12 @@ export interface TaskCardProps {
 .shimmer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
   animation: shimmer 2s infinite;
 }
 
@@ -1467,10 +1602,18 @@ export interface TaskCardProps {
   color: var(--color-text-muted);
 }
 
-.priorityLow { color: #9ca3af; }
-.priorityMedium { color: #60a5fa; }
-.priorityHigh { color: #fb923c; }
-.priorityUrgent { color: #ef4444; }
+.priorityLow {
+  color: #9ca3af;
+}
+.priorityMedium {
+  color: #60a5fa;
+}
+.priorityHigh {
+  color: #fb923c;
+}
+.priorityUrgent {
+  color: #ef4444;
+}
 
 .avatar {
   width: 20px;
@@ -1503,14 +1646,21 @@ export interface TaskCardProps {
 
 ```tsx
 // src/components/Board/TaskCard/TaskCard.tsx
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Activity, ArrowRight, Code, FileText, User, Warning } from '@phosphor-icons/react';
-import clsx from 'clsx';
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  Activity,
+  ArrowRight,
+  Code,
+  FileText,
+  User,
+  Warning,
+} from "@phosphor-icons/react";
+import clsx from "clsx";
 
-import type { Priority, Task } from '@/utils/tasks.types';
-import type { TaskCardProps } from './TaskCard.types';
-import styles from './TaskCard.module.css';
+import type { Priority, Task } from "@/utils/tasks.types";
+import type { TaskCardProps } from "./TaskCard.types";
+import styles from "./TaskCard.module.css";
 
 const PRIORITY_CLASS: Record<Priority, string> = {
   Low: styles.priorityLow,
@@ -1520,12 +1670,19 @@ const PRIORITY_CLASS: Record<Priority, string> = {
 };
 
 export function TaskCard({ task, onSelect }: TaskCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
 
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const isAgentActive = task.status === 'In Progress';
-  const isReview = task.status === 'Review';
-  const isDone = task.status === 'Done';
+  const isAgentActive = task.status === "In Progress";
+  const isReview = task.status === "Review";
+  const isDone = task.status === "Done";
 
   return (
     <div
@@ -1543,12 +1700,14 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
     >
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          {task.type === 'Spec' ? (
+          {task.type === "Spec" ? (
             <FileText size={16} className={styles.typeIcon} />
           ) : (
             <Code size={16} className={styles.typeIcon} />
           )}
-          <span className={clsx(styles.title, isDone && styles.titleDone)}>{task.title}</span>
+          <span className={clsx(styles.title, isDone && styles.titleDone)}>
+            {task.title}
+          </span>
         </div>
         {isReview && <span className={styles.reviewBadge}>Review</span>}
       </div>
@@ -1571,7 +1730,7 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
           <a
             href={`/session/${task.sessionId}`}
             className={styles.sessionLink}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <span>Terminal</span>
             <ArrowRight size={10} />
@@ -1591,8 +1750,8 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
 
 ```ts
 // src/components/Board/TaskCard/index.ts
-export { TaskCard } from './TaskCard';
-export type { TaskCardProps } from './TaskCard.types';
+export { TaskCard } from "./TaskCard";
+export type { TaskCardProps } from "./TaskCard.types";
 ```
 
 **Step 5: Commit**
@@ -1607,6 +1766,7 @@ git commit -m "feat: add TaskCard component with agent pulse and session link"
 ## Task 13: Create Board/Board component
 
 **Files:**
+
 - Create: `src/components/Board/Board/index.ts`
 - Create: `src/components/Board/Board/Board.tsx`
 - Create: `src/components/Board/Board/Board.module.css`
@@ -1636,7 +1796,7 @@ git commit -m "feat: add TaskCard component with agent pulse and session link"
 
 ```tsx
 // src/components/Board/Board/Board.tsx
-'use client';
+"use client";
 
 import {
   DndContext,
@@ -1648,18 +1808,23 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
-} from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useState } from 'react';
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { useState } from "react";
 
-import { useUpdateTask } from '@/hooks/useTasks';
-import { useTasksSocket } from '@/hooks/useTasksSocket';
-import type { Task, TaskStatus } from '@/utils/tasks.types';
-import { Column } from '../Column';
-import { TaskCard } from '../TaskCard';
-import styles from './Board.module.css';
+import { useUpdateTask } from "@/hooks/useTasks";
+import { useTasksSocket } from "@/hooks/useTasksSocket";
+import type { Task, TaskStatus } from "@/utils/tasks.types";
+import { Column } from "../Column";
+import { TaskCard } from "../TaskCard";
+import styles from "./Board.module.css";
 
-const BOARD_COLUMNS: TaskStatus[] = ['Not Started', 'In Progress', 'Review', 'Done'];
+const BOARD_COLUMNS: TaskStatus[] = [
+  "Not Started",
+  "In Progress",
+  "Review",
+  "Done",
+];
 
 interface BoardProps {
   tasks: Task[];
@@ -1674,11 +1839,13 @@ export function Board({ tasks, onSelectTask }: BoardProps) {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveTask(tasks.find(t => t.id === active.id) ?? null);
+    setActiveTask(tasks.find((t) => t.id === active.id) ?? null);
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -1688,7 +1855,7 @@ export function Board({ tasks, onSelectTask }: BoardProps) {
     const overId = over.id as string;
     const targetStatus = BOARD_COLUMNS.includes(overId as TaskStatus)
       ? (overId as TaskStatus)
-      : (tasks.find(t => t.id === overId)?.status ?? null);
+      : (tasks.find((t) => t.id === overId)?.status ?? null);
 
     if (targetStatus && active.id !== over.id) {
       updateTask({ id: active.id as string, status: targetStatus });
@@ -1697,15 +1864,27 @@ export function Board({ tasks, onSelectTask }: BoardProps) {
 
   return (
     <div className={styles.board}>
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
         <div className={styles.columns}>
-          {BOARD_COLUMNS.map(status => (
-            <Column key={status} status={status} tasks={tasks.filter(t => t.status === status)} onSelectTask={onSelectTask} />
+          {BOARD_COLUMNS.map((status) => (
+            <Column
+              key={status}
+              status={status}
+              tasks={tasks.filter((t) => t.status === status)}
+              onSelectTask={onSelectTask}
+            />
           ))}
         </div>
 
         <DragOverlay>
-          {activeTask ? <TaskCard task={activeTask} onSelect={() => undefined} /> : null}
+          {activeTask ? (
+            <TaskCard task={activeTask} onSelect={() => undefined} />
+          ) : null}
         </DragOverlay>
       </DndContext>
     </div>
@@ -1719,14 +1898,15 @@ export function Board({ tasks, onSelectTask }: BoardProps) {
 
 ```ts
 // src/components/Board/Board/index.ts
-export { Board } from './Board';
+export { Board } from "./Board";
 ```
 
 **Step 4: Update Column to forward onSelectTask**
 
 In `Column.types.ts` add:
+
 ```ts
-import type { Task, TaskStatus } from '@/utils/tasks.types';
+import type { Task, TaskStatus } from "@/utils/tasks.types";
 
 export interface ColumnProps {
   status: TaskStatus;
@@ -1736,10 +1916,13 @@ export interface ColumnProps {
 ```
 
 In `Column.tsx`, pass `onSelectTask` to each `TaskCard`:
+
 ```tsx
-{tasks.map(task => (
-  <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
-))}
+{
+  tasks.map((task) => (
+    <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
+  ));
+}
 ```
 
 **Step 5: Commit**
@@ -1754,6 +1937,7 @@ git commit -m "feat: add Board component with DnD context and column layout"
 ## Task 14: Create Board/Backlog component
 
 **Files:**
+
 - Create: `src/components/Board/Backlog/index.ts`
 - Create: `src/components/Board/Backlog/Backlog.tsx`
 - Create: `src/components/Board/Backlog/Backlog.module.css`
@@ -1847,7 +2031,9 @@ git commit -m "feat: add Board component with DnD context and column layout"
   border: none;
   cursor: pointer;
   background: transparent;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   color: var(--color-text-muted);
 }
 
@@ -1898,17 +2084,17 @@ git commit -m "feat: add Board component with DnD context and column layout"
 
 ```tsx
 // src/components/Board/Backlog/Backlog.tsx
-'use client';
+"use client";
 
-import { Code, FileText, Plus } from '@phosphor-icons/react';
-import clsx from 'clsx';
-import { useState } from 'react';
+import { Code, FileText, Plus } from "@phosphor-icons/react";
+import clsx from "clsx";
+import { useState } from "react";
 
-import { useCreateTask, useTasks } from '@/hooks/useTasks';
-import { useTasksSocket } from '@/hooks/useTasksSocket';
-import type { Task, TaskType } from '@/utils/tasks.types';
-import { TaskCard } from '../TaskCard';
-import styles from './Backlog.module.css';
+import { useCreateTask, useTasks } from "@/hooks/useTasks";
+import { useTasksSocket } from "@/hooks/useTasksSocket";
+import type { Task, TaskType } from "@/utils/tasks.types";
+import { TaskCard } from "../TaskCard";
+import styles from "./Backlog.module.css";
 
 interface BacklogProps {
   onSelectTask: (task: Task) => void;
@@ -1919,16 +2105,21 @@ export function Backlog({ onSelectTask }: BacklogProps) {
 
   const { data: allTasks = [] } = useTasks();
   const { mutate: createTask } = useCreateTask();
-  const backlogTasks = allTasks.filter(t => t.status === 'Backlog');
+  const backlogTasks = allTasks.filter((t) => t.status === "Backlog");
 
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftType, setDraftType] = useState<TaskType>('Spec');
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftType, setDraftType] = useState<TaskType>("Spec");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!draftTitle.trim()) return;
-    createTask({ title: draftTitle.trim(), type: draftType, priority: 'Medium', status: 'Backlog' });
-    setDraftTitle('');
+    createTask({
+      title: draftTitle.trim(),
+      type: draftType,
+      priority: "Medium",
+      status: "Backlog",
+    });
+    setDraftTitle("");
   };
 
   return (
@@ -1944,34 +2135,43 @@ export function Backlog({ onSelectTask }: BacklogProps) {
           <input
             type="text"
             value={draftTitle}
-            onChange={e => setDraftTitle(e.target.value)}
+            onChange={(e) => setDraftTitle(e.target.value)}
             placeholder="Create a new draft..."
             className={styles.createInput}
           />
           <div className={styles.typeToggle}>
-            {(['Spec', 'Develop'] as TaskType[]).map(t => (
+            {(["Spec", "Develop"] as TaskType[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setDraftType(t)}
-                className={clsx(styles.typeButton, draftType === t && styles.typeButtonActive)}
+                className={clsx(
+                  styles.typeButton,
+                  draftType === t && styles.typeButtonActive,
+                )}
               >
-                {t === 'Spec' ? <FileText size={12} /> : <Code size={12} />}
+                {t === "Spec" ? <FileText size={12} /> : <Code size={12} />}
                 {t}
               </button>
             ))}
           </div>
-          <button type="submit" disabled={!draftTitle.trim()} className={styles.addButton}>
+          <button
+            type="submit"
+            disabled={!draftTitle.trim()}
+            className={styles.addButton}
+          >
             Add
           </button>
         </form>
 
         <div className={styles.list}>
-          {backlogTasks.map(task => (
+          {backlogTasks.map((task) => (
             <TaskCard key={task.id} task={task} onSelect={onSelectTask} />
           ))}
           {backlogTasks.length === 0 && (
-            <div className={styles.emptyState}>No issues in the backlog. Create a draft above to get started.</div>
+            <div className={styles.emptyState}>
+              No issues in the backlog. Create a draft above to get started.
+            </div>
           )}
         </div>
       </div>
@@ -1984,7 +2184,7 @@ export function Backlog({ onSelectTask }: BacklogProps) {
 
 ```ts
 // src/components/Board/Backlog/index.ts
-export { Backlog } from './Backlog';
+export { Backlog } from "./Backlog";
 ```
 
 **Step 4: Commit**
@@ -1999,6 +2199,7 @@ git commit -m "feat: add Backlog view component with inline task creation"
 ## Task 15: Create Editor/LexicalEditor component
 
 **Files:**
+
 - Create: `src/components/Editor/LexicalEditor/index.ts`
 - Create: `src/components/Editor/LexicalEditor/LexicalEditor.tsx`
 - Create: `src/components/Editor/LexicalEditor/LexicalEditor.module.css`
@@ -2046,24 +2247,24 @@ export interface LexicalEditorProps {
 
 ```tsx
 // src/components/Editor/LexicalEditor/LexicalEditor.tsx
-'use client';
+"use client";
 
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import type { EditorState } from 'lexical';
-import { useEffect } from 'react';
+import { LexicalComposer } from "@lexical/react/LexicalComposer";
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
+import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
+import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { ContentEditable } from "@lexical/react/LexicalContentEditable";
+import type { EditorState } from "lexical";
+import { useEffect } from "react";
 
-import type { LexicalEditorProps } from './LexicalEditor.types';
-import styles from './LexicalEditor.module.css';
+import type { LexicalEditorProps } from "./LexicalEditor.types";
+import styles from "./LexicalEditor.module.css";
 
 const THEME = {
-  paragraph: '',
-  text: { bold: 'font-bold', italic: 'italic', underline: 'underline' },
+  paragraph: "",
+  text: { bold: "font-bold", italic: "italic", underline: "underline" },
 };
 
 function StateLoader({ value }: { value?: string }) {
@@ -2080,9 +2281,13 @@ function StateLoader({ value }: { value?: string }) {
   return null;
 }
 
-export function LexicalEditor({ value, onChange, readOnly = false }: LexicalEditorProps) {
+export function LexicalEditor({
+  value,
+  onChange,
+  readOnly = false,
+}: LexicalEditorProps) {
   const initialConfig = {
-    namespace: 'SpecEditor',
+    namespace: "SpecEditor",
     theme: THEME,
     editable: !readOnly,
     onError: (error: Error) => console.error(error),
@@ -2097,7 +2302,9 @@ export function LexicalEditor({ value, onChange, readOnly = false }: LexicalEdit
       <div className={styles.wrapper}>
         <RichTextPlugin
           contentEditable={<ContentEditable className={styles.editorContent} />}
-          placeholder={<div className={styles.placeholder}>Enter spec details...</div>}
+          placeholder={
+            <div className={styles.placeholder}>Enter spec details...</div>
+          }
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />
@@ -2113,8 +2320,8 @@ export function LexicalEditor({ value, onChange, readOnly = false }: LexicalEdit
 
 ```ts
 // src/components/Editor/LexicalEditor/index.ts
-export { LexicalEditor } from './LexicalEditor';
-export type { LexicalEditorProps } from './LexicalEditor.types';
+export { LexicalEditor } from "./LexicalEditor";
+export type { LexicalEditorProps } from "./LexicalEditor.types";
 ```
 
 **Step 5: Commit**
@@ -2129,6 +2336,7 @@ git commit -m "feat: add LexicalEditor rich text component"
 ## Task 16: Create Editor/SpecEditor component
 
 **Files:**
+
 - Create: `src/components/Editor/SpecEditor/index.ts`
 - Create: `src/components/Editor/SpecEditor/SpecEditor.tsx`
 - Create: `src/components/Editor/SpecEditor/SpecEditor.module.css`
@@ -2138,7 +2346,7 @@ git commit -m "feat: add LexicalEditor rich text component"
 
 ```ts
 // src/components/Editor/SpecEditor/SpecEditor.types.ts
-import type { Task } from '@/utils/tasks.types';
+import type { Task } from "@/utils/tasks.types";
 
 export interface SpecEditorProps {
   task: Task | null;
@@ -2200,7 +2408,9 @@ export interface SpecEditorProps {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
 }
 
 .closeButton:hover {
@@ -2231,8 +2441,18 @@ export interface SpecEditorProps {
   gap: var(--space-2);
 }
 
-.dotAgent { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-agent); }
-.dotOrange { width: 8px; height: 8px; border-radius: 50%; background-color: #f97316; }
+.dotAgent {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-agent);
+}
+.dotOrange {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f97316;
+}
 
 .editorWrapper {
   flex: 1;
@@ -2389,27 +2609,27 @@ export interface SpecEditorProps {
 
 ```tsx
 // src/components/Editor/SpecEditor/SpecEditor.tsx
-'use client';
+"use client";
 
-import { PaperPlaneTilt, Robot, User, X } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { PaperPlaneTilt, Robot, User, X } from "@phosphor-icons/react";
+import { useState } from "react";
 
-import { useHandoverTask, useUpdateTask } from '@/hooks/useTasks';
-import { LexicalEditor } from '../LexicalEditor';
-import type { SpecEditorProps } from './SpecEditor.types';
-import styles from './SpecEditor.module.css';
+import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
+import { LexicalEditor } from "../LexicalEditor";
+import type { SpecEditorProps } from "./SpecEditor.types";
+import styles from "./SpecEditor.module.css";
 
 export function SpecEditor({ task, onClose }: SpecEditorProps) {
   const { mutate: updateTask } = useUpdateTask();
   const { mutate: handoverTask, isPending: isHandingOver } = useHandoverTask();
 
-  const [spec, setSpec] = useState(task?.spec ?? '');
+  const [spec, setSpec] = useState(task?.spec ?? "");
   const [isEditing, setIsEditing] = useState(!task?.spec);
 
   if (!task) return null;
 
-  const isBacklog = task.status === 'Backlog';
-  const isReview = task.status === 'Review';
+  const isBacklog = task.status === "Backlog";
+  const isReview = task.status === "Review";
 
   const handleSave = () => {
     updateTask({ id: task.id, spec });
@@ -2428,7 +2648,11 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
           <span className={styles.taskId}>{task.id}</span>
           <h2 className={styles.taskTitle}>{task.title}</h2>
         </div>
-        <button className={styles.closeButton} onClick={onClose} aria-label="Close">
+        <button
+          className={styles.closeButton}
+          onClick={onClose}
+          aria-label="Close"
+        >
           <X size={20} />
         </button>
       </div>
@@ -2449,14 +2673,17 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
           <div className={styles.editorToolbar}>
             <span className={styles.editorLabel}>Specification</span>
             {isBacklog && (
-              <button className={styles.editToggle} onClick={() => setIsEditing(v => !v)}>
-                {isEditing ? 'Preview' : 'Edit'}
+              <button
+                className={styles.editToggle}
+                onClick={() => setIsEditing((v) => !v)}
+              >
+                {isEditing ? "Preview" : "Edit"}
               </button>
             )}
           </div>
           <div className={styles.editorBody}>
             <LexicalEditor
-              key={`${task.id}-${isEditing ? 'edit' : 'read'}`}
+              key={`${task.id}-${isEditing ? "edit" : "read"}`}
               value={spec}
               onChange={isEditing ? setSpec : undefined}
               readOnly={!isEditing}
@@ -2471,10 +2698,15 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
               <span>Agent Notes</span>
             </div>
             <p className={styles.agentNotesText}>
-              Implementation complete according to the spec. Please review the changes in the terminal.
+              Implementation complete according to the spec. Please review the
+              changes in the terminal.
             </p>
             {task.sessionId && (
-              <a href={`/session/${task.sessionId}`} className={styles.viewDiffButton} style={{ textDecoration: 'none', display: 'inline-block' }}>
+              <a
+                href={`/session/${task.sessionId}`}
+                className={styles.viewDiffButton}
+                style={{ textDecoration: "none", display: "inline-block" }}
+              >
                 Open Terminal
               </a>
             )}
@@ -2494,9 +2726,15 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
             </button>
           )}
           {isBacklog && (
-            <button className={styles.handoverButton} onClick={handleHandover} disabled={isHandingOver}>
+            <button
+              className={styles.handoverButton}
+              onClick={handleHandover}
+              disabled={isHandingOver}
+            >
               <PaperPlaneTilt size={16} />
-              <span>{isHandingOver ? 'Starting...' : 'Handover to Claude'}</span>
+              <span>
+                {isHandingOver ? "Starting..." : "Handover to Claude"}
+              </span>
             </button>
           )}
         </div>
@@ -2510,8 +2748,8 @@ export function SpecEditor({ task, onClose }: SpecEditorProps) {
 
 ```ts
 // src/components/Editor/SpecEditor/index.ts
-export { SpecEditor } from './SpecEditor';
-export type { SpecEditorProps } from './SpecEditor.types';
+export { SpecEditor } from "./SpecEditor";
+export type { SpecEditorProps } from "./SpecEditor.types";
 ```
 
 **Step 5: Commit**
@@ -2526,6 +2764,7 @@ git commit -m "feat: add SpecEditor slide-in panel with Lexical editor and hando
 ## Task 17: Create Modals/NewIssueModal component
 
 **Files:**
+
 - Create: `src/components/Modals/NewIssueModal/index.ts`
 - Create: `src/components/Modals/NewIssueModal/NewIssueModal.tsx`
 - Create: `src/components/Modals/NewIssueModal/NewIssueModal.module.css`
@@ -2590,7 +2829,9 @@ export interface NewIssueModalProps {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
 }
 
 .closeButton:hover {
@@ -2664,7 +2905,9 @@ export interface NewIssueModalProps {
   border: none;
   cursor: pointer;
   background: transparent;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   color: var(--color-text-muted);
 }
 
@@ -2740,34 +2983,34 @@ export interface NewIssueModalProps {
 
 ```tsx
 // src/components/Modals/NewIssueModal/NewIssueModal.tsx
-'use client';
+"use client";
 
-import * as Dialog from '@radix-ui/react-dialog';
-import { Code, FileText, X } from '@phosphor-icons/react';
-import clsx from 'clsx';
-import { useState } from 'react';
+import * as Dialog from "@radix-ui/react-dialog";
+import { Code, FileText, X } from "@phosphor-icons/react";
+import clsx from "clsx";
+import { useState } from "react";
 
-import { useCreateTask } from '@/hooks/useTasks';
-import type { Priority, TaskType } from '@/utils/tasks.types';
-import type { NewIssueModalProps } from './NewIssueModal.types';
-import styles from './NewIssueModal.module.css';
+import { useCreateTask } from "@/hooks/useTasks";
+import type { Priority, TaskType } from "@/utils/tasks.types";
+import type { NewIssueModalProps } from "./NewIssueModal.types";
+import styles from "./NewIssueModal.module.css";
 
 export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
   const { mutate: createTask } = useCreateTask();
-  const [title, setTitle] = useState('');
-  const [type, setType] = useState<TaskType>('Spec');
-  const [priority, setPriority] = useState<Priority>('Medium');
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<TaskType>("Spec");
+  const [priority, setPriority] = useState<Priority>("Medium");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     createTask(
-      { title: title.trim(), type, priority, status: 'Backlog' },
+      { title: title.trim(), type, priority, status: "Backlog" },
       {
         onSuccess: () => {
-          setTitle('');
-          setType('Spec');
-          setPriority('Medium');
+          setTitle("");
+          setType("Spec");
+          setPriority("Medium");
           onClose();
         },
       },
@@ -2775,7 +3018,7 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={open => !open && onClose()}>
+    <Dialog.Root open={open} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay}>
           <Dialog.Content className={styles.modal}>
@@ -2795,7 +3038,7 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
                   autoFocus
                   type="text"
                   value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  onChange={(e) => setTitle(e.target.value)}
                   placeholder="What needs to be done?"
                   className={styles.input}
                 />
@@ -2805,14 +3048,21 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
                 <div className={styles.field} style={{ flex: 1 }}>
                   <label className={styles.label}>Type</label>
                   <div className={styles.typeToggle}>
-                    {(['Spec', 'Develop'] as TaskType[]).map(t => (
+                    {(["Spec", "Develop"] as TaskType[]).map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setType(t)}
-                        className={clsx(styles.typeButton, type === t && styles.typeButtonActive)}
+                        className={clsx(
+                          styles.typeButton,
+                          type === t && styles.typeButtonActive,
+                        )}
                       >
-                        {t === 'Spec' ? <FileText size={14} /> : <Code size={14} />}
+                        {t === "Spec" ? (
+                          <FileText size={14} />
+                        ) : (
+                          <Code size={14} />
+                        )}
                         {t}
                       </button>
                     ))}
@@ -2823,7 +3073,7 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
                   <label className={styles.label}>Priority</label>
                   <select
                     value={priority}
-                    onChange={e => setPriority(e.target.value as Priority)}
+                    onChange={(e) => setPriority(e.target.value as Priority)}
                     className={styles.select}
                   >
                     <option value="Low">Low</option>
@@ -2835,10 +3085,18 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
               </div>
 
               <div className={styles.formFooter}>
-                <button type="button" className={styles.cancelButton} onClick={onClose}>
+                <button
+                  type="button"
+                  className={styles.cancelButton}
+                  onClick={onClose}
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={!title.trim()} className={styles.submitButton}>
+                <button
+                  type="submit"
+                  disabled={!title.trim()}
+                  className={styles.submitButton}
+                >
                   Create Issue
                 </button>
               </div>
@@ -2855,8 +3113,8 @@ export function NewIssueModal({ open, onClose }: NewIssueModalProps) {
 
 ```ts
 // src/components/Modals/NewIssueModal/index.ts
-export { NewIssueModal } from './NewIssueModal';
-export type { NewIssueModalProps } from './NewIssueModal.types';
+export { NewIssueModal } from "./NewIssueModal";
+export type { NewIssueModalProps } from "./NewIssueModal.types";
 ```
 
 **Step 5: Commit**
@@ -2871,6 +3129,7 @@ git commit -m "feat: add NewIssueModal with Radix Dialog"
 ## Task 18: Create AppShell and wire everything together
 
 **Files:**
+
 - Create: `src/app/AppShell.tsx`
 - Create: `src/app/AppShell.module.css`
 - Modify: `src/app/page.tsx`
@@ -2916,49 +3175,70 @@ git commit -m "feat: add NewIssueModal with Radix Dialog"
 
 ```tsx
 // src/app/AppShell.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 
-import { Backlog } from '@/components/Board/Backlog';
-import { Board } from '@/components/Board/Board';
-import { SpecEditor } from '@/components/Editor/SpecEditor';
-import { Sidebar, type View } from '@/components/Layout/Sidebar';
-import { TopBar } from '@/components/Layout/TopBar';
-import { NewIssueModal } from '@/components/Modals/NewIssueModal';
-import { useTasks } from '@/hooks/useTasks';
-import type { Task } from '@/utils/tasks.types';
-import styles from './AppShell.module.css';
+import { Backlog } from "@/components/Board/Backlog";
+import { Board } from "@/components/Board/Board";
+import { SpecEditor } from "@/components/Editor/SpecEditor";
+import { Sidebar, type View } from "@/components/Layout/Sidebar";
+import { TopBar } from "@/components/Layout/TopBar";
+import { NewIssueModal } from "@/components/Modals/NewIssueModal";
+import { useTasks } from "@/hooks/useTasks";
+import type { Task } from "@/utils/tasks.types";
+import styles from "./AppShell.module.css";
 
 export function AppShell() {
   const { data: tasks = [] } = useTasks();
-  const [currentView, setCurrentView] = useState<View>('Board');
+  const [currentView, setCurrentView] = useState<View>("Board");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newIssueOpen, setNewIssueOpen] = useState(false);
 
-  const agentActive = tasks.some(t => t.status === 'In Progress');
+  const agentActive = tasks.some((t) => t.status === "In Progress");
 
   return (
     <div className={styles.shell}>
-      <Sidebar currentView={currentView} agentActive={agentActive} onViewChange={setCurrentView} />
+      <Sidebar
+        currentView={currentView}
+        agentActive={agentActive}
+        onViewChange={setCurrentView}
+      />
 
       <main className={styles.main}>
-        <TopBar currentView={currentView} onNewIssue={() => setNewIssueOpen(true)} />
+        <TopBar
+          currentView={currentView}
+          onNewIssue={() => setNewIssueOpen(true)}
+        />
 
         <div className={styles.content}>
-          {currentView === 'Board' ? (
-            <Board tasks={tasks.filter(t => t.status !== 'Backlog')} onSelectTask={setSelectedTask} />
+          {currentView === "Board" ? (
+            <Board
+              tasks={tasks.filter((t) => t.status !== "Backlog")}
+              onSelectTask={setSelectedTask}
+            />
           ) : (
             <Backlog onSelectTask={setSelectedTask} />
           )}
 
-          {selectedTask && <div className={styles.backdrop} onClick={() => setSelectedTask(null)} />}
+          {selectedTask && (
+            <div
+              className={styles.backdrop}
+              onClick={() => setSelectedTask(null)}
+            />
+          )}
 
-          <SpecEditor task={selectedTask} onClose={() => setSelectedTask(null)} />
+          <SpecEditor
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+          />
         </div>
       </main>
 
-      <NewIssueModal open={newIssueOpen} onClose={() => setNewIssueOpen(false)} />
+      <NewIssueModal
+        open={newIssueOpen}
+        onClose={() => setNewIssueOpen(false)}
+      />
     </div>
   );
 }
@@ -2968,7 +3248,7 @@ export function AppShell() {
 
 ```tsx
 // src/app/page.tsx
-import { AppShell } from './AppShell';
+import { AppShell } from "./AppShell";
 
 export default function Page() {
   return <AppShell />;
@@ -2987,6 +3267,7 @@ git commit -m "feat: add AppShell and wire board, sidebar, spec editor together"
 ## Task 19: Update barrel exports and run full build check
 
 **Files:**
+
 - Modify: `src/components/index.ts`
 
 **Step 1: Update barrel exports**
@@ -2994,17 +3275,17 @@ git commit -m "feat: add AppShell and wire board, sidebar, spec editor together"
 Replace the contents of `src/components/index.ts` with:
 
 ```ts
-export * from './Board/Backlog';
-export * from './Board/Board';
-export * from './Board/Column';
-export * from './Board/TaskCard';
-export * from './Editor/LexicalEditor';
-export * from './Editor/SpecEditor';
-export * from './InstanceCard';
-export * from './Layout/Sidebar';
-export * from './Layout/TopBar';
-export * from './Modals/NewIssueModal';
-export * from './Terminal';
+export * from "./Board/Backlog";
+export * from "./Board/Board";
+export * from "./Board/Column";
+export * from "./Board/TaskCard";
+export * from "./Editor/LexicalEditor";
+export * from "./Editor/SpecEditor";
+export * from "./InstanceCard";
+export * from "./Layout/Sidebar";
+export * from "./Layout/TopBar";
+export * from "./Modals/NewIssueModal";
+export * from "./Terminal";
 ```
 
 **Step 2: Run linter**
@@ -3030,6 +3311,7 @@ yarn dev
 ```
 
 Open http://localhost:3000 and verify:
+
 - [ ] Sidebar shows Board / Backlog nav
 - [ ] Board renders 4 columns (Not Started, In Progress, Review, Done)
 - [ ] "New Issue" button opens modal, creates task in Backlog
@@ -3051,24 +3333,24 @@ git commit -m "feat: update barrel exports for all new board components"
 
 ## Summary
 
-| Task | What it does |
-|------|-------------|
-| 1 | Install Lexical |
-| 2 | Add QueryClientProvider |
-| 3 | Add design tokens (spacing, radius, type, shimmer) |
-| 4 | Task type definitions |
-| 5 | Server: task REST endpoints |
-| 6 | Server: handover + board WebSocket |
-| 7 | useTasks TanStack Query hooks |
-| 8 | useTasksSocket live sync hook |
-| 9 | Sidebar layout component |
-| 10 | TopBar layout component |
-| 11 | Column DnD droppable |
-| 12 | TaskCard sortable with agent pulse |
-| 13 | Board DnD context |
-| 14 | Backlog view |
-| 15 | LexicalEditor rich text |
-| 16 | SpecEditor slide-in panel |
-| 17 | NewIssueModal |
-| 18 | AppShell wiring |
-| 19 | Barrel exports + build verify |
+| Task | What it does                                       |
+| ---- | -------------------------------------------------- |
+| 1    | Install Lexical                                    |
+| 2    | Add QueryClientProvider                            |
+| 3    | Add design tokens (spacing, radius, type, shimmer) |
+| 4    | Task type definitions                              |
+| 5    | Server: task REST endpoints                        |
+| 6    | Server: handover + board WebSocket                 |
+| 7    | useTasks TanStack Query hooks                      |
+| 8    | useTasksSocket live sync hook                      |
+| 9    | Sidebar layout component                           |
+| 10   | TopBar layout component                            |
+| 11   | Column DnD droppable                               |
+| 12   | TaskCard sortable with agent pulse                 |
+| 13   | Board DnD context                                  |
+| 14   | Backlog view                                       |
+| 15   | LexicalEditor rich text                            |
+| 16   | SpecEditor slide-in panel                          |
+| 17   | NewIssueModal                                      |
+| 18   | AppShell wiring                                    |
+| 19   | Barrel exports + build verify                      |

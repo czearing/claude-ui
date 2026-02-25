@@ -21,7 +21,11 @@ export const SessionPage = ({ params }: SessionPageProps) => {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Link href="/" className={styles.backLink} aria-label="Back to instances">
+        <Link
+          href="/"
+          className={styles.backLink}
+          aria-label="Back to instances"
+        >
           ← Back
         </Link>
         <span className={styles.sessionName}>{sessionName}</span>

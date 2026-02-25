@@ -1,2 +1,2 @@
-export { NewIssueModal } from './NewIssueModal';
-export type { NewIssueModalProps } from './NewIssueModal.types';
+export { NewIssueModal } from "./NewIssueModal";
+export type { NewIssueModalProps } from "./NewIssueModal.types";

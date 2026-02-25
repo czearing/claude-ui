@@ -51,7 +51,9 @@
   font-size: var(--text-sm);
   border: none;
   cursor: pointer;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   text-align: left;
   background: transparent;
 }

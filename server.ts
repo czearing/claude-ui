@@ -227,13 +227,17 @@ app
 
           let ptyProcess: pty.IPty;
           try {
-            ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
-              name: "xterm-color",
-              cols: 80,
-              rows: 24,
-              cwd: process.cwd(),
-              env: process.env as Record<string, string>,
-            });
+            ptyProcess = pty.spawn(
+              command,
+              ["--dangerously-skip-permissions"],
+              {
+                name: "xterm-color",
+                cols: 80,
+                rows: 24,
+                cwd: process.cwd(),
+                env: process.env as Record<string, string>,
+              },
+            );
           } catch (err) {
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: String(err) }));
@@ -280,10 +284,7 @@ app
               const taskIdx = current.findIndex(
                 (t) => t.sessionId === sessionId,
               );
-              if (
-                taskIdx !== -1 &&
-                current[taskIdx].status === "In Progress"
-              ) {
+              if (taskIdx !== -1 && current[taskIdx].status === "In Progress") {
                 current[taskIdx] = {
                   ...current[taskIdx],
                   status: "Review",
@@ -363,7 +364,9 @@ app
       const sessionId = url.query["sessionId"] as string | undefined;
 
       if (!sessionId) {
-        ws.send(JSON.stringify({ type: "error", message: "Missing sessionId" }));
+        ws.send(
+          JSON.stringify({ type: "error", message: "Missing sessionId" }),
+        );
         ws.close();
         return;
       }

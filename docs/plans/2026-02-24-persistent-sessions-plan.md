@@ -13,6 +13,7 @@
 ## Task 1: Server — session registry + persistent pty
 
 **Files:**
+
 - Modify: `server.ts`
 
 This task replaces the single-pty-per-connection model with a session-keyed registry. Tasks 1 and 2 are independent and can be done in parallel.
@@ -58,123 +59,142 @@ function appendToBuffer(entry: SessionEntry, chunk: Buffer): void {
   }
 }
 
-app.prepare().then(() => {
-  const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url!, true);
+app
+  .prepare()
+  .then(() => {
+    const server = createServer((req, res) => {
+      const parsedUrl = parse(req.url!, true);
 
-    // Handle DELETE /api/sessions/:id — kill the pty and remove from registry
-    if (req.method === "DELETE" && parsedUrl.pathname?.startsWith("/api/sessions/")) {
-      const id = parsedUrl.pathname.slice("/api/sessions/".length);
-      const entry = sessions.get(id);
-      if (entry) {
-        entry.activeWs = null;
-        entry.pty.kill();
-        sessions.delete(id);
+      // Handle DELETE /api/sessions/:id — kill the pty and remove from registry
+      if (
+        req.method === "DELETE" &&
+        parsedUrl.pathname?.startsWith("/api/sessions/")
+      ) {
+        const id = parsedUrl.pathname.slice("/api/sessions/".length);
+        const entry = sessions.get(id);
+        if (entry) {
+          entry.activeWs = null;
+          entry.pty.kill();
+          sessions.delete(id);
+        }
+        res.writeHead(204);
+        res.end();
+        return;
       }
-      res.writeHead(204);
-      res.end();
-      return;
-    }
 
-    void handle(req, res, parsedUrl);
-  });
+      void handle(req, res, parsedUrl);
+    });
 
-  const wss = new WebSocketServer({ server, path: "/ws/terminal" });
+    const wss = new WebSocketServer({ server, path: "/ws/terminal" });
 
-  wss.on("connection", (ws, req) => {
-    const url = parse(req.url ?? "", true);
-    const sessionId = url.query["sessionId"] as string | undefined;
+    wss.on("connection", (ws, req) => {
+      const url = parse(req.url ?? "", true);
+      const sessionId = url.query["sessionId"] as string | undefined;
 
-    if (!sessionId) {
-      ws.send(JSON.stringify({ type: "error", message: "Missing sessionId" }));
-      ws.close();
-      return;
-    }
-
-    let entry = sessions.get(sessionId);
-
-    if (entry) {
-      // Reconnect: attach this WS, replay buffer
-      entry.activeWs = ws;
-      if (entry.outputBuffer.length > 0) {
-        const replay = Buffer.concat(entry.outputBuffer);
-        ws.send(JSON.stringify({ type: "replay", data: replay.toString("base64") }));
-      }
-    } else {
-      // New session: spawn pty
-      let ptyProcess: pty.IPty;
-      try {
-        ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
-          name: "xterm-color",
-          cols: 80,
-          rows: 24,
-          cwd: process.cwd(),
-          env: process.env as Record<string, string>,
-        });
-      } catch (err) {
-        ws.send(JSON.stringify({ type: "error", message: String(err) }));
+      if (!sessionId) {
+        ws.send(
+          JSON.stringify({ type: "error", message: "Missing sessionId" }),
+        );
         ws.close();
         return;
       }
 
-      entry = { pty: ptyProcess, outputBuffer: [], bufferSize: 0, activeWs: ws };
-      sessions.set(sessionId, entry);
+      let entry = sessions.get(sessionId);
 
-      ptyProcess.onData((data) => {
-        const chunk = Buffer.from(data);
-        const e = sessions.get(sessionId)!;
-        appendToBuffer(e, chunk);
-        if (e.activeWs?.readyState === WebSocket.OPEN) {
-          e.activeWs.send(chunk);
+      if (entry) {
+        // Reconnect: attach this WS, replay buffer
+        entry.activeWs = ws;
+        if (entry.outputBuffer.length > 0) {
+          const replay = Buffer.concat(entry.outputBuffer);
+          ws.send(
+            JSON.stringify({ type: "replay", data: replay.toString("base64") }),
+          );
         }
-      });
-
-      ptyProcess.onExit(({ exitCode }) => {
-        const e = sessions.get(sessionId);
-        if (e?.activeWs?.readyState === WebSocket.OPEN) {
-          e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
-          e.activeWs.close();
-        }
-        sessions.delete(sessionId);
-      });
-    }
-
-    ws.on("message", (data, isBinary) => {
-      const e = sessions.get(sessionId);
-      if (!e) return;
-      if (isBinary) {
-        e.pty.write(Buffer.from(data as ArrayBuffer).toString());
       } else {
-        const text = (data as Buffer).toString("utf8");
+        // New session: spawn pty
+        let ptyProcess: pty.IPty;
         try {
-          const msg = JSON.parse(text) as { type: string; cols?: number; rows?: number };
-          if (msg.type === "resize" && msg.cols && msg.rows) {
-            e.pty.resize(msg.cols, msg.rows);
-            return;
-          }
-        } catch {
-          // not JSON — write raw to PTY
+          ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
+            name: "xterm-color",
+            cols: 80,
+            rows: 24,
+            cwd: process.cwd(),
+            env: process.env as Record<string, string>,
+          });
+        } catch (err) {
+          ws.send(JSON.stringify({ type: "error", message: String(err) }));
+          ws.close();
+          return;
         }
-        e.pty.write(text);
+
+        entry = {
+          pty: ptyProcess,
+          outputBuffer: [],
+          bufferSize: 0,
+          activeWs: ws,
+        };
+        sessions.set(sessionId, entry);
+
+        ptyProcess.onData((data) => {
+          const chunk = Buffer.from(data);
+          const e = sessions.get(sessionId)!;
+          appendToBuffer(e, chunk);
+          if (e.activeWs?.readyState === WebSocket.OPEN) {
+            e.activeWs.send(chunk);
+          }
+        });
+
+        ptyProcess.onExit(({ exitCode }) => {
+          const e = sessions.get(sessionId);
+          if (e?.activeWs?.readyState === WebSocket.OPEN) {
+            e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+            e.activeWs.close();
+          }
+          sessions.delete(sessionId);
+        });
       }
+
+      ws.on("message", (data, isBinary) => {
+        const e = sessions.get(sessionId);
+        if (!e) return;
+        if (isBinary) {
+          e.pty.write(Buffer.from(data as ArrayBuffer).toString());
+        } else {
+          const text = (data as Buffer).toString("utf8");
+          try {
+            const msg = JSON.parse(text) as {
+              type: string;
+              cols?: number;
+              rows?: number;
+            };
+            if (msg.type === "resize" && msg.cols && msg.rows) {
+              e.pty.resize(msg.cols, msg.rows);
+              return;
+            }
+          } catch {
+            // not JSON — write raw to PTY
+          }
+          e.pty.write(text);
+        }
+      });
+
+      ws.on("close", () => {
+        const e = sessions.get(sessionId);
+        if (e) {
+          e.activeWs = null;
+          // Do NOT kill pty — session stays alive
+        }
+      });
     });
 
-    ws.on("close", () => {
-      const e = sessions.get(sessionId);
-      if (e) {
-        e.activeWs = null;
-        // Do NOT kill pty — session stays alive
-      }
+    server.listen(port, () => {
+      console.error(`> Ready on http://localhost:${port}`);
     });
+  })
+  .catch((err: unknown) => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
   });
-
-  server.listen(port, () => {
-    console.error(`> Ready on http://localhost:${port}`);
-  });
-}).catch((err: unknown) => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
-});
 ```
 
 **Step 3: Verify TypeScript compiles**
@@ -197,6 +217,7 @@ git commit -m "feat: persist pty sessions across WebSocket reconnects"
 ## Task 2: Client — thread sessionId through + replay handler + deleteSession API call
 
 **Files:**
+
 - Modify: `src/hooks/useTerminalSocket.types.ts`
 - Modify: `src/hooks/useTerminalSocket.ts`
 - Modify: `src/app/TerminalPage.types.ts`
@@ -234,12 +255,14 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
     }
 
     const ws = new WebSocket(
-      `ws://${window.location.host}/ws/terminal?sessionId=${encodeURIComponent(sessionId)}`
+      `ws://${window.location.host}/ws/terminal?sessionId=${encodeURIComponent(sessionId)}`,
     );
     ws.binaryType = "arraybuffer";
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "resize", cols: xterm.cols, rows: xterm.rows }));
+      ws.send(
+        JSON.stringify({ type: "resize", cols: xterm.cols, rows: xterm.rows }),
+      );
     };
 
     ws.onmessage = (event: MessageEvent) => {
@@ -258,7 +281,9 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
           xterm.clear();
           xterm.write(Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0)));
         } else if (msg.type === "exit") {
-          xterm.write("\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n");
+          xterm.write(
+            "\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n",
+          );
         } else if (msg.type === "error") {
           xterm.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
         }
@@ -348,7 +373,11 @@ export const SessionPage = ({ params }: SessionPageProps) => {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Link href="/" className={styles.backLink} aria-label="Back to instances">
+        <Link
+          href="/"
+          className={styles.backLink}
+          aria-label="Back to instances"
+        >
           ← Back
         </Link>
         <span className={styles.sessionName}>{sessionName}</span>
@@ -523,6 +552,7 @@ git commit -m "feat: thread sessionId through client stack and handle replay"
 ## Task 3: Tests — useSessionStore.deleteSession + useTerminalSocket
 
 **Files:**
+
 - Create: `src/hooks/useSessionStore.test.ts`
 - Create: `src/hooks/useTerminalSocket.test.ts`
 
@@ -541,9 +571,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
   };
 })();
 
@@ -569,10 +605,9 @@ describe("useSessionStore", () => {
       await result.current.deleteSession(session!.id);
     });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `/api/sessions/${session!.id}`,
-      { method: "DELETE" }
-    );
+    expect(global.fetch).toHaveBeenCalledWith(`/api/sessions/${session!.id}`, {
+      method: "DELETE",
+    });
   });
 
   it("deleteSession removes session from state", async () => {
@@ -595,7 +630,9 @@ describe("useSessionStore", () => {
   });
 
   it("deleteSession removes session even if fetch throws", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+    (global.fetch as jest.Mock).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
     const { result } = renderHook(() => useSessionStore());
 
     let session: ReturnType<typeof result.current.addSession>;
@@ -665,7 +702,10 @@ class MockWebSocket {
   static lastInstance: MockWebSocket;
 }
 
-Object.defineProperty(window, "WebSocket", { value: MockWebSocket, writable: true });
+Object.defineProperty(window, "WebSocket", {
+  value: MockWebSocket,
+  writable: true,
+});
 Object.defineProperty(window, "location", {
   value: { host: "localhost:3000" },
   writable: true,
@@ -680,7 +720,7 @@ describe("useTerminalSocket", () => {
     renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
 
     expect(MockWebSocket.lastInstance.url).toBe(
-      "ws://localhost:3000/ws/terminal?sessionId=session-abc"
+      "ws://localhost:3000/ws/terminal?sessionId=session-abc",
     );
   });
 
@@ -690,7 +730,7 @@ describe("useTerminalSocket", () => {
     MockWebSocket.lastInstance.onopen?.();
 
     expect(MockWebSocket.lastInstance.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: "resize", cols: 80, rows: 24 })
+      JSON.stringify({ type: "resize", cols: 80, rows: 24 }),
     );
   });
 
@@ -714,7 +754,7 @@ describe("useTerminalSocket", () => {
 
     expect(mockClear).toHaveBeenCalled();
     expect(mockWrite).toHaveBeenCalledWith(
-      Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))
+      Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
     );
   });
 
@@ -724,7 +764,7 @@ describe("useTerminalSocket", () => {
 
     // No new instance created
     expect(MockWebSocket.lastInstance?.url).not.toBe(
-      "ws://localhost:3000/ws/terminal?sessionId=session-abc"
+      "ws://localhost:3000/ws/terminal?sessionId=session-abc",
     );
   });
 });
@@ -787,8 +827,8 @@ Click the × button. Confirm the card disappears. The server-side pty process sh
 
 ## Agent Team
 
-| Agent | Tasks | Can start immediately? |
-|-------|-------|----------------------|
-| Agent 1 (Backend) | Task 1 | Yes |
-| Agent 2 (Client) | Task 2 | Yes (parallel with Agent 1) |
+| Agent                 | Tasks       | Can start immediately?        |
+| --------------------- | ----------- | ----------------------------- |
+| Agent 1 (Backend)     | Task 1      | Yes                           |
+| Agent 2 (Client)      | Task 2      | Yes (parallel with Agent 1)   |
 | Agent 3 (Tests + E2E) | Tasks 3 + 4 | After Agents 1 and 2 complete |

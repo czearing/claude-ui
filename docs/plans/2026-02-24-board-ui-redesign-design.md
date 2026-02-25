@@ -19,16 +19,16 @@ The design follows a reference implementation provided by the user, adapted to o
 
 ```ts
 type Task = {
-  id: string            // 'TASK-001', auto-incremented
-  title: string
-  type: 'Spec' | 'Develop'
-  status: 'Backlog' | 'Not Started' | 'In Progress' | 'Review' | 'Done'
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent'
-  spec: string          // Lexical editor JSON string
-  sessionId?: string    // linked Claude session ID, set on handover
-  createdAt: string     // ISO timestamp
-  updatedAt: string     // ISO timestamp
-}
+  id: string; // 'TASK-001', auto-incremented
+  title: string;
+  type: "Spec" | "Develop";
+  status: "Backlog" | "Not Started" | "In Progress" | "Review" | "Done";
+  priority: "Low" | "Medium" | "High" | "Urgent";
+  spec: string; // Lexical editor JSON string
+  sessionId?: string; // linked Claude session ID, set on handover
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+};
 ```
 
 **Persistence**: `tasks.json` on the server, read/written by REST endpoints on `server.ts`.
@@ -39,13 +39,13 @@ type Task = {
 
 ### New REST Endpoints (added to `server.ts`)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/tasks` | Read all tasks from `tasks.json` |
-| `POST` | `/api/tasks` | Create a new task |
-| `PATCH` | `/api/tasks/:id` | Update task fields (status, spec, priority, etc.) |
-| `DELETE` | `/api/tasks/:id` | Delete a task |
-| `POST` | `/api/tasks/:id/handover` | Create Claude PTY session, link to task, move to In Progress |
+| Method   | Path                      | Description                                                  |
+| -------- | ------------------------- | ------------------------------------------------------------ |
+| `GET`    | `/api/tasks`              | Read all tasks from `tasks.json`                             |
+| `POST`   | `/api/tasks`              | Create a new task                                            |
+| `PATCH`  | `/api/tasks/:id`          | Update task fields (status, spec, priority, etc.)            |
+| `DELETE` | `/api/tasks/:id`          | Delete a task                                                |
+| `POST`   | `/api/tasks/:id/handover` | Create Claude PTY session, link to task, move to In Progress |
 
 ### Handover Flow (server-side)
 
@@ -76,14 +76,14 @@ TanStack Query manages all task data. No Zustand.
 
 **Hooks** (`src/hooks/`):
 
-| Hook | Query/Mutation | Endpoint |
-|------|---------------|----------|
-| `useTasks()` | Query `['tasks']` | `GET /api/tasks` |
-| `useCreateTask()` | Mutation | `POST /api/tasks` |
-| `useUpdateTask()` | Mutation (optimistic) | `PATCH /api/tasks/:id` |
-| `useDeleteTask()` | Mutation (optimistic) | `DELETE /api/tasks/:id` |
-| `useHandoverTask()` | Mutation | `POST /api/tasks/:id/handover` |
-| `useTasksSocket()` | WS subscription | Invalidates `['tasks']` on task events |
+| Hook                | Query/Mutation        | Endpoint                               |
+| ------------------- | --------------------- | -------------------------------------- |
+| `useTasks()`        | Query `['tasks']`     | `GET /api/tasks`                       |
+| `useCreateTask()`   | Mutation              | `POST /api/tasks`                      |
+| `useUpdateTask()`   | Mutation (optimistic) | `PATCH /api/tasks/:id`                 |
+| `useDeleteTask()`   | Mutation (optimistic) | `DELETE /api/tasks/:id`                |
+| `useHandoverTask()` | Mutation              | `POST /api/tasks/:id/handover`         |
+| `useTasksSocket()`  | WS subscription       | Invalidates `['tasks']` on task events |
 
 ### Component Tree
 
@@ -161,42 +161,64 @@ Tailwind utility classes translate to CSS Module classes:
 
 ```css
 /* Column.module.css */
-.column { display: flex; flex-direction: column; width: 320px; flex-shrink: 0; height: 100%; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); padding: 0 var(--space-1); }
-.dropZone { flex: 1; display: flex; flex-direction: column; gap: var(--space-3); border-radius: var(--radius-xl); padding: var(--space-2); transition: background-color 200ms; }
-.dropZoneOver { background-color: var(--color-agent-light); }
+.column {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  flex-shrink: 0;
+  height: 100%;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  padding: 0 var(--space-1);
+}
+.dropZone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2);
+  transition: background-color 200ms;
+}
+.dropZoneOver {
+  background-color: var(--color-agent-light);
+}
 ```
 
 ### Icons
 
 All Lucide references replaced with Phosphor equivalents:
 
-| Lucide | Phosphor |
-|--------|----------|
-| `Plus` | `Plus` |
-| `X` | `X` |
-| `Search` | `MagnifyingGlass` |
-| `FileText` | `FileText` |
-| `Code` | `Code` |
-| `Send` | `PaperPlaneTilt` |
-| `Bot` | `Robot` |
-| `Activity` | `Activity` |
-| `User` | `User` |
-| `Settings` | `Gear` |
-| `LayoutGrid` | `SquaresFour` |
-| `CheckSquare` | `CheckSquare` |
-| `Archive` | `Archive` |
-| `Filter` | `Funnel` |
-| `AlertCircle` | `Warning` |
+| Lucide        | Phosphor          |
+| ------------- | ----------------- |
+| `Plus`        | `Plus`            |
+| `X`           | `X`               |
+| `Search`      | `MagnifyingGlass` |
+| `FileText`    | `FileText`        |
+| `Code`        | `Code`            |
+| `Send`        | `PaperPlaneTilt`  |
+| `Bot`         | `Robot`           |
+| `Activity`    | `Activity`        |
+| `User`        | `User`            |
+| `Settings`    | `Gear`            |
+| `LayoutGrid`  | `SquaresFour`     |
+| `CheckSquare` | `CheckSquare`     |
+| `Archive`     | `Archive`         |
+| `Filter`      | `Funnel`          |
+| `AlertCircle` | `Warning`         |
 
 ---
 
 ## 6. Dependencies to Add
 
-| Package | Purpose |
-|---------|---------|
+| Package          | Purpose               |
+| ---------------- | --------------------- |
 | `@lexical/react` | Rich text spec editor |
-| `lexical` | Lexical core |
+| `lexical`        | Lexical core          |
 
 DnD Kit, Radix UI, TanStack Query, clsx, Phosphor Icons — all already installed.
 
@@ -205,6 +227,7 @@ DnD Kit, Radix UI, TanStack Query, clsx, Phosphor Icons — all already installe
 ## 7. Files Affected
 
 ### New Files
+
 - `src/utils/tasks.types.ts`
 - `src/hooks/useTasks.ts`
 - `src/hooks/useTasksSocket.ts`
@@ -219,6 +242,7 @@ DnD Kit, Radix UI, TanStack Query, clsx, Phosphor Icons — all already installe
 - `src/components/Modals/NewIssueModal/` (full component folder)
 
 ### Modified Files
+
 - `server.ts` — add task REST endpoints, handover logic, WS task broadcasts
 - `src/app/page.tsx` — render AppShell instead of HomePage
 - `src/app/layout.tsx` — ensure font variables match reference

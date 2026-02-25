@@ -1,7 +1,7 @@
-import { Funnel, MagnifyingGlass, Plus, Rows } from '@phosphor-icons/react';
+import { Funnel, MagnifyingGlass, Plus, Rows } from "@phosphor-icons/react";
 
-import type { TopBarProps } from './TopBar.types';
-import styles from './TopBar.module.css';
+import type { TopBarProps } from "./TopBar.types";
+import styles from "./TopBar.module.css";
 
 export function TopBar({ currentView, onNewIssue }: TopBarProps) {
   return (
@@ -15,7 +15,11 @@ export function TopBar({ currentView, onNewIssue }: TopBarProps) {
       <div className={styles.actions}>
         <div className={styles.searchWrapper}>
           <MagnifyingGlass size={16} className={styles.searchIcon} />
-          <input type="text" placeholder="Search..." className={styles.searchInput} />
+          <input
+            type="text"
+            placeholder="Search..."
+            className={styles.searchInput}
+          />
         </div>
 
         <button className={styles.iconButton} aria-label="Filter">

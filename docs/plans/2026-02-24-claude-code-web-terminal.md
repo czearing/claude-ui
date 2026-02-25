@@ -13,6 +13,7 @@
 ### Task 1: Install runtime and dev dependencies
 
 **Files:**
+
 - Modify: `package.json`
 
 **Step 1: Install runtime deps**
@@ -32,6 +33,7 @@ yarn add --dev tsx @types/ws
 ```bash
 yarn list node-pty ws @xterm/xterm @xterm/addon-fit tsx
 ```
+
 Expected: all packages listed with versions.
 
 **Step 4: Commit**
@@ -48,6 +50,7 @@ git commit -m "install node-pty, ws, xterm, and tsx dependencies"
 The default `next dev` / `next start` commands bypass our custom server. We replace them with `tsx` running `server.ts` directly.
 
 **Files:**
+
 - Modify: `package.json` (scripts section only)
 
 **Step 1: Update scripts**
@@ -66,6 +69,7 @@ Keep all other scripts unchanged.
 ```bash
 cat package.json | grep -A2 '"dev"'
 ```
+
 Expected: shows `tsx watch server.ts`.
 
 **Step 3: Commit**
@@ -82,6 +86,7 @@ git commit -m "update dev and start scripts to use custom server via tsx"
 This is the core of the backend. It creates one HTTP server, hands HTTP requests to Next.js, and attaches a WebSocket server for the terminal path.
 
 **Files:**
+
 - Create: `server.ts`
 
 **Step 1: Write `server.ts`**
@@ -145,7 +150,11 @@ app.prepare().then(() => {
       } else {
         const text = data.toString();
         try {
-          const msg = JSON.parse(text) as { type: string; cols?: number; rows?: number };
+          const msg = JSON.parse(text) as {
+            type: string;
+            cols?: number;
+            rows?: number;
+          };
           if (msg.type === "resize" && msg.cols && msg.rows) {
             ptyProcess.resize(msg.cols, msg.rows);
             return;
@@ -174,6 +183,7 @@ app.prepare().then(() => {
 ```bash
 yarn dev
 ```
+
 Expected: `> Ready on http://localhost:3000` with no TypeScript errors. Ctrl+C to stop.
 
 **Step 3: Commit**
@@ -188,6 +198,7 @@ git commit -m "add custom Next.js server with node-pty WebSocket terminal"
 ### Task 4: Create Terminal component types and CSS
 
 **Files:**
+
 - Create: `src/components/Terminal/Terminal.types.ts`
 - Create: `src/components/Terminal/Terminal.module.css`
 
@@ -228,6 +239,7 @@ export type TerminalProps = {
 xterm.js requires a real DOM with canvas support, which jsdom doesn't provide. We mock both packages.
 
 **Files:**
+
 - Create: `src/components/Terminal/Terminal.test.tsx`
 
 **Step 1: Write the failing test**
@@ -309,6 +321,7 @@ describe("Terminal", () => {
 ```bash
 yarn test src/components/Terminal/Terminal.test.tsx
 ```
+
 Expected: FAIL — `Terminal` module not found.
 
 ---
@@ -316,6 +329,7 @@ Expected: FAIL — `Terminal` module not found.
 ### Task 6: Implement Terminal component
 
 **Files:**
+
 - Create: `src/components/Terminal/Terminal.tsx`
 - Create: `src/components/Terminal/index.ts`
 
@@ -377,6 +391,7 @@ export * from "./Terminal.types";
 ```bash
 yarn test src/components/Terminal/Terminal.test.tsx
 ```
+
 Expected: PASS — all 5 tests green.
 
 **Step 4: Commit**
@@ -391,6 +406,7 @@ git commit -m "add Terminal component wrapping xterm.js with fit addon"
 ### Task 7: Create useTerminalSocket hook
 
 **Files:**
+
 - Create: `src/hooks/useTerminalSocket.ts`
 - Create: `src/hooks/useTerminalSocket.types.ts`
 
@@ -420,7 +436,9 @@ export const useTerminalSocket = (xterm: XTerm | null) => {
     const ws = new WebSocket(`ws://${window.location.host}/ws/terminal`);
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "resize", cols: xterm.cols, rows: xterm.rows }));
+      ws.send(
+        JSON.stringify({ type: "resize", cols: xterm.cols, rows: xterm.rows }),
+      );
     };
 
     ws.onmessage = (event: MessageEvent) => {
@@ -429,9 +447,15 @@ export const useTerminalSocket = (xterm: XTerm | null) => {
         return;
       }
       try {
-        const msg = JSON.parse(event.data as string) as { type: string; code?: number; message?: string };
+        const msg = JSON.parse(event.data as string) as {
+          type: string;
+          code?: number;
+          message?: string;
+        };
         if (msg.type === "exit") {
-          xterm.write("\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n");
+          xterm.write(
+            "\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n",
+          );
         } else if (msg.type === "error") {
           xterm.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
         }
@@ -490,6 +514,7 @@ git commit -m "add useTerminalSocket hook for WebSocket-PTY communication"
 ### Task 8: Create TerminalPage client component
 
 **Files:**
+
 - Create: `src/app/TerminalPage.tsx`
 - Create: `src/app/TerminalPage.module.css`
 - Create: `src/app/TerminalPage.types.ts`
@@ -554,6 +579,7 @@ git commit -m "add TerminalPage client component composing Terminal and useTermi
 ### Task 9: Wire up page.tsx and update barrel exports
 
 **Files:**
+
 - Modify: `src/app/page.tsx`
 - Modify: `src/components/index.ts`
 
@@ -589,6 +615,7 @@ git commit -m "wire TerminalPage into app root and export Terminal from componen
 ```bash
 yarn lint
 ```
+
 Expected: 0 errors, 0 warnings.
 
 **Step 2: Run tests**
@@ -596,6 +623,7 @@ Expected: 0 errors, 0 warnings.
 ```bash
 yarn test
 ```
+
 Expected: all tests pass.
 
 **Step 3: Run dev server and verify terminal loads**
@@ -605,6 +633,7 @@ yarn dev
 ```
 
 Open `http://localhost:3000` in the browser. Expected:
+
 - Black terminal fills the viewport
 - `claude` launches and its welcome/interactive prompt appears
 - Typing works (keypresses echoed back through PTY)
@@ -621,13 +650,13 @@ git commit -m "fix lint issues from terminal implementation"
 
 ## Protocol Reference
 
-| Direction | Frame type | Meaning |
-|---|---|---|
-| Server → Client | Binary | PTY stdout bytes — pass directly to `xterm.write()` |
-| Server → Client | Text JSON `{type:"exit",code:N}` | PTY process exited |
-| Server → Client | Text JSON `{type:"error",message:S}` | Spawn failure |
-| Client → Server | Text (raw) | Keypress / stdin bytes |
-| Client → Server | Text JSON `{type:"resize",cols:N,rows:N}` | Terminal resize |
+| Direction       | Frame type                                | Meaning                                             |
+| --------------- | ----------------------------------------- | --------------------------------------------------- |
+| Server → Client | Binary                                    | PTY stdout bytes — pass directly to `xterm.write()` |
+| Server → Client | Text JSON `{type:"exit",code:N}`          | PTY process exited                                  |
+| Server → Client | Text JSON `{type:"error",message:S}`      | Spawn failure                                       |
+| Client → Server | Text (raw)                                | Keypress / stdin bytes                              |
+| Client → Server | Text JSON `{type:"resize",cols:N,rows:N}` | Terminal resize                                     |
 
 ## Notes
 

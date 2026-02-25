@@ -1,4 +1,4 @@
-import type { Task, TaskStatus } from '@/utils/tasks.types';
+import type { Task, TaskStatus } from "@/utils/tasks.types";
 
 export interface ColumnProps {
   status: TaskStatus;

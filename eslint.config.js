@@ -49,7 +49,7 @@ export default config(
           Object.entries(globals.browser).map(([key, value]) => [
             key.trim(),
             value,
-          ])
+          ]),
         ),
       },
     },
@@ -217,5 +217,5 @@ export default config(
     rules: {
       ...configs.disableTypeChecked.rules,
     },
-  }
+  },
 );

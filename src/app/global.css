@@ -56,7 +56,12 @@ h6 {
   --color-agent-light: rgba(124, 58, 237, 0.2);
 
   --font-sans: var(--font-inter, ui-sans-serif, system-ui, sans-serif);
-  --font-mono: var(--font-jetbrains-mono, ui-monospace, 'Cascadia Code', monospace);
+  --font-mono: var(
+    --font-jetbrains-mono,
+    ui-monospace,
+    "Cascadia Code",
+    monospace
+  );
 
   /* Spacing */
   --space-1: 4px;

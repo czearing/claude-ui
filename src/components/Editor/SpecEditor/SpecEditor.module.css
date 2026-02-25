@@ -48,7 +48,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
 }
 
 .closeButton:hover {
@@ -79,8 +81,18 @@
   gap: var(--space-2);
 }
 
-.dotAgent { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-agent); }
-.dotOrange { width: 8px; height: 8px; border-radius: 50%; background-color: #f97316; }
+.dotAgent {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-agent);
+}
+.dotOrange {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f97316;
+}
 
 .editorWrapper {
   flex: 1;

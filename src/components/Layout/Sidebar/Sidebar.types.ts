@@ -1,4 +1,4 @@
-export type View = 'Board' | 'Backlog';
+export type View = "Board" | "Backlog";
 
 export interface SidebarProps {
   currentView: View;
