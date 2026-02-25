@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { CaretUpDown, Check, Kanban, Plus } from "@phosphor-icons/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useRepos } from "@/hooks/useRepos";
 import { AddRepoDialog } from "./AddRepoDialog";
@@ -14,9 +14,11 @@ import type { RepoSwitcherProps } from "./RepoSwitcher.types";
 export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
   const { data: repos = [] } = useRepos();
   const router = useRouter();
+  const pathname = usePathname();
   const [addOpen, setAddOpen] = useState(false);
 
   const activeRepo = repos.find((r) => r.id === activeRepoId);
+  const viewSegment = pathname.endsWith("/backlog") ? "backlog" : "board";
 
   return (
     <>
@@ -46,7 +48,7 @@ export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
               <DropdownMenu.Item
                 key={repo.id}
                 className={styles.item}
-                onSelect={() => router.push(`/repos/${repo.id}`)}
+                onSelect={() => router.push(`/repos/${repo.id}/${viewSegment}`)}
               >
                 <span className={styles.itemName}>{repo.name}</span>
                 {repo.id === activeRepoId && (
@@ -75,7 +77,7 @@ export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
         onClose={() => setAddOpen(false)}
         onCreated={(repoId) => {
           setAddOpen(false);
-          router.push(`/repos/${repoId}`);
+          router.push(`/repos/${repoId}/board`);
         }}
       />
     </>

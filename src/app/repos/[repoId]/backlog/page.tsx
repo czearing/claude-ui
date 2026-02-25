@@ -1,5 +1,4 @@
-// src/app/repos/[repoId]/page.tsx
-import { redirect } from "next/navigation";
+import { AppShell } from "@/app/AppShell";
 
 export default async function Page({
   params,
@@ -7,5 +6,5 @@ export default async function Page({
   params: Promise<{ repoId: string }>;
 }) {
   const { repoId } = await params;
-  redirect(`/repos/${repoId}/board`);
+  return <AppShell repoId={repoId} view="Backlog" />;
 }

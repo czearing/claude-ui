@@ -1,5 +1,8 @@
+"use client";
+
 import { Archive, CheckSquare, Gear, SquaresFour } from "@phosphor-icons/react";
 import clsx from "clsx";
+import { useRouter } from "next/navigation";
 
 import { RepoSwitcher } from "./RepoSwitcher";
 import styles from "./Sidebar.module.css";
@@ -27,17 +30,13 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   );
 }
 
-const NAV_VIEWS: { view: View; label: string; icon: React.ReactNode }[] = [
-  { view: "Board", label: "Board", icon: <SquaresFour size={16} /> },
-  { view: "Backlog", label: "Backlog", icon: <CheckSquare size={16} /> },
+const NAV_VIEWS: { view: View; path: string; label: string; icon: React.ReactNode }[] = [
+  { view: "Board", path: "board", label: "Board", icon: <SquaresFour size={16} /> },
+  { view: "Backlog", path: "backlog", label: "Backlog", icon: <CheckSquare size={16} /> },
 ];
 
-export function Sidebar({
-  repoId,
-  currentView,
-  agentActive,
-  onViewChange,
-}: SidebarProps) {
+export function Sidebar({ repoId, currentView, agentActive }: SidebarProps) {
+  const router = useRouter();
   return (
     <aside className={styles.sidebar}>
       <div className={styles.header}>
@@ -45,13 +44,13 @@ export function Sidebar({
       </div>
 
       <nav className={styles.nav}>
-        {NAV_VIEWS.map(({ view, label, icon }) => (
+        {NAV_VIEWS.map(({ view, path, label, icon }) => (
           <NavItem
             key={view}
             icon={icon}
             label={label}
             active={currentView === view}
-            onClick={() => onViewChange(view)}
+            onClick={() => router.push(`/repos/${repoId}/${path}`)}
           />
         ))}
         <NavItem icon={<Archive size={16} />} label="Archives" />
