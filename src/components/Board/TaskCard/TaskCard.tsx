@@ -80,6 +80,7 @@ export function TaskCard({
                 <button
                   className={`${styles.menuTrigger} ${menuOpen ? styles.menuTriggerOpen : ""}`}
                   onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                   aria-label="Task actions"
                 >
                   <DotsThree size={14} weight="bold" />
