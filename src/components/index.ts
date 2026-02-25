@@ -8,4 +8,5 @@ export * from "./InstanceCard";
 export * from "./Layout/Sidebar";
 export * from "./Layout/TopBar";
 export * from "./Modals/NewIssueModal";
+export * from "./StatusIndicator";
 export * from "./Terminal";

@@ -1,10 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 
 import { useSessionStore } from "@/hooks/useSessionStore";
 import { TerminalPage } from "@/app/TerminalPage";
+import { StatusIndicator } from "@/components";
+import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
 
 import styles from "./SessionPage.module.css";
 
@@ -17,6 +19,7 @@ export const SessionPage = ({ params }: SessionPageProps) => {
   const { sessions } = useSessionStore();
   const session = sessions.find((s) => s.id === id);
   const sessionName = session?.name ?? "Instance";
+  const [status, setStatus] = useState<ClaudeStatus>("connecting");
 
   return (
     <div className={styles.page}>
@@ -29,9 +32,10 @@ export const SessionPage = ({ params }: SessionPageProps) => {
           ← Back
         </Link>
         <span className={styles.sessionName}>{sessionName}</span>
+        <StatusIndicator status={status} />
       </header>
       <div className={styles.terminal}>
-        <TerminalPage sessionId={id} />
+        <TerminalPage sessionId={id} onStatus={setStatus} />
       </div>
     </div>
   );

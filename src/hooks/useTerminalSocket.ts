@@ -3,11 +3,19 @@
 import { useEffect } from "react";
 import type { Terminal as XTerm } from "@xterm/xterm";
 
-export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
+import type { ClaudeStatus } from "./useTerminalSocket.types";
+
+export const useTerminalSocket = (
+  xterm: XTerm | null,
+  sessionId: string,
+  onStatus?: (status: ClaudeStatus) => void
+) => {
   useEffect(() => {
     if (!xterm) {
       return;
     }
+
+    onStatus?.("connecting");
 
     const ws = new WebSocket(
       `ws://${window.location.host}/ws/terminal?sessionId=${encodeURIComponent(sessionId)}`,
@@ -31,11 +39,15 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
           code?: number;
           message?: string;
           data?: string;
+          value?: ClaudeStatus;
         };
         if (msg.type === "replay" && msg.data) {
           xterm.clear();
           xterm.write(Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0)));
+        } else if (msg.type === "status" && msg.value) {
+          onStatus?.(msg.value);
         } else if (msg.type === "exit") {
+          onStatus?.("exited");
           xterm.write(
             "\r\n\x1b[33mSession ended. Reload to restart.\x1b[0m\r\n",
           );
@@ -48,6 +60,7 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
     };
 
     ws.onclose = () => {
+      onStatus?.("disconnected");
       xterm.write("\r\n\x1b[33mDisconnected.\x1b[0m\r\n");
     };
 
@@ -69,5 +82,5 @@ export const useTerminalSocket = (xterm: XTerm | null, sessionId: string) => {
       ws.onclose = null;
       ws.close();
     };
-  }, [xterm, sessionId]);
+  }, [xterm, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 };

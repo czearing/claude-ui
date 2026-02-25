@@ -1,0 +1,33 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.label {
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connecting .dot { background: #8b949e; }
+.busy .dot        { background: #f0883e; animation: pulse 1.2s ease-in-out infinite; }
+.idle .dot        { background: #3fb950; }
+.exited .dot      { background: #6e7681; }
+.disconnected .dot { background: #f85149; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .busy .dot { animation: none; }
+}

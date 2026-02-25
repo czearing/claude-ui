@@ -94,4 +94,42 @@ describe("useTerminalSocket", () => {
     // No new instance created — lastInstance URL unchanged
     expect(MockWebSocket.lastInstance?.url).toBe(urlBefore);
   });
+
+  it("calls onStatus('connecting') immediately when xterm is provided", () => {
+    const onStatus = jest.fn();
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+
+    expect(onStatus).toHaveBeenCalledWith("connecting");
+  });
+
+  it("calls onStatus with the value from a status frame", () => {
+    const onStatus = jest.fn();
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+
+    MockWebSocket.lastInstance.onmessage?.({
+      data: JSON.stringify({ type: "status", value: "busy" }),
+    } as MessageEvent);
+
+    expect(onStatus).toHaveBeenCalledWith("busy");
+  });
+
+  it("calls onStatus('exited') on exit message", () => {
+    const onStatus = jest.fn();
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+
+    MockWebSocket.lastInstance.onmessage?.({
+      data: JSON.stringify({ type: "exit" }),
+    } as MessageEvent);
+
+    expect(onStatus).toHaveBeenCalledWith("exited");
+  });
+
+  it("calls onStatus('disconnected') on WS close", () => {
+    const onStatus = jest.fn();
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc", onStatus));
+
+    MockWebSocket.lastInstance.onclose?.();
+
+    expect(onStatus).toHaveBeenCalledWith("disconnected");
+  });
 });
