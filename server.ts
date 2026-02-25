@@ -2,6 +2,7 @@ import next from "next";
 import * as pty from "node-pty";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join } from "node:path";
@@ -36,21 +37,28 @@ const sessions = new Map<string, SessionEntry>();
 // ─── Tasks ─────────────────────────────────────────────────────────────────────────────────
 
 const TASKS_FILE = join(process.cwd(), "tasks.json");
+const REPOS_FILE = join(process.cwd(), "repos.json");
 
 type TaskStatus = "Backlog" | "Not Started" | "In Progress" | "Review" | "Done";
-type TaskType = "Spec" | "Develop";
 type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 interface Task {
   id: string;
   title: string;
-  type: TaskType;
   status: TaskStatus;
   priority: Priority;
   spec: string;
+  repoId: string;
   sessionId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface Repo {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: string;
 }
 
 const boardClients = new Set<WebSocket>();
@@ -66,6 +74,42 @@ async function readTasks(): Promise<Task[]> {
 
 async function writeTasks(tasks: Task[]): Promise<void> {
   await writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf8");
+}
+
+async function readRepos(): Promise<Repo[]> {
+  try {
+    const raw = await readFile(REPOS_FILE, "utf8");
+    return JSON.parse(raw) as Repo[];
+  } catch {
+    return [];
+  }
+}
+
+async function writeRepos(repos: Repo[]): Promise<void> {
+  await writeFile(REPOS_FILE, JSON.stringify(repos, null, 2), "utf8");
+}
+
+async function ensureDefaultRepo(): Promise<void> {
+  const repos = await readRepos();
+  if (repos.length > 0) return;
+
+  const defaultRepo: Repo = {
+    id: randomUUID(),
+    name: "Default",
+    path: process.cwd(),
+    createdAt: new Date().toISOString(),
+  };
+  await writeRepos([defaultRepo]);
+
+  // Migrate existing tasks that have no repoId
+  const tasks = await readTasks();
+  const needsMigration = tasks.some((t) => !t.repoId);
+  if (needsMigration) {
+    const migrated = tasks.map((t) =>
+      t.repoId ? t : { ...t, repoId: defaultRepo.id },
+    );
+    await writeTasks(migrated);
+  }
 }
 
 function broadcastTaskEvent(event: string, data: unknown): void {
@@ -151,7 +195,9 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
 
 app
   .prepare()
-  .then(() => {
+  .then(async () => {
+    await ensureDefaultRepo();
+
     const server = createServer(async (req, res) => {
       try {
         const parsedUrl = parse(req.url!, true);
@@ -159,8 +205,12 @@ app
         // GET /api/tasks
         if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
           const tasks = await readTasks();
+          const repoId = parsedUrl.query["repoId"] as string | undefined;
+          const result = repoId
+            ? tasks.filter((t) => t.repoId === repoId)
+            : tasks;
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(tasks));
+          res.end(JSON.stringify(result));
           return;
         }
 
@@ -172,10 +222,11 @@ app
           const task: Task = {
             id: generateTaskId(tasks),
             title: typeof body["title"] === "string" ? body["title"] : "",
-            type: (body["type"] as TaskType) ?? "Spec",
             status: (body["status"] as TaskStatus) ?? "Backlog",
             priority: (body["priority"] as Priority) ?? "Medium",
             spec: typeof body["spec"] === "string" ? body["spec"] : "",
+            repoId:
+              typeof body["repoId"] === "string" ? body["repoId"] : "default",
             createdAt: now,
             updatedAt: now,
           };
@@ -222,9 +273,13 @@ app
         ) {
           const id = parsedUrl.pathname.slice("/api/tasks/".length);
           const tasks = await readTasks();
+          const taskToDelete = tasks.find((t) => t.id === id);
           const filtered = tasks.filter((t) => t.id !== id);
           await writeTasks(filtered);
-          broadcastTaskEvent("task:deleted", { id });
+          broadcastTaskEvent("task:deleted", {
+            id,
+            repoId: taskToDelete?.repoId,
+          });
           res.writeHead(204);
           res.end();
           return;
@@ -250,6 +305,11 @@ app
           const sessionId = randomUUID();
           const specText = extractTextFromLexical(task.spec);
 
+          // Look up the repo path for this task
+          const repos = await readRepos();
+          const repo = repos.find((r) => r.id === task.repoId);
+          const cwd = repo?.path ?? process.cwd();
+
           let ptyProcess: pty.IPty;
           try {
             ptyProcess = pty.spawn(
@@ -259,7 +319,7 @@ app
                 name: "xterm-color",
                 cols: 80,
                 rows: 24,
-                cwd: process.cwd(),
+                cwd,
                 env: process.env as Record<string, string>,
               },
             );
@@ -366,6 +426,94 @@ app
             entry.pty.kill();
             sessions.delete(id);
           }
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        // GET /api/repos
+        if (req.method === "GET" && parsedUrl.pathname === "/api/repos") {
+          const repos = await readRepos();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(repos));
+          return;
+        }
+
+        // POST /api/repos
+        if (req.method === "POST" && parsedUrl.pathname === "/api/repos") {
+          const body = await readBody(req);
+          const name =
+            typeof body["name"] === "string" ? body["name"].trim() : "";
+          const path =
+            typeof body["path"] === "string" ? body["path"].trim() : "";
+          if (!name || !path) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "name and path are required" }));
+            return;
+          }
+          if (!existsSync(path)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: `Path does not exist: ${path}` }));
+            return;
+          }
+          const repos = await readRepos();
+          const repo: Repo = {
+            id: randomUUID(),
+            name,
+            path,
+            createdAt: new Date().toISOString(),
+          };
+          repos.push(repo);
+          await writeRepos(repos);
+          broadcastTaskEvent("repo:created", repo);
+          res.writeHead(201, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(repo));
+          return;
+        }
+
+        // PATCH /api/repos/:id
+        if (
+          req.method === "PATCH" &&
+          parsedUrl.pathname?.startsWith("/api/repos/")
+        ) {
+          const id = parsedUrl.pathname.slice("/api/repos/".length);
+          const body = await readBody(req);
+          const repos = await readRepos();
+          const idx = repos.findIndex((r) => r.id === id);
+          if (idx === -1) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          if (
+            typeof body["path"] === "string" &&
+            !existsSync(body["path"] as string)
+          ) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: `Path does not exist: ${body["path"] as string}`,
+              }),
+            );
+            return;
+          }
+          repos[idx] = { ...repos[idx], ...body, id } as Repo;
+          await writeRepos(repos);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(repos[idx]));
+          return;
+        }
+
+        // DELETE /api/repos/:id
+        if (
+          req.method === "DELETE" &&
+          parsedUrl.pathname?.startsWith("/api/repos/")
+        ) {
+          const id = parsedUrl.pathname.slice("/api/repos/".length);
+          const repos = await readRepos();
+          const filtered = repos.filter((r) => r.id !== id);
+          await writeRepos(filtered);
+          broadcastTaskEvent("repo:deleted", { id });
           res.writeHead(204);
           res.end();
           return;
