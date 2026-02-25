@@ -36,6 +36,7 @@
   align-items: flex-start;
   gap: var(--space-3);
   margin-bottom: var(--space-6);
+  padding-right: 2rem;
 }
 
 /* Notion-style page title */
@@ -70,7 +71,9 @@
 }
 
 .closeButton {
-  flex-shrink: 0;
+  position: absolute;
+  top: var(--space-8);
+  right: var(--space-8);
   margin-top: 6px;
   padding: 4px;
   background: transparent;

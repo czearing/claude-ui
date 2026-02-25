@@ -5,8 +5,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowCounterClockwise,
-  ArrowRight,
   DotsThree,
+  Eye,
   FileText,
   Kanban,
   Trash,
@@ -92,7 +92,22 @@ export function TaskCard({
                 sideOffset={4}
                 onCloseAutoFocus={(e) => e.preventDefault()}
               >
-                {isAgentActive && onRecall && (
+                <DropdownMenu.Item asChild>
+                  <button
+                    className={styles.menuItem}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect(task);
+                    }}
+                  >
+                    <span className={styles.menuItemLabel}>
+                      <Eye size={13} />
+                      View prompt
+                    </span>
+                  </button>
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator className={styles.menuSeparator} />
+                {onRecall && (
                   <>
                     <DropdownMenu.Item asChild>
                       <button
@@ -103,9 +118,11 @@ export function TaskCard({
                           <ArrowCounterClockwise size={13} />
                           Move to Backlog
                         </span>
-                        <span className={styles.menuItemSubtext}>
-                          stops the running agent
-                        </span>
+                        {isAgentActive && (
+                          <span className={styles.menuItemSubtext}>
+                            stops the running agent
+                          </span>
+                        )}
                       </button>
                     </DropdownMenu.Item>
                     <DropdownMenu.Separator className={styles.menuSeparator} />
@@ -140,17 +157,6 @@ export function TaskCard({
 
       <div className={styles.footer}>
         <div className={styles.meta} />
-
-        {task.sessionId && (
-          <a
-            href={`/repos/${task.repoId}/session/${task.sessionId}`}
-            className={styles.sessionLink}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span>Terminal</span>
-            <ArrowRight size={10} />
-          </a>
-        )}
       </div>
     </div>
   );

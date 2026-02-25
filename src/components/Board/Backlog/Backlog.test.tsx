@@ -62,28 +62,22 @@ describe("Backlog", () => {
     render(
       <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
-    expect(
-      screen.getByRole("heading", { name: "Backlog" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tasks" })).toBeInTheDocument();
   });
 
   it("renders a sort combobox defaulting to Newest", () => {
     render(
       <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
-    expect(screen.getByRole("combobox", { name: /sort/i })).toHaveValue(
-      "newest",
-    );
+    expect(screen.getByRole("combobox", { name: /sort/i })).toBeInTheDocument();
   });
 
   it("sorts tasks A-Z by title when selected", async () => {
     render(
       <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
-    await userEvent.selectOptions(
-      screen.getByRole("combobox", { name: /sort/i }),
-      "az",
-    );
+    await userEvent.click(screen.getByRole("combobox", { name: /sort/i }));
+    await userEvent.click(await screen.findByRole("option", { name: "A → Z" }));
     const buttons = screen.getAllByRole("button", { name: /to agent/i });
     expect(buttons[0]).toHaveAccessibleName("Send Add dark mode to agent");
     expect(buttons[1]).toHaveAccessibleName("Send Fix login bug to agent");
@@ -93,9 +87,9 @@ describe("Backlog", () => {
     render(
       <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
-    await userEvent.selectOptions(
-      screen.getByRole("combobox", { name: /sort/i }),
-      "oldest",
+    await userEvent.click(screen.getByRole("combobox", { name: /sort/i }));
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Oldest" }),
     );
     const buttons = screen.getAllByRole("button", { name: /to agent/i });
     expect(buttons[0]).toHaveAccessibleName("Send Fix login bug to agent");

@@ -7,12 +7,10 @@ import {
   MagnifyingGlass,
   Plus,
   Sparkle,
+  Trash,
 } from "@phosphor-icons/react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
-import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
-import { useTasksSocket } from "@/hooks/useTasksSocket";
-import { formatRelativeDate } from "@/utils/formatRelativeDate";
-import type { Task } from "@/utils/tasks.types";
 import {
   Select,
   SelectCaret,
@@ -21,6 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/Select";
+import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
+import { useTasksSocket } from "@/hooks/useTasksSocket";
+import { formatRelativeDate } from "@/utils/formatRelativeDate";
+import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
 
 const SORT_OPTIONS = [
@@ -74,6 +76,7 @@ export function Backlog({
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const filtered = search.trim()
     ? backlogTasks.filter((t) =>
@@ -88,7 +91,7 @@ export function Backlog({
       <div className={styles.inner}>
         <div className={styles.headerRow}>
           <div>
-            <h1 className={styles.heading}>Backlog</h1>
+            <h1 className={styles.heading}>Tasks</h1>
             <p className={styles.subheading}>Manage your issues and tasks</p>
           </div>
           <button className={styles.newButton} onClick={onNewTask}>
@@ -162,16 +165,42 @@ export function Backlog({
                   <Sparkle size={14} aria-hidden="true" />
                   Send to Agent
                 </button>
-                <button
-                  className={styles.moreButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteTask(task.id);
-                  }}
-                  aria-label={`Delete ${task.title}`}
+                <DropdownMenu.Root
+                  open={openMenuId === task.id}
+                  onOpenChange={(open) => setOpenMenuId(open ? task.id : null)}
                 >
-                  <DotsThree size={16} weight="bold" />
-                </button>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      className={`${styles.moreButton} ${openMenuId === task.id ? styles.moreButtonOpen : ""}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`More actions for ${task.title}`}
+                    >
+                      <DotsThree size={16} weight="bold" />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content
+                    className={styles.menuContent}
+                    align="end"
+                    sideOffset={4}
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <DropdownMenu.Item asChild>
+                      <button
+                        className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTask(task.id);
+                        }}
+                      >
+                        <span className={styles.menuItemLabel}>
+                          <Trash size={13} />
+                          Delete
+                        </span>
+                      </button>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
               </div>
             </div>
           ))}

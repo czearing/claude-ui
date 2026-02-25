@@ -21,12 +21,7 @@ import styles from "./Board.module.css";
 import { Column } from "../Column";
 import { TaskCard } from "../TaskCard";
 
-const BOARD_COLUMNS: TaskStatus[] = [
-  "Not Started",
-  "In Progress",
-  "Review",
-  "Done",
-];
+const BOARD_COLUMNS: TaskStatus[] = ["In Progress", "Review", "Done"];
 
 interface BoardProps {
   repoId: string;
