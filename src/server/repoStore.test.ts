@@ -57,6 +57,12 @@ describe("readRepos", () => {
 
     await expect(readRepos()).rejects.toThrow("EACCES");
   });
+
+  it("re-throws when JSON is malformed", async () => {
+    mockReadFile.mockResolvedValueOnce("not valid json{" as never);
+
+    await expect(readRepos()).rejects.toThrow(SyntaxError);
+  });
 });
 
 // ── writeRepos ────────────────────────────────────────────────────────────────
