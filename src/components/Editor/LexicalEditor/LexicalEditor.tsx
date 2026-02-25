@@ -8,7 +8,11 @@ import {
 } from "@lexical/code";
 import { LinkNode, AutoLinkNode } from "@lexical/link";
 import { ListNode, ListItemNode } from "@lexical/list";
-import { TRANSFORMERS } from "@lexical/markdown";
+import {
+  $convertFromMarkdownString,
+  $convertToMarkdownString,
+  TRANSFORMERS,
+} from "@lexical/markdown";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -20,6 +24,7 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { CLEAR_HISTORY_COMMAND } from "lexical";
 import type { EditorState } from "lexical";
 
 import { FloatingToolbarPlugin } from "./FloatingToolbarPlugin";
@@ -110,10 +115,20 @@ function StateLoader({ value }: { value?: string }) {
     }
     didInitRef.current = true;
     try {
+      // Legacy: try Lexical JSON format first
       const state = editor.parseEditorState(value);
-      editor.setEditorState(state);
+      editor.setEditorState(state); // setEditorState does not add to undo history
     } catch {
-      // ignore invalid state
+      // New: treat value as plain markdown
+      editor.update(() => {
+        $convertFromMarkdownString(value, TRANSFORMERS);
+      });
+      // After the markdown load flushes, clear history so Ctrl+Z starts
+      // from the loaded content, not from before it was loaded.
+      const unregister = editor.registerUpdateListener(() => {
+        unregister();
+        editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
+      });
     }
   }, [editor, value]);
   return null;
@@ -142,7 +157,9 @@ export function LexicalEditor({
   };
 
   const handleChange = (editorState: EditorState) => {
-    onChange?.(JSON.stringify(editorState.toJSON()));
+    editorState.read(() => {
+      onChange?.($convertToMarkdownString(TRANSFORMERS));
+    });
   };
 
   return (
@@ -160,7 +177,9 @@ export function LexicalEditor({
         {!readOnly && <MarkdownShortcutPlugin transformers={TRANSFORMERS} />}
         {!readOnly && <FloatingToolbarPlugin />}
         {!readOnly && <SlashMenuPlugin />}
-        {onChange && <OnChangePlugin onChange={handleChange} />}
+        {onChange && (
+          <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
+        )}
         <StateLoader value={value} />
       </div>
     </LexicalComposer>

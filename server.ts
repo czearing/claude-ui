@@ -4,7 +4,15 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:http";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
@@ -44,6 +52,7 @@ const sessions = new Map<string, SessionEntry>();
 
 const TASKS_FILE = join(process.cwd(), "tasks.json");
 const REPOS_FILE = join(process.cwd(), "repos.json");
+const SPECS_DIR = join(process.cwd(), "specs");
 
 type TaskStatus = "Backlog" | "Not Started" | "In Progress" | "Review" | "Done";
 type Priority = "Low" | "Medium" | "High" | "Urgent";
@@ -83,6 +92,149 @@ async function writeTasks(tasks: Task[]): Promise<void> {
   await writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf8");
 }
 
+function parseTaskFile(content: string): Task {
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(content);
+  if (!match) throw new Error("Invalid task file: missing frontmatter");
+  const frontmatter = match[1];
+  const body = match[2].trim();
+
+  const meta: Record<string, string> = {};
+  for (const line of frontmatter.split("\n")) {
+    const idx = line.indexOf(": ");
+    if (idx === -1) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 2).trim();
+    if (key) meta[key] = value;
+  }
+
+  const task: Task = {
+    id: meta["id"] ?? "",
+    title: meta["title"] ?? "",
+    status: (meta["status"] as TaskStatus) ?? "Backlog",
+    priority: (meta["priority"] as Priority) ?? "Medium",
+    repoId: meta["repoId"] ?? "",
+    spec: body,
+    createdAt: meta["createdAt"] ?? new Date().toISOString(),
+    updatedAt: meta["updatedAt"] ?? new Date().toISOString(),
+  };
+  if (meta["sessionId"]) task.sessionId = meta["sessionId"];
+  if (meta["archivedAt"]) task.archivedAt = meta["archivedAt"];
+  return task;
+}
+
+function serializeTaskFile(task: Task): string {
+  const lines = [
+    "---",
+    `id: ${task.id}`,
+    `title: ${task.title}`,
+    `status: ${task.status}`,
+    `priority: ${task.priority}`,
+    `repoId: ${task.repoId}`,
+  ];
+  if (task.sessionId) lines.push(`sessionId: ${task.sessionId}`);
+  if (task.archivedAt) lines.push(`archivedAt: ${task.archivedAt}`);
+  lines.push(`createdAt: ${task.createdAt}`);
+  lines.push(`updatedAt: ${task.updatedAt}`);
+  lines.push("---");
+  lines.push("");
+  if (task.spec) lines.push(task.spec);
+  return lines.join("\n");
+}
+
+function repoSpecsDir(repoId: string): string {
+  return join(SPECS_DIR, repoId);
+}
+
+async function ensureSpecsDir(repoId: string): Promise<void> {
+  await mkdir(repoSpecsDir(repoId), { recursive: true });
+}
+
+async function readTask(id: string, repoId: string): Promise<Task | null> {
+  try {
+    const raw = await readFile(join(repoSpecsDir(repoId), `${id}.md`), "utf8");
+    return parseTaskFile(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function writeTask(task: Task): Promise<void> {
+  await ensureSpecsDir(task.repoId);
+  await writeFile(
+    join(repoSpecsDir(task.repoId), `${task.id}.md`),
+    serializeTaskFile(task),
+    "utf8",
+  );
+}
+
+async function deleteTaskFile(id: string, repoId: string): Promise<void> {
+  try {
+    await unlink(join(repoSpecsDir(repoId), `${id}.md`));
+  } catch {
+    // ignore if already gone
+  }
+}
+
+async function readTasksForRepo(repoId: string): Promise<Task[]> {
+  try {
+    const dir = repoSpecsDir(repoId);
+    const files = await readdir(dir);
+    const tasks = await Promise.all(
+      files
+        .filter((f) => f.endsWith(".md"))
+        .map((f) => readTask(f.slice(0, -3), repoId)),
+    );
+    return tasks.filter((t): t is Task => t !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function readAllTasks(): Promise<Task[]> {
+  try {
+    const dirs = await readdir(SPECS_DIR);
+    const groups = await Promise.all(
+      dirs.map(async (dir) => {
+        try {
+          const s = await stat(join(SPECS_DIR, dir));
+          return s.isDirectory() ? readTasksForRepo(dir) : [];
+        } catch {
+          return [];
+        }
+      }),
+    );
+    return groups.flat();
+  } catch {
+    return [];
+  }
+}
+
+async function getNextTaskId(): Promise<string> {
+  let max = 0;
+  try {
+    const dirs = await readdir(SPECS_DIR);
+    for (const dir of dirs) {
+      try {
+        const s = await stat(join(SPECS_DIR, dir));
+        if (!s.isDirectory()) continue;
+        const files = await readdir(join(SPECS_DIR, dir));
+        for (const file of files) {
+          const m = /^TASK-(\d+)\.md$/.exec(file);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (n > max) max = n;
+          }
+        }
+      } catch {
+        // skip unreadable dirs
+      }
+    }
+  } catch {
+    // SPECS_DIR doesn't exist yet
+  }
+  return `TASK-${String(max + 1).padStart(3, "0")}`;
+}
+
 async function readRepos(): Promise<Repo[]> {
   try {
     const raw = await readFile(REPOS_FILE, "utf8");
@@ -118,6 +270,29 @@ async function ensureDefaultRepo(): Promise<void> {
       t.repoId ? t : { ...t, repoId: defaultRepo.id },
     );
     await writeTasks(migrated);
+  }
+
+  // Migrate tasks.json → individual markdown files
+  const tasksFilePath = join(process.cwd(), "tasks.json");
+  try {
+    const raw = await readFile(tasksFilePath, "utf8");
+    const legacyTasks = JSON.parse(raw) as Task[];
+    for (const t of legacyTasks) {
+      const existing = await readTask(t.id, t.repoId);
+      if (existing) continue; // already migrated
+      const migratedTask: Task = {
+        ...t,
+        spec: extractTextFromLexical(t.spec), // convert Lexical JSON → plain text
+      };
+      await writeTask(migratedTask);
+    }
+    // Rename tasks.json → tasks.json.bak so migration doesn't re-run
+    await rename(tasksFilePath, tasksFilePath + ".bak");
+    console.log(
+      `[tasks] Migrated ${legacyTasks.length} tasks to markdown files`,
+    );
+  } catch {
+    // tasks.json doesn't exist — nothing to migrate
   }
 }
 
@@ -213,16 +388,16 @@ function scheduleIdleStatus(entry: SessionEntry, sessionId: string): void {
         if (!latestE || latestE.currentStatus !== "idle") {
           return; // went busy again (spinner resumed) — not the real idle
         }
-        void readTasks().then((current) => {
-          const taskIdx = current.findIndex((t) => t.sessionId === sessionId);
-          if (taskIdx !== -1 && current[taskIdx].status === "In Progress") {
-            current[taskIdx] = {
-              ...current[taskIdx],
+        void readAllTasks().then((current) => {
+          const task = current.find((t) => t.sessionId === sessionId);
+          if (task && task.status === "In Progress") {
+            const updated: Task = {
+              ...task,
               status: "Review",
               updatedAt: new Date().toISOString(),
             };
-            void writeTasks(current).then(() =>
-              broadcastTaskEvent("task:updated", current[taskIdx]),
+            void writeTask(updated).then(() =>
+              broadcastTaskEvent("task:updated", updated),
             );
           }
         });
@@ -242,11 +417,10 @@ app
 
         // GET /api/tasks
         if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
-          const tasks = await readTasks();
           const repoId = parsedUrl.query["repoId"] as string | undefined;
           const result = repoId
-            ? tasks.filter((t) => t.repoId === repoId)
-            : tasks;
+            ? await readTasksForRepo(repoId)
+            : await readAllTasks();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(result));
           return;
@@ -255,10 +429,9 @@ app
         // POST /api/tasks
         if (req.method === "POST" && parsedUrl.pathname === "/api/tasks") {
           const body = await readBody(req);
-          const tasks = await readTasks();
           const now = new Date().toISOString();
           const task: Task = {
-            id: generateTaskId(tasks),
+            id: await getNextTaskId(),
             title: typeof body["title"] === "string" ? body["title"] : "",
             status: (body["status"] as TaskStatus) ?? "Backlog",
             priority: (body["priority"] as Priority) ?? "Medium",
@@ -268,8 +441,7 @@ app
             createdAt: now,
             updatedAt: now,
           };
-          tasks.push(task);
-          await writeTasks(tasks);
+          await writeTask(task);
           broadcastTaskEvent("task:created", task);
           res.writeHead(201, { "Content-Type": "application/json" });
           res.end(JSON.stringify(task));
@@ -284,9 +456,10 @@ app
         ) {
           const id = parsedUrl.pathname.slice("/api/tasks/".length);
           const body = await readBody(req);
-          const tasks = await readTasks();
-          const idx = tasks.findIndex((t) => t.id === id);
-          if (idx === -1) {
+          const existing = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (!existing) {
             res.writeHead(404);
             res.end();
             return;
@@ -296,23 +469,24 @@ app
           const leavingDone =
             body.status !== undefined &&
             body.status !== "Done" &&
-            tasks[idx].status === "Done";
+            existing.status === "Done";
 
-          tasks[idx] = {
-            ...tasks[idx],
+          const updated: Task = {
+            ...existing,
             ...body,
             id,
+            repoId: existing.repoId,
             updatedAt: now,
             archivedAt: becomingDone
-              ? (tasks[idx].archivedAt ?? now) // stamp once; don't overwrite if already set
+              ? (existing.archivedAt ?? now) // stamp once; don't overwrite if already set
               : leavingDone
                 ? undefined // clear when restoring
-                : tasks[idx].archivedAt, // unchanged
+                : existing.archivedAt, // unchanged
           } as Task;
-          await writeTasks(tasks);
-          broadcastTaskEvent("task:updated", tasks[idx]);
+          await writeTask(updated);
+          broadcastTaskEvent("task:updated", updated);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(tasks[idx]));
+          res.end(JSON.stringify(updated));
           return;
         }
 
@@ -322,10 +496,12 @@ app
           parsedUrl.pathname?.startsWith("/api/tasks/")
         ) {
           const id = parsedUrl.pathname.slice("/api/tasks/".length);
-          const tasks = await readTasks();
-          const taskToDelete = tasks.find((t) => t.id === id);
-          const filtered = tasks.filter((t) => t.id !== id);
-          await writeTasks(filtered);
+          const taskToDelete = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (taskToDelete) {
+            await deleteTaskFile(id, taskToDelete.repoId);
+          }
           broadcastTaskEvent("task:deleted", {
             id,
             repoId: taskToDelete?.repoId,
@@ -345,22 +521,22 @@ app
             "/api/tasks/".length,
             -"/recall".length,
           );
-          const tasks = await readTasks();
-          const idx = tasks.findIndex((t) => t.id === id);
-          if (idx === -1) {
+          const existing = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (!existing) {
             res.writeHead(404);
             res.end();
             return;
           }
-          const oldSessionId = tasks[idx].sessionId;
+          const oldSessionId = existing.sessionId;
           const updatedTask: Task = {
-            ...tasks[idx],
+            ...existing,
             status: "Backlog",
             updatedAt: new Date().toISOString(),
           };
           delete updatedTask.sessionId;
-          tasks[idx] = updatedTask;
-          await writeTasks(tasks);
+          await writeTask(updatedTask);
           broadcastTaskEvent("task:updated", updatedTask);
           if (oldSessionId) {
             const entry = sessions.get(oldSessionId);
@@ -387,14 +563,14 @@ app
             "/api/tasks/".length,
             -"/handover".length,
           );
-          const tasks = await readTasks();
-          const idx = tasks.findIndex((t) => t.id === id);
-          if (idx === -1) {
+          const task = await readAllTasks().then((ts) =>
+            ts.find((t) => t.id === id),
+          );
+          if (!task) {
             res.writeHead(404);
             res.end();
             return;
           }
-          const task = tasks[idx];
           const sessionId = randomUUID();
           const specText = extractTextFromLexical(task.spec);
           // Pass spec as a positional CLI argument so Claude receives it
@@ -469,34 +645,32 @@ app
             sessions.delete(sessionId);
 
             // Auto-advance to Review
-            void readTasks().then((current) => {
-              const taskIdx = current.findIndex(
-                (t) => t.sessionId === sessionId,
-              );
-              if (taskIdx !== -1 && current[taskIdx].status === "In Progress") {
-                current[taskIdx] = {
-                  ...current[taskIdx],
+            void readAllTasks().then((current) => {
+              const task = current.find((t) => t.sessionId === sessionId);
+              if (task && task.status === "In Progress") {
+                const updated: Task = {
+                  ...task,
                   status: "Review",
                   updatedAt: new Date().toISOString(),
                 };
-                void writeTasks(current).then(() =>
-                  broadcastTaskEvent("task:updated", current[taskIdx]),
+                void writeTask(updated).then(() =>
+                  broadcastTaskEvent("task:updated", updated),
                 );
               }
             });
           });
 
-          tasks[idx] = {
+          const inProgressTask: Task = {
             ...task,
             sessionId,
             status: "In Progress",
             updatedAt: new Date().toISOString(),
           };
-          await writeTasks(tasks);
-          broadcastTaskEvent("task:updated", tasks[idx]);
+          await writeTask(inProgressTask);
+          broadcastTaskEvent("task:updated", inProgressTask);
 
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(tasks[idx]));
+          res.end(JSON.stringify(inProgressTask));
           return;
         }
 
