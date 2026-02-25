@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { CaretUpDown, Check, Plus } from "@phosphor-icons/react";
+import { CaretUpDown, Check, Kanban, Plus } from "@phosphor-icons/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useRouter } from "next/navigation";
 
@@ -23,9 +23,14 @@ export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <button className={styles.trigger}>
-            <span className={styles.repoName}>
-              {activeRepo?.name ?? "Select repo"}
-            </span>
+            <div className={styles.triggerLeft}>
+              <div className={styles.icon}>
+                <Kanban size={14} color="white" weight="bold" />
+              </div>
+              <span className={styles.repoName}>
+                {activeRepo?.name ?? "Select repo"}
+              </span>
+            </div>
             <CaretUpDown size={12} className={styles.caret} />
           </button>
         </DropdownMenu.Trigger>

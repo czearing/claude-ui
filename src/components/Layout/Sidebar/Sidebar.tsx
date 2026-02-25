@@ -1,10 +1,4 @@
-import {
-  Archive,
-  CheckSquare,
-  Gear,
-  Kanban,
-  SquaresFour,
-} from "@phosphor-icons/react";
+import { Archive, CheckSquare, Gear, SquaresFour } from "@phosphor-icons/react";
 import clsx from "clsx";
 
 import { RepoSwitcher } from "./RepoSwitcher";
@@ -46,14 +40,7 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.logo}>
-        <div className={styles.logoIcon}>
-          <Kanban size={14} color="white" weight="bold" />
-        </div>
-        <span className={styles.logoText}>Claude Code</span>
-      </div>
-
-      <div className={styles.repoSection}>
+      <div className={styles.header}>
         <RepoSwitcher activeRepoId={repoId} />
       </div>
 
