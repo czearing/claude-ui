@@ -33,7 +33,7 @@ describe("parseClaudeStatus", () => {
       expect(parseClaudeStatus(spinnerChunk("⣾"))).toBe("thinking");
     });
 
-    it.each([..."⣾⣽⣻⢿⡿⣟⣯⣷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"])(
+    it.each([..."⣾⣽⣻⢿⡿⣟⣯⣷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✻✶✢·*"])(
       "returns 'thinking' for spinner char %s",
       (char) => {
         expect(parseClaudeStatus(`\r${char} ok`)).toBe("thinking");
@@ -57,9 +57,9 @@ describe("parseClaudeStatus", () => {
   // ── typing ────────────────────────────────────────────────────────────────
   describe("typing", () => {
     it("returns 'typing' for substantial plain text", () => {
-      expect(
-        parseClaudeStatus("Here is the solution to your problem"),
-      ).toBe("typing");
+      expect(parseClaudeStatus("Here is the solution to your problem")).toBe(
+        "typing",
+      );
     });
 
     it("returns 'typing' when text is wrapped in ANSI formatting", () => {

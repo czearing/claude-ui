@@ -10,10 +10,14 @@ const BRACKETED_PASTE_ON = "\x1b[?2004h";
 
 /**
  * Spinner animation pattern: carriage return (no newline) followed by a
- * braille or dot spinner character. This is how ora / cli-spinners redraw
- * in-place without scrolling the terminal.
+ * spinner character. This is how CLI spinners redraw in-place without
+ * scrolling the terminal.
+ *
+ * Includes:
+ *  - Braille dots  (ora / cli-spinners classic set)
+ *  - ✻ ✶ ✢ · *    (Claude Code v2 custom spinner set)
  */
-const SPINNER_RE = /\r[⣾⣽⣻⢿⡿⣟⣯⣷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/;
+const SPINNER_RE = /\r[⣾⣽⣻⢿⡿⣟⣯⣷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✻✶✢·*]/;
 
 /**
  * Matches all standard ANSI / VT100 escape sequences so we can strip them
@@ -46,14 +50,20 @@ function stripAnsi(s: string): string {
  */
 export function parseClaudeStatus(chunk: string): ParsedStatus | null {
   // 1. Bracketed paste ON = input prompt rendered = waiting for user
-  if (chunk.includes(BRACKETED_PASTE_ON)) { return "waiting"; }
+  if (chunk.includes(BRACKETED_PASTE_ON)) {
+    return "waiting";
+  }
 
   // 2. Spinner + carriage-return = processing animation
-  if (SPINNER_RE.test(chunk)) { return "thinking"; }
+  if (SPINNER_RE.test(chunk)) {
+    return "thinking";
+  }
 
   // 3. Substantial printable text = Claude is streaming its response
   const printable = stripAnsi(chunk).replace(/\s/g, "");
-  if (printable.length >= TYPING_THRESHOLD) { return "typing"; }
+  if (printable.length >= TYPING_THRESHOLD) {
+    return "typing";
+  }
 
   return null;
 }
