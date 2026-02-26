@@ -31,7 +31,9 @@ export async function resolveAgentsDir(
   if (scope === "repo" && repoId) {
     const repos = await readRepos();
     const repo = repos.find((r) => r.id === repoId);
-    if (!repo) {throw new Error("Repo not found");}
+    if (!repo) {
+      throw new Error("Repo not found");
+    }
     return join(repo.path, ".claude", "agents");
   }
   return globalAgentsDir();

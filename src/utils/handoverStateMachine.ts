@@ -7,14 +7,23 @@ import { parseClaudeStatus, type ParsedStatus } from "./parseClaudeStatus";
  *
  * ⎿ detection is intentionally NOT gated by this window because ⎿ never
  * appears in the startup splash.
+ *
+ * 3 000 ms: Claude Code startup on Windows (node-pty + claude.cmd) routinely
+ * takes 1–2 s, so 500 ms was too short and let the startup spinner fire within
+ * the window, causing every task to be immediately advanced to Review.
  */
-export const SPEC_ECHO_WINDOW_MS = 500;
+export const SPEC_ECHO_WINDOW_MS = 3000;
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 export interface HandoverState {
-  /** "spec_sent" until the task advances to Review; "done" thereafter. */
-  phase: "spec_sent" | "done";
+  /**
+   * "waiting_for_prompt" — Claude REPL has not yet shown the ❯ prompt;
+   *   spec has NOT been written to the PTY yet.
+   * "spec_sent" — spec injected, waiting for Claude to finish.
+   * "done" — task advanced to Review.
+   */
+  phase: "waiting_for_prompt" | "spec_sent" | "done";
   /**
    * True once we have seen a ⎿ prefix or a thinking spinner (past the echo
    * window).  Guards the fast-path so startup noise never advances the task.
@@ -30,7 +39,24 @@ export interface HandoverState {
   specSentAt: number;
 }
 
-export function makeInitialHandoverState(specSentAt: number): HandoverState {
+/**
+ * State before the spec is injected — waiting for Claude's ❯ prompt.
+ * specSentAt is 0 here; it will be stamped when the spec is actually written.
+ */
+export function makeInitialHandoverState(): HandoverState {
+  return {
+    phase: "waiting_for_prompt",
+    hadMeaningfulActivity: false,
+    lastMeaningfulStatus: null,
+    specSentAt: 0,
+  };
+}
+
+/**
+ * State after the spec has been injected into the PTY.
+ * Used by callers that need to advance from "waiting_for_prompt" to "spec_sent".
+ */
+export function makeSpecSentState(specSentAt: number): HandoverState {
   return {
     phase: "spec_sent",
     hadMeaningfulActivity: false,
@@ -49,6 +75,11 @@ export interface HandoverChunkResult {
    * Caller should emit this to connected WebSocket clients.
    */
   statusEmit: ParsedStatus | null;
+  /**
+   * True when the caller should write the spec to the PTY using bracketed
+   * paste.  Only fires once, on the first ❯ prompt in waiting_for_prompt phase.
+   */
+  injectSpec: boolean;
   /** True when the state machine has decided to advance the task to Review. */
   advanceToReview: boolean;
 }
@@ -69,13 +100,40 @@ export function processHandoverChunk(
 ): HandoverChunkResult {
   // Once the task is done, ignore all future chunks.
   if (state.phase === "done") {
-    return { state, statusEmit: null, advanceToReview: false };
+    return {
+      state,
+      statusEmit: null,
+      injectSpec: false,
+      advanceToReview: false,
+    };
   }
 
   const parsed = parseClaudeStatus(data);
   const lastMeaningfulStatus =
     parsed !== null ? parsed : state.lastMeaningfulStatus;
 
+  // ── Phase 1: waiting for the first ❯ prompt so we can inject the spec ───────
+  if (state.phase === "waiting_for_prompt") {
+    if (parsed === "waiting") {
+      // Claude REPL is ready.  Signal the caller to write the spec to the PTY.
+      // Transition to spec_sent, stamping specSentAt = nowMs.
+      return {
+        state: makeSpecSentState(nowMs),
+        statusEmit: parsed,
+        injectSpec: true,
+        advanceToReview: false,
+      };
+    }
+    // Not ready yet — buffer output but take no action.
+    return {
+      state: { ...state, lastMeaningfulStatus },
+      statusEmit: parsed,
+      injectSpec: false,
+      advanceToReview: false,
+    };
+  }
+
+  // ── Phase 2: spec sent, waiting for Claude to finish processing ──────────────
   let hadMeaningfulActivity = state.hadMeaningfulActivity;
 
   // ⎿ prefix (tool results, "Interrupted" message, etc.) never appears in the
@@ -106,6 +164,7 @@ export function processHandoverChunk(
         lastMeaningfulStatus,
       },
       statusEmit: parsed,
+      injectSpec: false,
       advanceToReview: true,
     };
   }
@@ -113,6 +172,7 @@ export function processHandoverChunk(
   return {
     state: { ...state, hadMeaningfulActivity, lastMeaningfulStatus },
     statusEmit: parsed,
+    injectSpec: false,
     advanceToReview: false,
   };
 }

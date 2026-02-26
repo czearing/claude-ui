@@ -73,8 +73,7 @@ async function handleRequest(
       const sessionId =
         typeof body["sessionId"] === "string" ? body["sessionId"] : null;
       const spec = typeof body["spec"] === "string" ? body["spec"] : null;
-      const cwd =
-        typeof body["cwd"] === "string" ? body["cwd"] : process.cwd();
+      const cwd = typeof body["cwd"] === "string" ? body["cwd"] : process.cwd();
 
       if (!sessionId || spec === null) {
         res.writeHead(400, { "Content-Type": "application/json" });
@@ -197,9 +196,7 @@ async function main(): Promise<void> {
   });
 
   server.listen(PTY_MANAGER_PORT, () => {
-    console.error(
-      `pty-manager ready on http://localhost:${PTY_MANAGER_PORT}`,
-    );
+    console.error(`pty-manager ready on http://localhost:${PTY_MANAGER_PORT}`);
   });
 }
 

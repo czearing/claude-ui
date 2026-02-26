@@ -63,11 +63,7 @@ describe("GET /api/repos", () => {
     const res = makeRes();
     const parsed = parse("/api/repos");
 
-    const handled = await handleRepoRoutes(
-      req,
-      res as never,
-      parsed,
-    );
+    const handled = await handleRepoRoutes(req, res as never, parsed);
 
     expect(handled).toBe(true);
     expect(res.writeHead).toHaveBeenCalledWith(200, {

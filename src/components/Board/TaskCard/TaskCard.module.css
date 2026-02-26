@@ -39,7 +39,7 @@
 }
 
 .cardSelected {
-  border-color: rgba(124, 58, 237, 0.5);
+  border-color: var(--color-agent-border);
   background-color: rgba(124, 58, 237, 0.07);
 }
 
@@ -122,7 +122,7 @@
 .agentBadge {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-size: var(--text-xs);
   color: var(--color-agent);
   font-weight: 500;
@@ -219,13 +219,13 @@
 }
 
 .menuItem:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-hover);
 }
 
 .menuItemLabel {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text);
@@ -242,7 +242,7 @@
 }
 
 .menuItemDanger:hover {
-  background: rgba(248, 113, 113, 0.08);
+  background: var(--color-danger-bg);
 }
 
 .menuSeparator {
@@ -254,7 +254,7 @@
 .sessionLink {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-1);
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   text-decoration: none;

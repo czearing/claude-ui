@@ -39,7 +39,9 @@ const mockDeleteTaskFile = deleteTaskFile as jest.MockedFunction<
 const mockGetNextTaskId = getNextTaskId as jest.MockedFunction<
   typeof getNextTaskId
 >;
-const mockReadAllTasks = readAllTasks as jest.MockedFunction<typeof readAllTasks>;
+const mockReadAllTasks = readAllTasks as jest.MockedFunction<
+  typeof readAllTasks
+>;
 const mockReadTasksForRepo = readTasksForRepo as jest.MockedFunction<
   typeof readTasksForRepo
 >;
@@ -173,7 +175,10 @@ describe("POST /api/tasks", () => {
     expect(typeof written.createdAt).toBe("string");
     expect(typeof written.updatedAt).toBe("string");
 
-    expect(mockBroadcastTaskEvent).toHaveBeenCalledWith("task:created", written);
+    expect(mockBroadcastTaskEvent).toHaveBeenCalledWith(
+      "task:created",
+      written,
+    );
     expect(res.writeHead).toHaveBeenCalledWith(201, {
       "Content-Type": "application/json",
     });

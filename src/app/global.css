@@ -59,6 +59,25 @@ h6 {
   --color-danger-bg: rgba(248, 81, 73, 0.15);
   --color-warning: #fb923c;
   --color-warning-bg: rgba(249, 115, 22, 0.2);
+  --color-success: #3fb950;
+  --color-success-bg: rgba(63, 185, 80, 0.15);
+  --color-info: #58a6ff;
+
+  /* Agent color variants */
+  --color-agent-border: rgba(124, 58, 237, 0.5);
+
+  /* Surface overlays (for hover states on dark surfaces) */
+  --color-surface-hover: rgba(255, 255, 255, 0.06);
+  --color-surface-subtle: rgba(255, 255, 255, 0.05);
+
+  /* Code syntax highlight tokens */
+  --code-comment: #6a737d;
+  --code-property: #79b8ff;
+  --code-selector: #85e89d;
+  --code-operator: #e1e4e8;
+  --code-attr: #ffab70;
+  --code-variable: #b392f0;
+  --code-inline: #e879a0;
 
   --font-sans: var(--font-inter, ui-sans-serif, system-ui, sans-serif);
   --font-mono: var(
@@ -70,6 +89,7 @@ h6 {
 
   /* Spacing */
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;

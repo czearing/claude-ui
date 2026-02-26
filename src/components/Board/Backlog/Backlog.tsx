@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  DotsThree,
-  FileText,
-  MagnifyingGlass,
-  Plus,
-  Sparkle,
-  Trash,
-} from "@phosphor-icons/react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { FileText, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 
 import {
   Select,
@@ -21,9 +13,9 @@ import {
 } from "@/components/Select";
 import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
-import { formatRelativeDate } from "@/utils/formatRelativeDate";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
+import { BacklogRow } from "./BacklogRow";
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest" },
@@ -132,73 +124,16 @@ export function Backlog({
 
         <div className={styles.list}>
           {sorted.map((task) => (
-            <div
+            <BacklogRow
               key={task.id}
-              className={`${styles.row} ${task.id === selectedTaskId ? styles.rowSelected : ""}`}
-              onClick={() => onSelectTask(task)}
-            >
-              <div className={styles.rowLeft}>
-                <div className={styles.docIcon}>
-                  <FileText size={16} />
-                </div>
-                <div className={styles.rowContent}>
-                  <span
-                    className={`${styles.rowTitle}${!task.title ? ` ${styles.rowTitleEmpty}` : ""}`}
-                  >
-                    {task.title || "New Title"}
-                  </span>
-                  <span className={styles.rowDate}>
-                    {formatRelativeDate(task.createdAt)}
-                  </span>
-                </div>
-              </div>
-
-              <div className={styles.rowActions}>
-                <button
-                  className={styles.agentButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handoverTask(task.id);
-                  }}
-                  aria-label={`Send ${task.title} to agent`}
-                >
-                  <Sparkle size={14} aria-hidden="true" />
-                  Send to Agent
-                </button>
-                <DropdownMenu.Root
-                  open={openMenuId === task.id}
-                  onOpenChange={(open) => setOpenMenuId(open ? task.id : null)}
-                >
-                  <DropdownMenu.Trigger asChild>
-                    <button
-                      className={`${styles.moreButton} ${openMenuId === task.id ? styles.moreButtonOpen : ""}`}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={`More actions for ${task.title}`}
-                    >
-                      <DotsThree size={16} weight="bold" />
-                    </button>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content
-                    className={styles.menuContent}
-                    align="end"
-                    sideOffset={4}
-                    onCloseAutoFocus={(e) => e.preventDefault()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <DropdownMenu.Item
-                      className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                      onSelect={() => deleteTask(task.id)}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <Trash size={13} />
-                        Delete
-                      </span>
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
-              </div>
-            </div>
+              task={task}
+              isSelected={task.id === selectedTaskId}
+              isMenuOpen={openMenuId === task.id}
+              onSelect={() => onSelectTask(task)}
+              onSetMenuOpen={(open) => setOpenMenuId(open ? task.id : null)}
+              onHandover={() => handoverTask(task.id)}
+              onDelete={() => deleteTask(task.id)}
+            />
           ))}
 
           {sorted.length === 0 && (

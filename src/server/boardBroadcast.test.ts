@@ -139,7 +139,10 @@ describe("multiple independent broadcasts", () => {
     );
     expect(sendMock).toHaveBeenNthCalledWith(
       3,
-      JSON.stringify({ type: "task:updated", data: { id: "t1", status: "done" } }),
+      JSON.stringify({
+        type: "task:updated",
+        data: { id: "t1", status: "done" },
+      }),
     );
   });
 });

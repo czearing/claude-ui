@@ -71,9 +71,7 @@ export function handleTerminalUpgrade(
     ptymgrWs.on("close", () => browserWs.close());
     ptymgrWs.on("error", (err) => {
       if (browserWs.readyState === WebSocket.OPEN) {
-        browserWs.send(
-          JSON.stringify({ type: "error", message: String(err) }),
-        );
+        browserWs.send(JSON.stringify({ type: "error", message: String(err) }));
       }
       browserWs.close();
     });

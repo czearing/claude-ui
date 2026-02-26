@@ -118,7 +118,7 @@
   font-family: var(--font-mono);
   font-size: 0.85em;
   background: rgba(255, 255, 255, 0.08);
-  color: #e879a0;
+  color: var(--code-inline);
   padding: 2px 5px;
   border-radius: var(--radius-sm);
 }
@@ -159,7 +159,7 @@
 }
 
 .tableCellHeader {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-surface-subtle);
   font-weight: 600;
   border: 1px solid var(--color-border);
   padding: 6px 12px;
@@ -190,33 +190,33 @@
 /* ─── Code highlight tokens ──────────────────────────────────────────────── */
 
 .tokenComment {
-  color: #6a737d;
+  color: var(--code-comment);
 }
 
 .tokenPunctuation {
-  color: #a0a0a5;
+  color: var(--color-text-muted);
 }
 
 .tokenProperty {
-  color: #79b8ff;
+  color: var(--code-property);
 }
 
 .tokenSelector {
-  color: #85e89d;
+  color: var(--code-selector);
 }
 
 .tokenOperator {
-  color: #e1e4e8;
+  color: var(--code-operator);
 }
 
 .tokenAttr {
-  color: #ffab70;
+  color: var(--code-attr);
 }
 
 .tokenVariable {
-  color: #b392f0;
+  color: var(--code-variable);
 }
 
 .tokenFunction {
-  color: #b392f0;
+  color: var(--code-variable);
 }

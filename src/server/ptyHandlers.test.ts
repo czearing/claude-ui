@@ -4,10 +4,7 @@
 import type { IPty } from "node-pty";
 import { WebSocket } from "ws";
 
-import {
-  attachHandoverHandlers,
-  attachTerminalHandlers,
-} from "./ptyHandlers";
+import { attachHandoverHandlers, attachTerminalHandlers } from "./ptyHandlers";
 import {
   advanceToReview,
   appendToBuffer,
@@ -378,7 +375,10 @@ describe("attachHandoverHandlers", () => {
       const fake = makeFakePty();
       // Do NOT put the session in sessions map
 
-      attachHandoverHandlers(fake.pty as unknown as IPty, "nonexistent-session");
+      attachHandoverHandlers(
+        fake.pty as unknown as IPty,
+        "nonexistent-session",
+      );
       fake.triggerData("some data");
 
       expect(mockedAppendToBuffer).not.toHaveBeenCalled();

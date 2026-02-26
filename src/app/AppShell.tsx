@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
@@ -12,39 +12,12 @@ import { useCreateTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./AppShell.module.css";
+import { useSplitPane } from "./useSplitPane";
 
 const SpecEditor = dynamic(
   () => import("@/components/Editor/SpecEditor").then((m) => m.SpecEditor),
   { ssr: false },
 );
-
-const MIN_LEFT = 320;
-const MIN_RIGHT = 340;
-const DEFAULT_LEFT_WIDTH = 480;
-const STORAGE_KEY = "split-pane-left-width";
-
-function readStoredWidth(): number {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const n = parseInt(raw, 10);
-      if (n >= MIN_LEFT) {
-        return n;
-      }
-    }
-  } catch {
-    // localStorage unavailable (SSR / private browsing)
-  }
-  return DEFAULT_LEFT_WIDTH;
-}
-
-function storeWidth(width: number) {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(width));
-  } catch {
-    // ignore
-  }
-}
 
 interface AppShellProps {
   repoId: string;
@@ -57,20 +30,21 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
   const router = useRouter();
   const handoverTask = useHandoverTask(repoId);
   const { mutate: createTask } = useCreateTask(repoId);
+  const { contentRef, leftRef, leftWidth, openPane, handleDividerMouseDown } =
+    useSplitPane();
 
   useTasksSocket();
-
-  const contentRef = useRef<HTMLDivElement>(null);
-  const leftRef = useRef<HTMLDivElement>(null);
-  const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
-  const widthRef = useRef(DEFAULT_LEFT_WIDTH);
 
   const agentActive = tasks.some((t) => t.status === "In Progress");
 
   useEffect(() => {
-    if (!selectedTask) return;
+    if (!selectedTask) {
+      return;
+    }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedTask(null);
+      if (e.key === "Escape") {
+        setSelectedTask(null);
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -100,46 +74,8 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
       }
       return;
     }
-    const w = readStoredWidth();
-    widthRef.current = w;
-    setLeftWidth(w);
+    openPane();
     setSelectedTask(task);
-  }
-
-  function handleDividerMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    const contentEl = contentRef.current;
-    const leftEl = leftRef.current;
-    if (!contentEl || !leftEl) {
-      return;
-    }
-
-    contentEl.setAttribute("data-resizing", "true");
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const onMove = (ev: MouseEvent) => {
-      const rect = contentEl.getBoundingClientRect();
-      const next = Math.max(
-        MIN_LEFT,
-        Math.min(ev.clientX - rect.left, rect.width - MIN_RIGHT),
-      );
-      widthRef.current = next;
-      leftEl.style.width = `${next}px`;
-    };
-
-    const onUp = () => {
-      contentEl.removeAttribute("data-resizing");
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      setLeftWidth(widthRef.current);
-      storeWidth(widthRef.current);
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
   }
 
   return (
@@ -182,7 +118,6 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
                 className={styles.divider}
                 onMouseDown={handleDividerMouseDown}
               />
-
               <div className={styles.right}>
                 <SpecEditor
                   key={selectedTask.id}

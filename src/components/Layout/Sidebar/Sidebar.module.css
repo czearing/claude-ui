@@ -100,5 +100,5 @@
 }
 
 .dotIdle {
-  background-color: #6b7280;
+  background-color: var(--color-text-muted);
 }

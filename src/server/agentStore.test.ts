@@ -37,7 +37,9 @@ const mockParseFrontmatterDoc = parseFrontmatterDoc as jest.MockedFunction<
   typeof parseFrontmatterDoc
 >;
 const mockSerializeFrontmatterDoc =
-  serializeFrontmatterDoc as jest.MockedFunction<typeof serializeFrontmatterDoc>;
+  serializeFrontmatterDoc as jest.MockedFunction<
+    typeof serializeFrontmatterDoc
+  >;
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -198,7 +200,10 @@ describe("readAgent", () => {
       join("/agents/dir", "my-agent.md"),
       "utf8",
     );
-    expect(mockParseFrontmatterDoc).toHaveBeenCalledWith("raw content", "my-agent");
+    expect(mockParseFrontmatterDoc).toHaveBeenCalledWith(
+      "raw content",
+      "my-agent",
+    );
     expect(result).toEqual({
       name: "my-agent",
       description: "Does things",
@@ -215,7 +220,11 @@ describe("writeAgent", () => {
     mockWriteFile.mockResolvedValueOnce(undefined);
     mockSerializeFrontmatterDoc.mockReturnValueOnce("serialized content");
 
-    const agent = { name: "my-agent", description: "Does things", content: "body" };
+    const agent = {
+      name: "my-agent",
+      description: "Does things",
+      content: "body",
+    };
     await writeAgent("/agents/dir", agent);
 
     expect(mockMkdir).toHaveBeenCalledWith("/agents/dir", { recursive: true });
@@ -236,7 +245,9 @@ describe("deleteAgent", () => {
       Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
     );
 
-    await expect(deleteAgent("/agents/dir", "my-agent")).resolves.toBeUndefined();
+    await expect(
+      deleteAgent("/agents/dir", "my-agent"),
+    ).resolves.toBeUndefined();
   });
 
   it("calls unlink with the correct path", async () => {
