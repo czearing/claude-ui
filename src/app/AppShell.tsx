@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
@@ -36,6 +36,10 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
   useTasksSocket();
 
   const agentActive = tasks.some((t) => t.status === "In Progress");
+  const boardTasks = useMemo(
+    () => tasks.filter((t) => t.status !== "Backlog"),
+    [tasks],
+  );
 
   useEffect(() => {
     if (!selectedTask) {
@@ -98,7 +102,7 @@ export function AppShell({ repoId, view: currentView }: AppShellProps) {
             {currentView === "Board" ? (
               <Board
                 repoId={repoId}
-                tasks={tasks.filter((t) => t.status !== "Backlog")}
+                tasks={boardTasks}
                 onSelectTask={handleSelectTask}
                 onHandover={handleHandover}
               />

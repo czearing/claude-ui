@@ -12,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/Select";
 import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
-import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
 import { BacklogRow } from "./BacklogRow";
@@ -58,8 +57,6 @@ export function Backlog({
   onNewTask,
   selectedTaskId,
 }: BacklogProps) {
-  useTasksSocket();
-
   const { data: allTasks = [] } = useTasks(repoId);
   const { mutate: deleteTask } = useDeleteTask(repoId);
   const { mutate: handoverTask } = useHandoverTask(repoId);

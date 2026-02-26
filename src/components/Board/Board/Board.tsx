@@ -21,6 +21,7 @@ import { Column } from "../Column";
 import { TaskCard } from "../TaskCard";
 
 const BOARD_COLUMNS: TaskStatus[] = ["In Progress", "Review", "Done"];
+const EMPTY: Task[] = [];
 
 interface BoardProps {
   repoId: string;
@@ -92,7 +93,7 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
                 status={status}
                 tasks={
                   status === "Done"
-                    ? []
+                    ? EMPTY
                     : tasks.filter((t) => t.status === status)
                 }
                 onSelectTask={onSelectTask}
