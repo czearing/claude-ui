@@ -66,9 +66,11 @@ jest.mock("node:url", () => ({
 
 // ─── Retrieve handles to mocked modules ──────────────────────────────────────
 
-const { _sessions: sessionsMap, emitStatus, advanceToReview } = jest.requireMock(
-  "./ptyStore",
-) as unknown as {
+const {
+  _sessions: sessionsMap,
+  emitStatus,
+  advanceToReview,
+} = jest.requireMock("./ptyStore") as unknown as {
   _sessions: Map<string, object>;
   emitStatus: jest.Mock;
   advanceToReview: jest.Mock;
