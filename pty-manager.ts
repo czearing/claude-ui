@@ -110,6 +110,7 @@ async function handleRequest(
         specSentAt: 0,
         hadMeaningfulActivity: false,
         lastMeaningfulStatus: null,
+        supportsBracketedPaste: false,
       };
       sessions.set(sessionId, entry);
       sessionRegistry.set(sessionId, {

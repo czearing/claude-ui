@@ -9,7 +9,7 @@ import * as pty from "node-pty";
 import type { WebSocket } from "ws";
 
 import { attachTerminalHandlers } from "./ptyHandlers";
-import { emitStatus, sessions } from "./ptyStore";
+import { advanceToReview, emitStatus, sessions } from "./ptyStore";
 import type { SessionRegistryEntry } from "../utils/sessionRegistry";
 
 import type { IncomingMessage } from "node:http";
@@ -100,11 +100,25 @@ export function handleWsConnection(
       specSentAt: 0,
       hadMeaningfulActivity: false,
       lastMeaningfulStatus: null,
+      supportsBracketedPaste: false,
     };
     sessions.set(sessionId, entry);
     emitStatus(ws, "connecting");
 
     attachTerminalHandlers(ptyProcess, sessionId);
+
+    // Recovery: if this is a resumed session whose registry entry is older
+    // than 5 minutes, the pty-manager likely restarted while the task was
+    // "In Progress".  Advance to Review now — advanceToReview checks
+    // task.status === "In Progress" before mutating, so it is safe to call
+    // even if the task is already in a different state.
+    if (registryEntry) {
+      const ageMs = Date.now() - new Date(registryEntry.createdAt).getTime();
+      const FIVE_MINUTES_MS = 5 * 60 * 1000;
+      if (ageMs > FIVE_MINUTES_MS) {
+        advanceToReview(sessionId);
+      }
+    }
   }
 
   ws.on("message", (data, isBinary) => {

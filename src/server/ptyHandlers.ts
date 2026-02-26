@@ -50,22 +50,30 @@ export function attachHandoverHandlers(
       }
     }
 
-    // Phase 1 → Phase 2: Claude REPL is ready — inject the spec.
-    // Bracketed paste (ESC[200~ … ESC[201~) tells readline to accept
-    // embedded newlines without treating each one as a submission, so
-    // the entire multiline spec arrives as a single message.
+    // Track bracketed-paste support via the \x1b[?2004h sequence.
+    if (!e.supportsBracketedPaste && data.includes("\x1b[?2004h")) {
+      e.supportsBracketedPaste = true;
+    }
+
+    // Phase 1 → Phase 2: inject spec on the first ❯ prompt.
+    // Use bracketed paste only when the PTY has advertised support
+    // (\x1b[?2004h seen).  Claude Code v2.1.58+ omits that sequence,
+    // so fall back to plain spec + \r which works on all versions.
     if (e.handoverPhase === "waiting_for_prompt" && parsed === "waiting") {
-      e.pty.write(`\x1b[200~${e.handoverSpec}\x1b[201~\r`);
+      const spec = e.handoverSpec.replace(/\n/g, " ");
+      if (e.supportsBracketedPaste) {
+        e.pty.write(`\x1b[200~${spec}\x1b[201~\r`);
+      } else {
+        e.pty.write(`${spec}\r`);
+      }
       e.handoverPhase = "spec_sent";
       e.specSentAt = Date.now();
       e.hadMeaningfulActivity = false;
       return;
     }
 
-    // ⎿ prefix (tool results, "Interrupted" message, etc.) never appears in
-    // the startup splash, so it is a safe meaningful-activity signal with NO
-    // time gate — even if the interrupt fires within the first 500 ms we must
-    // honour it.
+    // ⎿ prefix (tool results, "Interrupted") never appears in startup splash —
+    // safe meaningful-activity signal with no time gate.
     if (
       e.handoverPhase === "spec_sent" &&
       !e.hadMeaningfulActivity &&
@@ -85,9 +93,8 @@ export function attachHandoverHandlers(
       e.hadMeaningfulActivity = true;
     }
 
-    // Fast path: ❯ prompt detected = Claude is done (task complete or
-    // question asked). Advance to Review immediately without waiting for
-    // the idle timer to fire.
+    // Fast path: ❯ prompt + meaningful activity = task done.
+    // Advance to Review without waiting for the idle timer.
     if (
       parsed === "waiting" &&
       e.handoverPhase === "spec_sent" &&
@@ -102,7 +109,6 @@ export function attachHandoverHandlers(
       return;
     }
 
-    // Fallback: schedule waiting detection after PTY silence
     scheduleIdleStatus(e, sessionId);
   });
 

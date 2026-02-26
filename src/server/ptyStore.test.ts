@@ -31,6 +31,7 @@ function makeEntry(overrides: Partial<SessionEntry> = {}): SessionEntry {
     specSentAt: 0,
     hadMeaningfulActivity: false,
     lastMeaningfulStatus: null,
+    supportsBracketedPaste: false,
     ...overrides,
   };
 }

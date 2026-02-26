@@ -47,6 +47,7 @@ jest.mock("./ptyStore", () => {
     sessions: map,
     _sessions: map,
     emitStatus: jest.fn(),
+    advanceToReview: jest.fn(),
   };
 });
 
@@ -65,11 +66,12 @@ jest.mock("node:url", () => ({
 
 // ─── Retrieve handles to mocked modules ──────────────────────────────────────
 
-const { _sessions: sessionsMap, emitStatus } = jest.requireMock(
+const { _sessions: sessionsMap, emitStatus, advanceToReview } = jest.requireMock(
   "./ptyStore",
 ) as unknown as {
   _sessions: Map<string, object>;
   emitStatus: jest.Mock;
+  advanceToReview: jest.Mock;
 };
 
 const { attachTerminalHandlers } = jest.requireMock(
@@ -358,6 +360,63 @@ describe("handleWsConnection", () => {
 
       // emitStatus with "connecting".
       expect(emitStatus).toHaveBeenCalledWith(ws, "connecting");
+
+      // Recent session (just now): advanceToReview NOT called.
+      expect(advanceToReview).not.toHaveBeenCalled();
+    });
+
+    it("calls advanceToReview immediately when resumed session is older than 5 minutes (pty-manager restart recovery)", () => {
+      setSessionId(SESSION_ID);
+      const registry = new Map<
+        string,
+        { id: string; cwd: string; createdAt: string }
+      >();
+      // Registry entry created 6 minutes ago — older than the 5-minute threshold.
+      const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+      registry.set(SESSION_ID, {
+        id: SESSION_ID,
+        cwd: "/home/user/project",
+        createdAt: sixMinutesAgo,
+      });
+      const save = makeSave();
+      const ws = new MockWs();
+
+      handleWsConnection(
+        ws as never,
+        makeReq(),
+        registry as never,
+        save,
+        "claude",
+      );
+
+      // Recovery: advanceToReview should be called for the old in-progress session.
+      expect(advanceToReview).toHaveBeenCalledWith(SESSION_ID);
+    });
+
+    it("does NOT call advanceToReview when resumed session is less than 5 minutes old", () => {
+      setSessionId(SESSION_ID);
+      const registry = new Map<
+        string,
+        { id: string; cwd: string; createdAt: string }
+      >();
+      // Registry entry created 2 minutes ago — within threshold.
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      registry.set(SESSION_ID, {
+        id: SESSION_ID,
+        cwd: "/home/user/project",
+        createdAt: twoMinutesAgo,
+      });
+      const ws = new MockWs();
+
+      handleWsConnection(
+        ws as never,
+        makeReq(),
+        registry as never,
+        makeSave(),
+        "claude",
+      );
+
+      expect(advanceToReview).not.toHaveBeenCalled();
     });
   });
 

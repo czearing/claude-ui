@@ -93,6 +93,7 @@ function makeEntry(overrides: Partial<SessionEntry> = {}): SessionEntry {
     specSentAt: 0,
     hadMeaningfulActivity: false,
     lastMeaningfulStatus: null,
+    supportsBracketedPaste: false,
     ...overrides,
   };
 }
@@ -122,11 +123,12 @@ describe("attachHandoverHandlers", () => {
   // ── onData: handover phase transitions ────────────────────────────────────
 
   describe("onData — handover phase transitions", () => {
-    it("waiting_for_prompt + parsed=waiting: writes spec via bracketed paste and sets phase to spec_sent", () => {
+    it("waiting_for_prompt + parsed=waiting + supportsBracketedPaste=true: writes spec via bracketed paste and sets phase to spec_sent", () => {
       const fake = makeFakePty();
       const entry = makeEntry({
         handoverPhase: "waiting_for_prompt",
         handoverSpec: "Do something useful",
+        supportsBracketedPaste: true,
         pty: fake.pty as unknown as SessionEntry["pty"],
       });
       sessions.set(SESSION_ID, entry);
@@ -141,6 +143,77 @@ describe("attachHandoverHandlers", () => {
       );
       expect(entry.handoverPhase).toBe("spec_sent");
       expect(entry.hadMeaningfulActivity).toBe(false);
+    });
+
+    it("waiting_for_prompt + parsed=waiting + supportsBracketedPaste=false: writes spec directly without bracketed paste markers", () => {
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        handoverPhase: "waiting_for_prompt",
+        handoverSpec: "Do something useful",
+        supportsBracketedPaste: false,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerData("❯ ");
+
+      expect(fake.pty.write).toHaveBeenCalledTimes(1);
+      expect(fake.pty.write).toHaveBeenCalledWith(`Do something useful\r`);
+      expect(entry.handoverPhase).toBe("spec_sent");
+    });
+
+    it("multiline spec has newlines replaced with spaces when writing without bracketed paste", () => {
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        handoverPhase: "waiting_for_prompt",
+        handoverSpec: "Line one\nLine two\nLine three",
+        supportsBracketedPaste: false,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerData("❯ ");
+
+      expect(fake.pty.write).toHaveBeenCalledWith(
+        `Line one Line two Line three\r`,
+      );
+    });
+
+    it("sets supportsBracketedPaste=true when \\x1b[?2004h is seen in data", () => {
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        handoverPhase: "waiting_for_prompt",
+        supportsBracketedPaste: false,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+      mockedParseClaudeStatus.mockReturnValue(null);
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerData("\x1b[?2004h some startup output");
+
+      expect(entry.supportsBracketedPaste).toBe(true);
+    });
+
+    it("does not overwrite supportsBracketedPaste once set to true", () => {
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        handoverPhase: "waiting_for_prompt",
+        supportsBracketedPaste: true,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+      mockedParseClaudeStatus.mockReturnValue(null);
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerData("normal output without the sequence");
+
+      // Still true — was not cleared
+      expect(entry.supportsBracketedPaste).toBe(true);
     });
 
     it("spec_sent phase + data includes ⎿: sets hadMeaningfulActivity = true (no time gate)", () => {

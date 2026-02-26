@@ -11,6 +11,8 @@ import { parseClaudeStatus, type ParsedStatus } from "./parseClaudeStatus";
  * 3 000 ms: Claude Code startup on Windows (node-pty + claude.cmd) routinely
  * takes 1–2 s, so 500 ms was too short and let the startup spinner fire within
  * the window, causing every task to be immediately advanced to Review.
+ *
+ * Must stay in sync with SPEC_ECHO_WINDOW_MS in ptyStore.ts.
  */
 export const SPEC_ECHO_WINDOW_MS = 3000;
 

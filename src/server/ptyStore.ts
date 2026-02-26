@@ -19,8 +19,12 @@ export const BUFFER_CAP = 500 * 1024;
 /**
  * Window after writing the spec to the PTY during which output is treated as
  * echo/startup noise rather than meaningful Claude activity.
+ *
+ * 3 000 ms: Claude Code startup on Windows (node-pty + claude.cmd) routinely
+ * takes 1–2 s, so 500 ms was too short and let the startup spinner fire within
+ * the window, causing every task to be immediately advanced to Review.
  */
-export const SPEC_ECHO_WINDOW_MS = 500;
+export const SPEC_ECHO_WINDOW_MS = 3000;
 
 /**
  * How long the PTY must be silent before we treat it as "waiting for input".
@@ -59,6 +63,13 @@ export type SessionEntry = {
    *  tool-use silences (last=thinking) from response-complete silences
    *  (last=typing) so advanceToReview only fires after a real response. */
   lastMeaningfulStatus: ParsedStatus | null;
+  /**
+   * True when the PTY output has included the bracketed-paste-on sequence
+   * (\x1b[?2004h).  Older Claude Code emits this before the ❯ prompt; newer
+   * versions (v2.1.58+) do not.  Used by spec injection to decide whether to
+   * wrap the spec in bracketed-paste markers.
+   */
+  supportsBracketedPaste: boolean;
 };
 
 // ─── In-memory session store ──────────────────────────────────────────────────
