@@ -1,14 +1,24 @@
 // src/components/Skills/SkillEditor/SkillEditor.test.tsx
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillEditor } from "./SkillEditor";
 
-beforeAll(() => {
-  Object.defineProperty(window, "getSelection", {
-    value: () => ({ rangeCount: 0 }),
-    writable: true,
-  });
+// Capture the onChange callback passed to LexicalEditor so tests can fire it.
+let capturedLexicalOnChange: ((val: string) => void) | undefined;
+
+jest.mock("@/components/Editor/LexicalEditor", () => ({
+  LexicalEditor: (props: {
+    value?: string;
+    onChange?: (val: string) => void;
+  }) => {
+    capturedLexicalOnChange = props.onChange;
+    return <div data-testid="lexical-editor" />;
+  },
+}));
+
+beforeEach(() => {
+  capturedLexicalOnChange = undefined;
 });
 
 describe("SkillEditor", () => {
@@ -39,8 +49,7 @@ describe("SkillEditor", () => {
         onDelete={jest.fn()}
       />,
     );
-    const editables = document.querySelectorAll("[contenteditable]");
-    expect(editables.length).toBeGreaterThan(0);
+    expect(screen.getByTestId("lexical-editor")).toBeInTheDocument();
   });
 
   it("calls onDelete when the delete button is clicked", async () => {
@@ -153,5 +162,39 @@ describe("SkillEditor", () => {
     // Unmount flushes the pending debounced callback
     unmount();
     expect(onChange).toHaveBeenCalledWith("new description", "some content");
+  });
+
+  it("does not call onChange when Lexical output differs from content only by trailing whitespace", () => {
+    const onChange = jest.fn();
+    render(
+      <SkillEditor
+        name="bugfix"
+        description=""
+        content="# Hello"
+        onChange={onChange}
+        onRename={jest.fn()}
+        onDelete={jest.fn()}
+      />,
+    );
+    // Lexical often appends a trailing newline — this should be suppressed.
+    act(() => capturedLexicalOnChange?.("# Hello\n"));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("calls onChange when Lexical output is genuinely different from content", () => {
+    const onChange = jest.fn();
+    const { unmount } = render(
+      <SkillEditor
+        name="bugfix"
+        description=""
+        content="# Hello"
+        onChange={onChange}
+        onRename={jest.fn()}
+        onDelete={jest.fn()}
+      />,
+    );
+    act(() => capturedLexicalOnChange?.("# Hello\n\nNew paragraph"));
+    unmount();
+    expect(onChange).toHaveBeenCalledWith("", "# Hello\n\nNew paragraph");
   });
 });

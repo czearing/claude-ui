@@ -24,7 +24,14 @@ export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
     <>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className={styles.trigger}>
+          {/* suppressHydrationWarning: Radix generates the button id via
+              React's useId, which produces different values between the
+              Next.js App Router SSR pass and client hydration. Without
+              this attribute React throws a non-patchable hydration error
+              and tears down the entire component tree (visible as a page
+              reload). The id is only used for ARIA aria-controls linking
+              so the mismatch has no functional impact. */}
+          <button className={styles.trigger} suppressHydrationWarning>
             <div className={styles.triggerLeft}>
               <div className={styles.icon}>
                 <Kanban size={14} color="white" weight="bold" />

@@ -1,134 +1,170 @@
-import type { Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 
-import { test, expect, MOCK_TASKS } from "./fixtures";
-import type { Task } from "./fixtures";
+import type { Task } from "../src/utils/tasks.types";
 
-const IN_PROGRESS_TASK = MOCK_TASKS.find((t) => t.id === "task-ip")!;
-
-// Intercepts GET /api/tasks?repoId=... with a mutable task list.
-// The pattern **/api/tasks* (single *) only matches URLs where the path
-// ends at "tasks" with no further slashes — i.e. it matches the list
-// endpoint but NOT /api/tasks/:id/handover or /api/tasks/:id/recall.
-async function routeTasks(page: Page, getTasks: () => Task[]) {
-  await page.route("**/api/tasks*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ json: getTasks() });
-    } else {
-      await route.continue();
-    }
-  });
+interface RepoJson {
+  id: string;
+  name: string;
+  path: string;
 }
 
-test("Send to Agent triggers handover and task disappears from backlog", async ({
-  page,
-}) => {
-  let tasks = [...MOCK_TASKS];
+// Serial mode prevents tests from interfering with each other's board state.
+test.describe.configure({ mode: "serial" });
 
-  await routeTasks(page, () => tasks);
+test.describe("Handover and Recall", () => {
+  let repoId: string;
+  const taskIds: string[] = [];
 
-  // Mock the handover endpoint — flip the task to In Progress in our mutable list
-  // so the subsequent tasks re-fetch no longer includes it in the Backlog filter.
-  await page.route("**/api/tasks/task-backlog/handover", async (route) => {
-    tasks = tasks.map((t) =>
-      t.id === "task-backlog"
-        ? { ...t, status: "In Progress" as const, sessionId: "session-new-123" }
-        : t,
-    );
-    await route.fulfill({ json: tasks.find((t) => t.id === "task-backlog") });
+  test.beforeAll(async ({ request }) => {
+    const res = await request.get("/api/repos");
+    expect(res.ok(), "GET /api/repos must succeed").toBe(true);
+    const repos = (await res.json()) as RepoJson[];
+    expect(
+      repos.length,
+      "At least one repo must be configured — add one in the app first",
+    ).toBeGreaterThan(0);
+    repoId = repos[0].id;
   });
 
-  await page.goto("/repos/repo-1/tasks");
-  await expect(page.getByText("Backlog item")).toBeVisible();
-
-  // The parent row div captures pointer events (it handles row selection),
-  // so force the click directly onto the button element.
-  await page
-    .getByRole("button", { name: "Send Backlog item to agent" })
-    .click({ force: true });
-
-  // useHandoverTask.onSuccess calls invalidateQueries, triggering a re-fetch.
-  // The task is now "In Progress" so the Backlog filter drops it from the list.
-  await expect(page.getByText("Backlog item")).not.toBeVisible();
-});
-
-test("handover with no spec advances task directly to Review without spawning a session", async ({
-  page,
-}) => {
-  // BACKLOG_TASK has spec: null — the server skips pty-manager and sets status
-  // directly to "Review" (no sessionId is assigned).
-  let tasks = [...MOCK_TASKS];
-
-  await routeTasks(page, () => tasks);
-
-  await page.route("**/api/tasks/task-backlog/handover", async (route) => {
-    tasks = tasks.map((t) =>
-      t.id === "task-backlog" ? { ...t, status: "Review" as const } : t,
-    );
-    await route.fulfill({ json: tasks.find((t) => t.id === "task-backlog") });
+  test.afterEach(async ({ request }) => {
+    for (const id of taskIds) {
+      await request.delete(`/api/tasks/${id}`);
+    }
+    taskIds.length = 0;
   });
 
-  await page.goto("/repos/repo-1/tasks");
-  await expect(page.getByText("Backlog item")).toBeVisible();
+  async function createTask(
+    request: APIRequestContext,
+    title: string,
+    spec: string = "",
+  ): Promise<Task> {
+    const res = await request.post("/api/tasks", {
+      data: { title, repoId, priority: "Medium", spec },
+    });
+    expect(res.status()).toBe(201);
+    const task = (await res.json()) as Task;
+    taskIds.push(task.id);
+    return task;
+  }
 
-  await page
-    .getByRole("button", { name: "Send Backlog item to agent" })
-    .click({ force: true });
+  test("Send to Agent triggers handover and task disappears from backlog", async ({
+    page,
+    request,
+  }) => {
+    const task = await createTask(request, "Handover backlog task");
 
-  // Task is now "Review" — not shown in the Backlog list
-  await expect(page.getByText("Backlog item")).not.toBeVisible();
-});
+    await page.goto(`/repos/${repoId}/tasks`);
+    await expect(page.getByText(task.title)).toBeVisible();
 
-test("clicking an In Progress task on the board navigates to its session page", async ({
-  page,
-}) => {
-  await routeTasks(page, () => MOCK_TASKS);
+    // With empty spec, handover skips Claude and sets the task to Review.
+    // The Backlog filter excludes Review tasks, so the row disappears.
+    await page
+      .getByRole("button", { name: `Send ${task.title} to agent` })
+      .click({ force: true });
 
-  // Mock the terminal WebSocket so the session page does not stall waiting for
-  // a pty-manager connection that won't arrive in this test environment.
-  await page.routeWebSocket("**/ws/terminal*", (_ws) => {});
-
-  await page.goto("/repos/repo-1/board");
-  // IN_PROGRESS_TASK (task-ip) has sessionId "session-abc".
-  // AppShell.handleSelectTask detects sessionId and calls router.push.
-  await expect(page.getByText("In progress task")).toBeVisible();
-  await page.getByText("In progress task").click();
-
-  await expect(page).toHaveURL(/\/repos\/repo-1\/session\/session-abc/);
-});
-
-test("session page renders back navigation and status indicator", async ({
-  page,
-}) => {
-  await page.routeWebSocket("**/ws/terminal*", (_ws) => {});
-
-  await page.goto(`/repos/repo-1/session/${IN_PROGRESS_TASK.sessionId}`);
-
-  await expect(page.getByRole("link", { name: /back/i })).toBeVisible();
-});
-
-test("recalling an In Progress task moves it back to Backlog", async ({
-  page,
-}) => {
-  let tasks = [...MOCK_TASKS];
-
-  await routeTasks(page, () => tasks);
-
-  await page.route("**/api/tasks/task-ip/recall", async (route) => {
-    tasks = tasks.map((t) =>
-      t.id === "task-ip"
-        ? { ...t, status: "Backlog" as const, sessionId: undefined }
-        : t,
-    );
-    await route.fulfill({ json: tasks.find((t) => t.id === "task-ip") });
+    await expect(page.getByText(task.title)).not.toBeVisible();
   });
 
-  await page.goto("/repos/repo-1/board");
-  await expect(page.getByText("In progress task")).toBeVisible();
+  test("handover with no spec advances task directly to Review without spawning a session", async ({
+    page,
+    request,
+  }) => {
+    const task = await createTask(request, "No spec handover task");
 
-  // The three-dot menu on the In Progress card has "Move to Backlog"
-  await page.getByLabel("Task actions").first().click();
-  await page.getByText("Move to Backlog").click();
+    let wsConnected = false;
+    await page.routeWebSocket("**/ws/terminal*", (_ws) => {
+      wsConnected = true;
+    });
 
-  // After recall the task is "Backlog" — it's excluded from the board
-  await expect(page.getByText("In progress task")).not.toBeVisible();
+    await page.goto(`/repos/${repoId}/tasks`);
+    await expect(page.getByText(task.title)).toBeVisible();
+
+    await page
+      .getByRole("button", { name: `Send ${task.title} to agent` })
+      .click({ force: true });
+
+    // Task is now Review — not shown in Backlog list.
+    await expect(page.getByText(task.title)).not.toBeVisible();
+
+    // No session navigation should have occurred — handover with empty spec
+    // does not create a session, so AppShell.handleHandover does not push.
+    expect(page.url()).not.toMatch(/\/session\//);
+
+    // Navigate to the board to verify the task landed in the Review column.
+    await page.goto(`/repos/${repoId}/board`);
+    await expect(page.getByText(task.title)).toBeVisible();
+
+    // No terminal WebSocket should have been opened.
+    expect(wsConnected).toBe(false);
+  });
+
+  test("clicking an In Progress task on the board navigates to its session page", async ({
+    page,
+    request,
+  }) => {
+    const task = await createTask(request, "In progress nav task");
+    const sessionId = `e2e-nav-${task.id}`;
+
+    await request.patch(`/api/tasks/${task.id}`, {
+      data: { status: "In Progress", sessionId },
+    });
+
+    // Mock the terminal WebSocket so the session page does not stall waiting
+    // for a real pty-manager session that does not exist for this test task.
+    await page.routeWebSocket("**/ws/terminal*", (_ws) => {});
+
+    await page.goto(`/repos/${repoId}/board`);
+    await expect(page.getByText(task.title)).toBeVisible();
+    await page.getByText(task.title).click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/repos/${repoId}/session/${sessionId}`),
+    );
+  });
+
+  test("session page renders back navigation", async ({ page, request }) => {
+    const task = await createTask(request, "Session nav task");
+    const sessionId = `e2e-session-${task.id}`;
+
+    await request.patch(`/api/tasks/${task.id}`, {
+      data: { status: "In Progress", sessionId },
+    });
+
+    await page.routeWebSocket("**/ws/terminal*", (_ws) => {});
+
+    await page.goto(`/repos/${repoId}/session/${sessionId}`);
+
+    await expect(page.getByRole("link", { name: /back/i })).toBeVisible();
+  });
+
+  test("recalling an In Progress task moves it back to Backlog", async ({
+    page,
+    request,
+  }) => {
+    const task = await createTask(request, "Recall test task");
+    const sessionId = `e2e-recall-${task.id}`;
+
+    await request.patch(`/api/tasks/${task.id}`, {
+      data: { status: "In Progress", sessionId },
+    });
+
+    await page.goto(`/repos/${repoId}/board`);
+    await expect(page.getByText(task.title)).toBeVisible();
+
+    // The title is in a <span> inside div.titleRow inside div.header.
+    // The "Task actions" button lives in div.headerRight — a sibling of titleRow
+    // inside the same div.header. Traversing up 2 levels from the span scopes
+    // us precisely to div.header, which has exactly one "Task actions" button.
+    await page
+      .locator("span", { hasText: new RegExp(`^${task.title}$`) })
+      .locator("xpath=../..")
+      .getByLabel("Task actions")
+      .click({ force: true });
+
+    await page.getByText("Move to Backlog").click();
+
+    // After recall the task status is Backlog — excluded from the board columns.
+    await expect(page.getByText(task.title)).not.toBeVisible();
+  });
 });

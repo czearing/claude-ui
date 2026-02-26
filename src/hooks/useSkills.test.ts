@@ -135,7 +135,7 @@ describe("useCreateSkill", () => {
     );
   });
 
-  it("invalidates the skills list on success", async () => {
+  it("invalidates the skills list on success with exact:true", async () => {
     const mockSkill = {
       name: "new-skill",
       description: "A new skill",
@@ -157,8 +157,36 @@ describe("useCreateSkill", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ["skills", "global", ""] }),
+      expect.objectContaining({
+        queryKey: ["skills", "global", ""],
+        exact: true,
+      }),
     );
+  });
+
+  it("pre-populates the new skill in cache on success", async () => {
+    const mockSkill = {
+      name: "new-skill",
+      description: "A new skill",
+      content: "# New",
+    };
+    (createSkill as jest.Mock).mockResolvedValue(mockSkill);
+    const { wrapper: Wrapper, queryClient } = makeWrapper();
+
+    const { result } = renderHook(() => useCreateSkill(), { wrapper: Wrapper });
+
+    act(() => {
+      result.current.mutate({
+        name: "new-skill",
+        description: "A new skill",
+        content: "# New",
+      });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(
+      queryClient.getQueryData(["skills", "global", "", "new-skill"]),
+    ).toEqual(mockSkill);
   });
 });
 

@@ -49,8 +49,19 @@ export function useCreateSkill(scope: SkillScope = "global", repoId?: string) {
       description: string;
       content: string;
     }) => createSkill(name, description, content, scope, repoId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: skillsKey(scope, repoId) }),
+    onSuccess: (data) => {
+      // Use exact:true so only the skills LIST is invalidated, not individual
+      // skill queries. Without it, the newly-selected skill's cache entry is
+      // marked stale and refetched, causing selectedSkill to be undefined
+      // momentarily and the SkillEditor to unmount (visible as a page reload).
+      void queryClient.invalidateQueries({
+        queryKey: skillsKey(scope, repoId),
+        exact: true,
+      });
+      // Pre-populate the new skill's cache so that selecting it immediately
+      // after create/rename doesn't cause a loading flash.
+      queryClient.setQueryData(skillKey(scope, repoId, data.name), data);
+    },
   });
 }
 

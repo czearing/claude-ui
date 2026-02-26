@@ -44,9 +44,12 @@ export function SkillEditor({
   }
 
   function handleContentChange(val: string) {
-    // Skip if the editor round-tripped to the same markdown that was loaded
-    // (e.g. OnChangePlugin firing immediately after ContentLoader).
-    if (val === content) {
+    // Skip if the editor round-tripped to the same markdown that was loaded.
+    // Lexical's $convertToMarkdownString often appends a trailing newline while
+    // the server trims content on PUT. After the first save, content === trimmed
+    // but val === trimmed + "\n", so a naive === check triggers a phantom save
+    // on every keystroke. Comparing trimmed values suppresses that noise.
+    if (val === content || val.trim() === content) {
       return;
     }
     scheduleSave(localDescription, val);

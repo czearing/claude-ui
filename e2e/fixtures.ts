@@ -64,14 +64,16 @@ export const test = base.extend<AppFixtures>({
       await page.route("**/api/repos", (route) =>
         route.fulfill({ json: [MOCK_REPO] }),
       );
-      await page.route("**/api/repos/repo-1/tasks", (route) =>
+      // Tasks are fetched as /api/tasks?repoId=<id>
+      await page.route(/\/api\/tasks\?/, (route) =>
         route.fulfill({ json: MOCK_TASKS }),
       );
-      await page.route("**/api/repos/repo-1/agents", (route) =>
-        route.fulfill({ json: [] }),
+      // Agents and skills default to global scope: /api/agents and /api/skills
+      await page.route("**/api/agents", (route) =>
+        route.fulfill({ json: { agents: [] } }),
       );
-      await page.route("**/api/repos/repo-1/skills", (route) =>
-        route.fulfill({ json: [] }),
+      await page.route("**/api/skills", (route) =>
+        route.fulfill({ json: { skills: [] } }),
       );
       await use();
     },

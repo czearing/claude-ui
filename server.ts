@@ -144,6 +144,11 @@ app
   .then(async () => {
     await ensureDefaultRepo();
 
+    // Must be obtained after prepare() so Next.js internals are ready.
+    // Handles HMR WebSocket connections (/_next/webpack-hmr) and any other
+    // upgrade paths that Next.js owns.
+    const nextUpgradeHandler = app.getUpgradeHandler();
+
     const server = createServer(async (req, res) => {
       try {
         const parsedUrl = parse(req.url!, true);
@@ -182,7 +187,12 @@ app
           boardWss.emit("connection", ws, req),
         );
       } else {
-        socket.destroy();
+        // Delegate to Next.js for internal WebSocket connections such as
+        // /_next/webpack-hmr (HMR in development). Previously this branch
+        // called socket.destroy(), which killed every HMR connection and
+        // caused Next.js to fall back to a full hard page reload after
+        // repeated failures — the random "page refresh" during editing.
+        void nextUpgradeHandler(req, socket, head);
       }
     });
 
