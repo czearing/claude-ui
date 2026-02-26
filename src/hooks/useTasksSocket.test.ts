@@ -1,9 +1,9 @@
 import React from "react";
-import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, act } from "@testing-library/react";
 
-import { useTasksSocket } from "./useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
+import { useTasksSocket } from "./useTasksSocket";
 
 // ─── WebSocket mock ──────────────────────────────────────────────────────────
 
@@ -102,7 +102,7 @@ describe("useTasksSocket", () => {
 
   // ─── onopen catch-up ────────────────────────────────────────────────────
 
-  it("invalidates all tasks queries on WebSocket open to catch up on missed events", () => {
+  it("does not invalidate tasks on initial WebSocket open", () => {
     const { queryClient, Wrapper } = createWrapper();
     queryClient.setQueryData(["tasks", "repo-1"], [makeTask()]);
 
@@ -114,7 +114,35 @@ describe("useTasksSocket", () => {
       MockWebSocket.lastInstance.onopen?.({} as Event);
     });
 
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["tasks"] });
+  });
+
+  it("invalidates tasks on reconnect to catch up on missed events", () => {
+    jest.useFakeTimers();
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(["tasks", "repo-1"], [makeTask()]);
+
+    renderHook(() => useTasksSocket(), { wrapper: Wrapper });
+
+    // Simulate disconnect to increment attempt counter
+    act(() => {
+      MockWebSocket.lastInstance.onclose?.({} as CloseEvent);
+    });
+
+    // Advance past the 1s backoff to trigger reconnect
+    act(() => {
+      jest.advanceTimersByTime(1100);
+    });
+
+    const invalidateSpy = jest.spyOn(queryClient, "invalidateQueries");
+
+    // Trigger onopen on the reconnected instance (attempt was > 0)
+    act(() => {
+      MockWebSocket.lastInstance.onopen?.({} as Event);
+    });
+
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["tasks"] });
+    jest.useRealTimers();
   });
 
   // ─── task:updated ────────────────────────────────────────────────────────
@@ -269,6 +297,29 @@ describe("useTasksSocket", () => {
     const tasks = queryClient.getQueryData<Task[]>(["tasks", "repo-1"]);
     expect(tasks).toHaveLength(2);
     expect(tasks?.[1].id).toBe("TASK-002");
+  });
+
+  it("preserves all fields including status on task:created with In Progress status", () => {
+    const { queryClient, Wrapper } = createWrapper();
+    const existing = makeTask({ id: "TASK-001" });
+    queryClient.setQueryData(["tasks", "repo-1"], [existing]);
+
+    renderHook(() => useTasksSocket(), { wrapper: Wrapper });
+
+    const newTask = makeTask({
+      id: "TASK-002",
+      title: "Active Work",
+      status: "In Progress",
+    });
+
+    act(() => {
+      sendMessage({ type: "task:created", data: newTask });
+    });
+
+    const tasks = queryClient.getQueryData<Task[]>(["tasks", "repo-1"]);
+    const added = tasks?.find((t) => t.id === "TASK-002");
+    expect(added?.status).toBe("In Progress");
+    expect(added?.title).toBe("Active Work");
   });
 
   it("does not write to cache when task:created and cache is empty (undefined)", () => {

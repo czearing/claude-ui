@@ -67,6 +67,13 @@ async function handleRequest(
   const pathname = parsedUrl.pathname ?? "";
 
   try {
+    // GET /sessions — list live session IDs for server startup recovery
+    if (req.method === "GET" && pathname === "/sessions") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ sessions: [...sessions.keys()] }));
+      return;
+    }
+
     // POST /sessions — Spawn a new PTY for a task handover
     if (req.method === "POST" && pathname === "/sessions") {
       const body = await readBody(req);
@@ -83,15 +90,25 @@ async function handleRequest(
 
       let ptyProcess: pty.IPty;
       try {
-        // Spawn Claude in interactive REPL mode; the spec is injected via
-        // PTY write once Claude shows its ❯ prompt (see attachHandoverHandlers).
-        ptyProcess = pty.spawn(command, ["--dangerously-skip-permissions"], {
-          name: "xterm-color",
-          cols: 80,
-          rows: 24,
-          cwd,
-          env: process.env as Record<string, string>,
-        });
+        // Pass the spec directly via -p so Claude receives it on startup
+        // without needing PTY write injection (which is unreliable on Windows).
+        // Unset CLAUDECODE so nested Claude instances are not blocked by the
+        // "cannot be launched inside another Claude Code session" guard.
+        const { CLAUDECODE: _cc, ...spawnEnv } = process.env as Record<
+          string,
+          string
+        >;
+        ptyProcess = pty.spawn(
+          command,
+          ["--dangerously-skip-permissions", "-p", spec],
+          {
+            name: "xterm-color",
+            cols: 80,
+            rows: 24,
+            cwd,
+            env: spawnEnv,
+          },
+        );
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: String(err) }));
@@ -105,9 +122,10 @@ async function handleRequest(
         activeWs: null,
         currentStatus: "connecting",
         idleTimer: null,
-        handoverPhase: "waiting_for_prompt",
+        // spec already passed via -p; no injection needed
+        handoverPhase: "spec_sent",
         handoverSpec: spec,
-        specSentAt: 0,
+        specSentAt: Date.now(),
         hadMeaningfulActivity: false,
         lastMeaningfulStatus: null,
         supportsBracketedPaste: false,
@@ -121,6 +139,13 @@ async function handleRequest(
       void saveSessionRegistry();
 
       attachHandoverHandlers(ptyProcess, sessionId);
+      // Remove from registry when the handover session exits so that if the
+      // pty-manager restarts, wsSessionHandler won't find a stale registry
+      // entry and spawn --continue (which would resume the wrong session).
+      ptyProcess.onExit(() => {
+        sessionRegistry.delete(sessionId);
+        void saveSessionRegistry();
+      });
 
       res.writeHead(201, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ sessionId }));

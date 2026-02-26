@@ -57,6 +57,23 @@ describe("Terminal", () => {
     expect(mockFit).toHaveBeenCalled();
   });
 
+  it("calls fit again when the ResizeObserver fires", () => {
+    let capturedCallback: (() => void) | null = null;
+    const mockObserve = jest.fn();
+    const mockDisconnect = jest.fn();
+    global.ResizeObserver = jest.fn().mockImplementation((cb: () => void) => {
+      capturedCallback = cb;
+      return { observe: mockObserve, disconnect: mockDisconnect };
+    });
+
+    render(<Terminal onReady={jest.fn()} />);
+
+    const callsBefore = mockFit.mock.calls.length;
+    capturedCallback?.();
+
+    expect(mockFit.mock.calls.length).toBe(callsBefore + 1);
+  });
+
   it("calls onReady with null and disposes xterm on unmount", () => {
     const onReady = jest.fn();
     const { unmount } = render(<Terminal onReady={onReady} />);

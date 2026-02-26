@@ -1,10 +1,9 @@
 "use client";
 
-import { render, screen } from "@testing-library/react";
 import type { DragEndEvent } from "@dnd-kit/core";
+import { render, screen } from "@testing-library/react";
 
 import { useDeleteTask, useRecallTask, useUpdateTask } from "@/hooks/useTasks";
-import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
 import { Board } from "./Board";
 
@@ -19,9 +18,10 @@ jest.mock("@dnd-kit/core", () => ({
     onDragEnd: (e: DragEndEvent) => void;
   }) => {
     capturedDragEnd = onDragEnd;
-    return <>{children}</>;
+    return children as React.ReactElement;
   },
-  DragOverlay: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DragOverlay: ({ children }: { children: React.ReactNode }) =>
+    children as React.ReactElement,
   PointerSensor: class {},
   KeyboardSensor: class {},
   closestCorners: jest.fn(),
@@ -32,9 +32,8 @@ jest.mock("@dnd-kit/core", () => ({
 
 jest.mock("@dnd-kit/sortable", () => ({
   sortableKeyboardCoordinates: jest.fn(),
-  SortableContext: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
+  SortableContext: ({ children }: { children: React.ReactNode }) =>
+    children as React.ReactElement,
   verticalListSortingStrategy: jest.fn(),
   useSortable: () => ({
     attributes: {},
@@ -123,6 +122,33 @@ describe("Board", () => {
   it("Done column is always empty — Done tasks are never rendered on the board", () => {
     render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
     expect(screen.queryByText("Done task")).not.toBeInTheDocument();
+  });
+
+  it("renders a new In Progress card when tasks prop gains a task:created entry", () => {
+    const { rerender } = render(
+      <Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />,
+    );
+
+    const createdTask: Task = {
+      id: "4",
+      title: "Newly Created Task",
+      status: "In Progress",
+      priority: "High",
+      spec: "",
+      repoId: "repo1",
+      createdAt: "2024-01-02T00:00:00Z",
+      updatedAt: "2024-01-02T00:00:00Z",
+    };
+
+    rerender(
+      <Board
+        repoId="repo1"
+        tasks={[...tasks, createdTask]}
+        onSelectTask={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Newly Created Task")).toBeInTheDocument();
   });
 
   it("calls updateTask with new status when drag ends on a different column", () => {

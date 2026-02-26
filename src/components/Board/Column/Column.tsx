@@ -5,8 +5,8 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import clsx from "clsx";
 import { Archive } from "@phosphor-icons/react";
+import { clsx } from "clsx";
 
 import type { TaskStatus } from "@/utils/tasks.types";
 import styles from "./Column.module.css";

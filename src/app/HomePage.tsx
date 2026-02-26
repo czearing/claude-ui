@@ -4,9 +4,8 @@ import { useRouter } from "next/navigation";
 
 import { InstanceCard } from "@/components";
 import { useSessionStore } from "@/hooks/useSessionStore";
-
-import styles from "./HomePage.module.css";
 import type { Session } from "@/hooks/useSessionStore";
+import styles from "./HomePage.module.css";
 
 export const HomePage = () => {
   const router = useRouter();

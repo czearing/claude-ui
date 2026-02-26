@@ -8,6 +8,7 @@ import { attachHandoverHandlers, attachTerminalHandlers } from "./ptyHandlers";
 import {
   advanceToReview,
   appendToBuffer,
+  completedSessions,
   emitStatus,
   scheduleIdleStatus,
   sessions,
@@ -20,6 +21,7 @@ import { parseClaudeStatus } from "../utils/parseClaudeStatus";
 
 jest.mock("./ptyStore", () => ({
   sessions: new Map(),
+  completedSessions: new Map(),
   appendToBuffer: jest.fn(),
   emitStatus: jest.fn(),
   scheduleIdleStatus: jest.fn(),
@@ -103,6 +105,7 @@ function makeEntry(overrides: Partial<SessionEntry> = {}): SessionEntry {
 beforeEach(() => {
   jest.useFakeTimers();
   sessions.clear();
+  completedSessions.clear();
   jest.clearAllMocks();
   // Default: parseClaudeStatus returns null (no status parsed)
   mockedParseClaudeStatus.mockReturnValue(null);
@@ -111,6 +114,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.useRealTimers();
   sessions.clear();
+  completedSessions.clear();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,7 +143,7 @@ describe("attachHandoverHandlers", () => {
 
       expect(fake.pty.write).toHaveBeenCalledTimes(1);
       expect(fake.pty.write).toHaveBeenCalledWith(
-        `\x1b[200~Do something useful\x1b[201~\r`,
+        `\x1b[200~Do something useful\x1b[201~\r\n`,
       );
       expect(entry.handoverPhase).toBe("spec_sent");
       expect(entry.hadMeaningfulActivity).toBe(false);
@@ -160,7 +164,7 @@ describe("attachHandoverHandlers", () => {
       fake.triggerData("❯ ");
 
       expect(fake.pty.write).toHaveBeenCalledTimes(1);
-      expect(fake.pty.write).toHaveBeenCalledWith(`Do something useful\r`);
+      expect(fake.pty.write).toHaveBeenCalledWith(`Do something useful\r\n`);
       expect(entry.handoverPhase).toBe("spec_sent");
     });
 
@@ -179,7 +183,7 @@ describe("attachHandoverHandlers", () => {
       fake.triggerData("❯ ");
 
       expect(fake.pty.write).toHaveBeenCalledWith(
-        `Line one Line two Line three\r`,
+        `Line one Line two Line three\r\n`,
       );
     });
 
@@ -324,6 +328,35 @@ describe("attachHandoverHandlers", () => {
       attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
       fake.triggerData("Some regular typing output that is long enough");
 
+      expect(mockedScheduleIdleStatus).toHaveBeenCalledWith(entry, SESSION_ID);
+    });
+
+    it("waiting_for_prompt + chunk contains both ❯ and spinner (full-screen repaint): spec is NOT injected", () => {
+      // A full-screen terminal repaint can include both a spinner at the top
+      // and the ❯ input area at the bottom in the same buffer flush.
+      // parseClaudeStatus returns "thinking" in this case (spinner wins).
+      // The handover logic must NOT advance the phase or inject the spec when
+      // parsed is "thinking" rather than "waiting".
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        handoverPhase: "waiting_for_prompt",
+        handoverSpec: "Do something useful",
+        supportsBracketedPaste: false,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+      // Simulate the case where the chunk contains both ❯ and a spinner:
+      // parseClaudeStatus sees the spinner and returns "thinking", not "waiting".
+      mockedParseClaudeStatus.mockReturnValue("thinking");
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerData("\r⣾ Thinking...\n❯ ");
+
+      // Phase must not advance because parsed !== "waiting"
+      expect(entry.handoverPhase).toBe("waiting_for_prompt");
+      // Spec must not be written to the pty
+      expect(fake.pty.write).not.toHaveBeenCalled();
+      // Falls through to the general scheduling path
       expect(mockedScheduleIdleStatus).toHaveBeenCalledWith(entry, SESSION_ID);
     });
   });
@@ -546,6 +579,43 @@ describe("attachHandoverHandlers", () => {
       fake.triggerExit(0);
 
       expect(sessions.has(SESSION_ID)).toBe(false);
+    });
+
+    it("stores the concatenated output buffer in completedSessions on exit", () => {
+      const fake = makeFakePty();
+      const chunkA = Buffer.from("hello ");
+      const chunkB = Buffer.from("world");
+      const entry = makeEntry({
+        handoverPhase: "spec_sent",
+        outputBuffer: [chunkA, chunkB],
+        bufferSize: chunkA.length + chunkB.length,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerExit(0);
+
+      expect(completedSessions.has(SESSION_ID)).toBe(true);
+      const stored = completedSessions.get(SESSION_ID)!;
+      expect(stored.toString()).toBe("hello world");
+    });
+
+    it("stores an empty buffer in completedSessions when session has no output", () => {
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        handoverPhase: "spec_sent",
+        outputBuffer: [],
+        bufferSize: 0,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+
+      attachHandoverHandlers(fake.pty as unknown as IPty, SESSION_ID);
+      fake.triggerExit(0);
+
+      expect(completedSessions.has(SESSION_ID)).toBe(true);
+      expect(completedSessions.get(SESSION_ID)!.length).toBe(0);
     });
 
     it("calls advanceToReview if isHandover=true and handover not yet done", () => {
@@ -816,6 +886,121 @@ describe("attachTerminalHandlers", () => {
       mockedParseClaudeStatus.mockReturnValue("waiting");
       fake.triggerData("❯ ");
       expect(mockedAdvanceToReview).toHaveBeenCalledWith(SESSION_ID);
+    });
+  });
+
+  // ── back-to-in-progress re-cycle behavior ─────────────────────────────────
+  // These tests verify the interaction between the WS message handler's
+  // external reset of hadMeaningfulActivity and the terminal handler's
+  // re-arming logic. The external reset is simulated by directly setting
+  // entry.hadMeaningfulActivity = false, matching what wsSessionHandler does.
+
+  describe("back-to-in-progress re-cycle behavior", () => {
+    it("does NOT call advanceToReview when ❯ fires immediately after external reset (no new ⎿ seen)", () => {
+      // Critical scenario: user sends "Keep going", which resets hadMeaningfulActivity.
+      // Claude responds with plain text only (no tool calls). The task must NOT
+      // advance back to Review — the user is still interacting.
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        hadMeaningfulActivity: false, // simulates post-reset state
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+
+      attachTerminalHandlers(fake.pty as unknown as IPty, SESSION_ID);
+
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+      fake.triggerData("❯ ");
+
+      expect(mockedAdvanceToReview).not.toHaveBeenCalled();
+    });
+
+    it("re-arms advanceToReview after external reset when new ⎿ output arrives", () => {
+      // Full re-cycle: after user input resets the flag, Claude uses a tool
+      // (producing ⎿), then returns to the prompt — advance fires again.
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        hadMeaningfulActivity: false,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+
+      attachTerminalHandlers(fake.pty as unknown as IPty, SESSION_ID);
+
+      // Cycle 1: ⎿ → hadMeaningfulActivity=true → ❯ → advanceToReview
+      mockedParseClaudeStatus.mockReturnValue(null);
+      fake.triggerData("  ⎿  first tool result");
+      expect(entry.hadMeaningfulActivity).toBe(true);
+
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+      fake.triggerData("❯ ");
+      expect(mockedAdvanceToReview).toHaveBeenCalledTimes(1);
+
+      // Simulate message handler: user sends input → flag reset
+      entry.hadMeaningfulActivity = false;
+
+      // ❯ prompt fires again while flag is still false — must NOT advance
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+      fake.triggerData("❯ ");
+      expect(mockedAdvanceToReview).toHaveBeenCalledTimes(1); // unchanged
+
+      // Claude uses a tool again → re-arms flag
+      mockedParseClaudeStatus.mockReturnValue(null);
+      fake.triggerData("  ⎿  second tool result");
+      expect(entry.hadMeaningfulActivity).toBe(true);
+
+      // ❯ prompt → cycle 2 advance fires
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+      fake.triggerData("❯ ");
+      expect(mockedAdvanceToReview).toHaveBeenCalledTimes(2);
+    });
+
+    it("Interrupted message (⎿ Interrupted) re-arms the flag after external reset", () => {
+      // When the user presses Ctrl+C mid-response, Claude outputs
+      // "⎿ Interrupted · What should Claude do instead?" which contains ⎿.
+      // This must re-arm hadMeaningfulActivity so the next ❯ prompt advances.
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        hadMeaningfulActivity: false, // post-reset state
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+
+      attachTerminalHandlers(fake.pty as unknown as IPty, SESSION_ID);
+
+      mockedParseClaudeStatus.mockReturnValue(null);
+      fake.triggerData("⎿ Interrupted · What should Claude do instead?");
+      expect(entry.hadMeaningfulActivity).toBe(true);
+
+      mockedParseClaudeStatus.mockReturnValue("waiting");
+      fake.triggerData("❯ ");
+      expect(mockedAdvanceToReview).toHaveBeenCalledWith(SESSION_ID);
+    });
+
+    it("three full cycles advance to Review each time", () => {
+      // Stress-tests the re-cycle: tool-use → prompt → reset → tool-use → prompt
+      // repeated three times all produce distinct advanceToReview calls.
+      const fake = makeFakePty();
+      const entry = makeEntry({
+        hadMeaningfulActivity: false,
+        pty: fake.pty as unknown as SessionEntry["pty"],
+      });
+      sessions.set(SESSION_ID, entry);
+
+      attachTerminalHandlers(fake.pty as unknown as IPty, SESSION_ID);
+
+      for (let cycle = 1; cycle <= 3; cycle++) {
+        mockedParseClaudeStatus.mockReturnValue(null);
+        fake.triggerData(`  ⎿  cycle ${cycle} tool result`);
+        expect(entry.hadMeaningfulActivity).toBe(true);
+
+        mockedParseClaudeStatus.mockReturnValue("waiting");
+        fake.triggerData("❯ ");
+        expect(mockedAdvanceToReview).toHaveBeenCalledTimes(cycle);
+
+        // Simulate message handler reset
+        entry.hadMeaningfulActivity = false;
+      }
     });
   });
 

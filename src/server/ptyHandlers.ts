@@ -12,6 +12,7 @@ import { WebSocket } from "ws";
 import {
   advanceToReview,
   appendToBuffer,
+  completedSessions,
   emitStatus,
   scheduleIdleStatus,
   sessions,
@@ -60,11 +61,17 @@ export function attachHandoverHandlers(
     // (\x1b[?2004h seen).  Claude Code v2.1.58+ omits that sequence,
     // so fall back to plain spec + \r which works on all versions.
     if (e.handoverPhase === "waiting_for_prompt" && parsed === "waiting") {
-      const spec = e.handoverSpec.replace(/\n/g, " ");
       if (e.supportsBracketedPaste) {
-        e.pty.write(`\x1b[200~${spec}\x1b[201~\r`);
+        // Bracketed paste preserves newlines literally (they won't trigger
+        // early submission inside \x1b[200~...\x1b[201~).  Use \r\n after
+        // the closing marker so Enter registers on Windows ConPTY.
+        e.pty.write(`\x1b[200~${e.handoverSpec}\x1b[201~\r\n`);
       } else {
-        e.pty.write(`${spec}\r`);
+        // Without bracketed paste, \n would be treated as Enter and submit
+        // the command prematurely — collapse to spaces.  Use \r\n for Enter
+        // so Windows ConPTY registers the submission (bare \r is not enough).
+        const spec = e.handoverSpec.replace(/\n/g, " ");
+        e.pty.write(`${spec}\r\n`);
       }
       e.handoverPhase = "spec_sent";
       e.specSentAt = Date.now();
@@ -129,7 +136,13 @@ export function attachHandoverHandlers(
         e.activeWs.close();
       }
     }
+    // Capture final output before removing the session so wsSessionHandler
+    // can replay it when the user views the terminal after the session exits.
+    const finalBuffer = e ? Buffer.concat(e.outputBuffer) : Buffer.alloc(0);
     sessions.delete(sessionId);
+    // Mark as completed so wsSessionHandler won't spawn a --continue session
+    // when the user views this session's terminal after it has already exited.
+    completedSessions.set(sessionId, finalBuffer);
 
     // Fallback: if the process exits before the state machine could
     // advance to Review (e.g. Claude crashed), do it now.
@@ -149,7 +162,10 @@ export function attachTerminalHandlers(
 ): void {
   ptyProcess.onData((data) => {
     const chunk = Buffer.from(data);
-    const e = sessions.get(sessionId)!;
+    const e = sessions.get(sessionId);
+    if (!e) {
+      return;
+    }
     appendToBuffer(e, chunk);
     if (e.activeWs?.readyState === WebSocket.OPEN) {
       e.activeWs.send(chunk);

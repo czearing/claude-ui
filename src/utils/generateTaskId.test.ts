@@ -1,5 +1,5 @@
-import type { Task } from "./tasks.types";
 import { generateTaskId } from "./generateTaskId";
+import type { Task } from "./tasks.types";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

@@ -113,3 +113,11 @@ sessions-registry.json
 
 # Specs (local task specs, not tracked in git)
 specs/
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# Playwright
+playwright-report/
+test-results/
+.playwright-mcp/

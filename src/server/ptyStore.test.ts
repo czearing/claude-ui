@@ -6,6 +6,7 @@ import { WebSocket } from "ws";
 import {
   advanceToReview,
   appendToBuffer,
+  backToInProgress,
   BUFFER_CAP,
   emitStatus,
   scheduleIdleStatus,
@@ -256,7 +257,7 @@ describe("scheduleIdleStatus", () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it("does NOT call advanceToReview when hadMeaningfulActivity is false", () => {
+    it("does NOT call advanceToReview when hadMeaningfulActivity is false and lastMeaningfulStatus is typing", () => {
       const entry = makeEntry({
         currentStatus: "typing",
         handoverPhase: "spec_sent",
@@ -269,6 +270,27 @@ describe("scheduleIdleStatus", () => {
       jest.advanceTimersByTime(SESSION_IDLE_MS);
 
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("calls advanceToReview when lastMeaningfulStatus is waiting (spinner fired within echo window)", () => {
+      // Covers the case where Claude processed the spec but the thinking
+      // spinner appeared within SPEC_ECHO_WINDOW_MS so hadMeaningfulActivity
+      // was never set — yet Claude is clearly idle at the ❯ prompt.
+      const entry = makeEntry({
+        currentStatus: "waiting",
+        handoverPhase: "spec_sent",
+        hadMeaningfulActivity: false,
+        lastMeaningfulStatus: "waiting",
+      });
+      sessions.set(SESSION_ID, entry);
+
+      scheduleIdleStatus(entry, SESSION_ID);
+      jest.advanceTimersByTime(SESSION_IDLE_MS);
+
+      expect(entry.handoverPhase).toBe("done");
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+      expect(fetchUrl).toContain(`/sessions/${SESSION_ID}/advance-to-review`);
     });
 
     it("does NOT call advanceToReview when handoverPhase is not spec_sent", () => {
@@ -325,15 +347,89 @@ describe("advanceToReview", () => {
     process.env.SERVER_PORT = original;
   });
 
+  it("falls back to port 3000 when SERVER_PORT is not set", () => {
+    const original = process.env.SERVER_PORT;
+    delete process.env.SERVER_PORT;
+
+    advanceToReview("session-fallback");
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
+    expect(url).toContain("localhost:3000");
+    expect(url).toContain("/sessions/session-fallback/advance-to-review");
+
+    process.env.SERVER_PORT = original;
+  });
+
   it("silently swallows fetch errors", async () => {
     (global.fetch as jest.Mock).mockRejectedValueOnce(
       new Error("connection refused"),
     );
 
-    // Should not throw — the void + .catch(() => {}) swallows the error
+    // Should not throw -- the void + .catch(() => {}) swallows the error
     expect(() => advanceToReview("session-err")).not.toThrow();
 
     // Flush the microtask queue so the rejected promise settles
+    await Promise.resolve();
+  });
+});
+
+// ─── backToInProgress ─────────────────────────────────────────────────────────
+
+describe("backToInProgress", () => {
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("calls fetch with the correct back-to-in-progress URL", () => {
+    backToInProgress("session-abc");
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toContain(
+      "/api/internal/sessions/session-abc/back-to-in-progress",
+    );
+    expect(options).toEqual({ method: "POST" });
+  });
+
+  it("uses SERVER_PORT env var when set", () => {
+    const original = process.env.SERVER_PORT;
+    process.env.SERVER_PORT = "4444";
+
+    backToInProgress("session-xyz");
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
+    expect(url).toContain("localhost:4444");
+
+    process.env.SERVER_PORT = original;
+  });
+
+  it("falls back to port 3000 when SERVER_PORT is not set", () => {
+    const original = process.env.SERVER_PORT;
+    delete process.env.SERVER_PORT;
+
+    backToInProgress("session-fallback");
+
+    const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
+    expect(url).toContain("localhost:3000");
+    expect(url).toContain("/sessions/session-fallback/back-to-in-progress");
+
+    process.env.SERVER_PORT = original;
+  });
+
+  it("silently swallows fetch errors", async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(
+      new Error("connection refused"),
+    );
+
+    expect(() => backToInProgress("session-err")).not.toThrow();
+
     await Promise.resolve();
   });
 });

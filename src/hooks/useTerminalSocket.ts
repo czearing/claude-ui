@@ -19,15 +19,20 @@ export const useTerminalSocket = (
   xtermRef.current = xterm;
 
   useEffect(() => {
-    if (!xterm) return;
+    if (!xterm) {
+      return;
+    }
 
     let ws: WebSocket;
     let reconnectAttempt = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
+    let sessionExited = false;
 
     const connect = () => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
 
       onStatus?.("connecting");
 
@@ -48,7 +53,9 @@ export const useTerminalSocket = (
 
       ws.onmessage = (event: MessageEvent) => {
         const t = xtermRef.current;
-        if (!t) return;
+        if (!t) {
+          return;
+        }
 
         if (event.data instanceof ArrayBuffer) {
           t.write(new Uint8Array(event.data));
@@ -72,6 +79,7 @@ export const useTerminalSocket = (
           } else if (msg.type === "status" && msg.value) {
             onStatus?.(msg.value);
           } else if (msg.type === "exit") {
+            sessionExited = true;
             onStatus?.("exited");
             t.write("\r\n\x1b[33mSession ended.\x1b[0m\r\n");
           } else if (msg.type === "error") {
@@ -83,7 +91,9 @@ export const useTerminalSocket = (
       };
 
       ws.onclose = () => {
-        if (cancelled) return;
+        if (cancelled || sessionExited) {
+          return;
+        }
         onStatus?.("disconnected");
         const t = xtermRef.current;
         const delay = Math.min(
@@ -115,7 +125,9 @@ export const useTerminalSocket = (
 
     return () => {
       cancelled = true;
-      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+      }
       dataDisposable.dispose();
       resizeDisposable.dispose();
       if (ws) {

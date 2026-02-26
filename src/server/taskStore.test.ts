@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import {
+  clearTaskCache,
   deleteTaskFile,
   ensureSpecsDir,
   getNextTaskId,
@@ -65,6 +66,7 @@ function eacces(): NodeJS.ErrnoException {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  clearTaskCache();
 });
 
 // ── repoSpecsDir ──────────────────────────────────────────────────────────────
@@ -212,6 +214,85 @@ describe("readTasksForRepo", () => {
 
     expect(result).toEqual([task1]);
   });
+
+  it("returns cached result on second call without reading disk again", async () => {
+    const task1 = makeTask({ id: "TASK-001" });
+
+    mockReaddir.mockResolvedValueOnce(["TASK-001.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content1" as never);
+    mockParseTaskFile.mockReturnValueOnce(task1);
+
+    await readTasksForRepo("repo-abc");
+    const result = await readTasksForRepo("repo-abc");
+
+    expect(mockReaddir).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([task1]);
+  });
+
+  it("updates cache in-place when writeTask replaces an existing task", async () => {
+    const task1 = makeTask({ id: "TASK-001" });
+    const task1Updated = makeTask({ id: "TASK-001", title: "Updated" });
+
+    mockReaddir.mockResolvedValueOnce(["TASK-001.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content1" as never);
+    mockParseTaskFile.mockReturnValueOnce(task1);
+
+    await readTasksForRepo("repo-abc");
+
+    mockMkdir.mockResolvedValueOnce(undefined);
+    mockWriteFile.mockResolvedValueOnce(undefined);
+    mockSerializeTaskFile.mockReturnValueOnce("updated content");
+    await writeTask(task1Updated);
+
+    // No additional readdir calls expected — cache updated in-place
+    const result = await readTasksForRepo("repo-abc");
+
+    expect(mockReaddir).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([task1Updated]);
+  });
+
+  it("appends to cache when writeTask adds a new task", async () => {
+    const task1 = makeTask({ id: "TASK-001" });
+    const task2 = makeTask({ id: "TASK-002" });
+
+    mockReaddir.mockResolvedValueOnce(["TASK-001.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content1" as never);
+    mockParseTaskFile.mockReturnValueOnce(task1);
+
+    await readTasksForRepo("repo-abc");
+
+    mockMkdir.mockResolvedValueOnce(undefined);
+    mockWriteFile.mockResolvedValueOnce(undefined);
+    mockSerializeTaskFile.mockReturnValueOnce("content2");
+    await writeTask(task2);
+
+    const result = await readTasksForRepo("repo-abc");
+
+    expect(mockReaddir).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(expect.arrayContaining([task1, task2]));
+  });
+
+  it("removes task from cache when deleteTaskFile removes an existing task", async () => {
+    const task1 = makeTask({ id: "TASK-001" });
+    const task2 = makeTask({ id: "TASK-002" });
+
+    mockReaddir.mockResolvedValueOnce(["TASK-001.md", "TASK-002.md"] as never);
+    mockReadFile.mockResolvedValueOnce("content1" as never);
+    mockParseTaskFile.mockReturnValueOnce(task1);
+    mockReadFile.mockResolvedValueOnce("content2" as never);
+    mockParseTaskFile.mockReturnValueOnce(task2);
+
+    await readTasksForRepo("repo-abc");
+
+    mockUnlink.mockResolvedValueOnce(undefined);
+    await deleteTaskFile("TASK-001", "repo-abc");
+
+    // No additional readdir calls expected — cache updated in-place
+    const result = await readTasksForRepo("repo-abc");
+
+    expect(mockReaddir).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([task2]);
+  });
 });
 
 // ── readAllTasks ──────────────────────────────────────────────────────────────
@@ -296,6 +377,18 @@ describe("getNextTaskId", () => {
     const result = await getNextTaskId();
 
     expect(result).toBe("TASK-001");
+  });
+
+  it("increments counter on successive calls without re-scanning disk", async () => {
+    mockReaddir.mockResolvedValueOnce([] as never);
+
+    const first = await getNextTaskId();
+    const second = await getNextTaskId();
+
+    expect(first).toBe("TASK-001");
+    expect(second).toBe("TASK-002");
+    // readdir only called once for the initial scan
+    expect(mockReaddir).toHaveBeenCalledTimes(1);
   });
 
   it("returns the next number after the highest TASK-NNN.md found", async () => {

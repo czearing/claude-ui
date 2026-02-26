@@ -168,7 +168,7 @@ export default config(
               name: "react",
               importNames: ["useMemo", "useCallback", "memo"],
               message:
-                "React Compiler handles memoization automatically. Remove useMemo, useCallback, and memo.",
+                "React 19 with React Compiler handles memoization automatically. Do not use useMemo, useCallback, or memo.",
             },
           ],
         },
@@ -203,7 +203,7 @@ export default config(
   },
 
   {
-    files: ["eslint.config.js", "*.config.{js,cjs,mjs}"],
+    files: ["eslint.config.js", "*.config.{js,cjs,mjs}", "scripts/**/*.mjs"],
     languageOptions: {
       sourceType: "module",
       globals: {

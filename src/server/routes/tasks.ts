@@ -177,7 +177,7 @@ export async function handleTaskRoutes(
       return true;
     }
     const sessionId = randomUUID();
-    // Build the prompt: title + spec body (extracted from Lexical JSON
+    // Build the prompt: spec body only (extracted from Lexical JSON
     // or passed through as plain text).
     const plainSpec = extractTextFromLexical(task.spec);
     const specText = plainSpec.trim();
@@ -271,6 +271,34 @@ export async function handleTaskRoutes(
       const updated: Task = {
         ...task,
         status: "Review",
+        updatedAt: new Date().toISOString(),
+      };
+      await writeTask(updated);
+      broadcastTaskEvent("task:updated", updated);
+    }
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  // POST /api/internal/sessions/:id/back-to-in-progress
+  // Called by pty-manager when the user sends input after a task has already
+  // advanced to Review — moves the task back to "In Progress".
+  if (
+    req.method === "POST" &&
+    parsedUrl.pathname?.startsWith("/api/internal/sessions/") &&
+    parsedUrl.pathname.endsWith("/back-to-in-progress")
+  ) {
+    const id = parsedUrl.pathname.slice(
+      "/api/internal/sessions/".length,
+      -"/back-to-in-progress".length,
+    );
+    const current = await readAllTasks();
+    const task = current.find((t) => t.sessionId === id);
+    if (task?.status === "Review") {
+      const updated: Task = {
+        ...task,
+        status: "In Progress",
         updatedAt: new Date().toISOString(),
       };
       await writeTask(updated);

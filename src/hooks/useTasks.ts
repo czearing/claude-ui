@@ -19,12 +19,16 @@ async function fetchTasks(repoId: string): Promise<Task[]> {
   return res.json() as Promise<Task[]>;
 }
 
-export function useTasks(repoId: string) {
+export function useTasks<T = Task[]>(
+  repoId: string,
+  select?: (data: Task[]) => T,
+) {
   return useQuery({
     queryKey: tasksKey(repoId),
     queryFn: () => fetchTasks(repoId),
     enabled: Boolean(repoId),
     staleTime: Infinity, // WebSocket keeps tasks fresh via setQueryData
+    select,
   });
 }
 
@@ -37,7 +41,9 @@ export function useCreateTask(repoId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...input, repoId }),
       }).then(async (r) => {
-        if (!r.ok) throw new Error("Failed to create task");
+        if (!r.ok) {
+          throw new Error("Failed to create task");
+        }
         return r.json() as Promise<Task>;
       }),
     onSuccess: () =>
@@ -54,7 +60,9 @@ export function useUpdateTask(repoId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       }).then(async (r) => {
-        if (!r.ok) throw new Error("Failed to update task");
+        if (!r.ok) {
+          throw new Error("Failed to update task");
+        }
         return r.json() as Promise<Task>;
       }),
     onMutate: async ({ id, ...input }) => {
@@ -84,7 +92,9 @@ export function useDeleteTask(repoId: string) {
   return useMutation({
     mutationFn: async (id: string) => {
       const r = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-      if (!r.ok && r.status !== 404) throw new Error("Failed to delete task");
+      if (!r.ok && r.status !== 404) {
+        throw new Error("Failed to delete task");
+      }
     },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
@@ -109,7 +119,9 @@ export function useHandoverTask(repoId: string) {
   return useMutation({
     mutationFn: (id: string) =>
       fetch(`/api/tasks/${id}/handover`, { method: "POST" }).then(async (r) => {
-        if (!r.ok) throw new Error("Failed to hand over task");
+        if (!r.ok) {
+          throw new Error("Failed to hand over task");
+        }
         return r.json() as Promise<Task>;
       }),
     onSuccess: () =>
@@ -122,7 +134,9 @@ export function useRecallTask(repoId: string) {
   return useMutation({
     mutationFn: (id: string) =>
       fetch(`/api/tasks/${id}/recall`, { method: "POST" }).then(async (r) => {
-        if (!r.ok) throw new Error("Failed to recall task");
+        if (!r.ok) {
+          throw new Error("Failed to recall task");
+        }
         return r.json() as Promise<Task>;
       }),
     onMutate: async (id) => {

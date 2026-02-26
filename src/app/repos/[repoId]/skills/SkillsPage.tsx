@@ -14,16 +14,18 @@ import {
   useUpdateSkill,
 } from "@/hooks/useSkills";
 import type { SkillScope } from "@/utils/skills.client";
-
 import styles from "./SkillsPage.module.css";
 
 interface SkillsPageProps {
   repoId: string;
+  selectedSkillName?: string;
 }
 
-export function SkillsPage({ repoId }: SkillsPageProps) {
+export function SkillsPage({ repoId, selectedSkillName }: SkillsPageProps) {
   const [scope, setScope] = useState<SkillScope>("global");
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(
+    selectedSkillName ?? null,
+  );
 
   const effectiveRepoId = scope === "repo" ? repoId : undefined;
 
@@ -38,9 +40,22 @@ export function SkillsPage({ repoId }: SkillsPageProps) {
   const { mutate: deleteSkill } = useDeleteSkill(scope, effectiveRepoId);
   const counterRef = useRef(0);
 
+  function handleSelect(name: string | null) {
+    setSelectedName(name);
+    if (name) {
+      window.history.replaceState(
+        null,
+        "",
+        `/repos/${repoId}/skills/${encodeURIComponent(name)}`,
+      );
+    } else {
+      window.history.replaceState(null, "", `/repos/${repoId}/skills`);
+    }
+  }
+
   function handleScopeChange(newScope: SkillScope) {
     setScope(newScope);
-    setSelectedName(null);
+    handleSelect(null);
   }
 
   function handleNew() {
@@ -50,12 +65,14 @@ export function SkillsPage({ repoId }: SkillsPageProps) {
     }
     createSkill(
       { name: candidate, description: "", content: "" },
-      { onSuccess: () => setSelectedName(candidate) },
+      { onSuccess: () => handleSelect(candidate) },
     );
   }
 
   function handleRename(newName: string) {
-    if (!selectedName) return;
+    if (!selectedName) {
+      return;
+    }
     const description = selectedSkill?.description ?? "";
     const content = selectedSkill?.content ?? "";
     createSkill(
@@ -63,19 +80,23 @@ export function SkillsPage({ repoId }: SkillsPageProps) {
       {
         onSuccess: () => {
           deleteSkill(selectedName);
-          setSelectedName(newName);
+          handleSelect(newName);
         },
       },
     );
   }
 
   function handleDelete() {
-    if (!selectedName) return;
-    deleteSkill(selectedName, { onSuccess: () => setSelectedName(null) });
+    if (!selectedName) {
+      return;
+    }
+    deleteSkill(selectedName, { onSuccess: () => handleSelect(null) });
   }
 
   function handleChange(description: string, content: string) {
-    if (!selectedName) return;
+    if (!selectedName) {
+      return;
+    }
     updateSkill({ name: selectedName, description, content });
   }
 
@@ -86,7 +107,7 @@ export function SkillsPage({ repoId }: SkillsPageProps) {
         <SkillList
           skills={skills}
           selectedName={selectedName}
-          onSelect={setSelectedName}
+          onSelect={handleSelect}
           onNew={handleNew}
           scope={scope}
           onScopeChange={handleScopeChange}

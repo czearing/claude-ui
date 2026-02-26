@@ -1,12 +1,12 @@
 /**
  * @jest-environment node
  */
+import { loadRegistry, saveRegistry } from "./sessionRegistry";
+import type { SessionRegistryEntry } from "./sessionRegistry";
+
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { loadRegistry, saveRegistry } from "./sessionRegistry";
-import type { SessionRegistryEntry } from "./sessionRegistry";
 
 let dir: string;
 

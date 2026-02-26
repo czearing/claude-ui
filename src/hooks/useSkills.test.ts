@@ -1,8 +1,15 @@
 // src/hooks/useSkills.test.ts
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
+import {
+  createSkill,
+  deleteSkill,
+  fetchSkill,
+  fetchSkills,
+  updateSkill,
+} from "@/utils/skills.client";
 import {
   useCreateSkill,
   useDeleteSkill,
@@ -18,14 +25,6 @@ jest.mock("@/utils/skills.client", () => ({
   updateSkill: jest.fn(),
   deleteSkill: jest.fn(),
 }));
-
-import {
-  createSkill,
-  deleteSkill,
-  fetchSkill,
-  fetchSkills,
-  updateSkill,
-} from "@/utils/skills.client";
 
 afterEach(() => jest.clearAllMocks());
 

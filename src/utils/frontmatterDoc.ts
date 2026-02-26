@@ -27,7 +27,9 @@ export interface FrontmatterDoc {
  */
 export function parseFrontmatterDoc(raw: string, name: string): FrontmatterDoc {
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!m) return { name, description: "", content: raw.trim() };
+  if (!m) {
+    return { name, description: "", content: raw.trim() };
+  }
   const front = m[1];
   const body = m[2].trim();
   const descMatch = front.match(/^description:\s*(.+)$/m);

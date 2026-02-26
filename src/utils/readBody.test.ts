@@ -1,10 +1,10 @@
 /**
  * @jest-environment node
  */
+import { readBody } from "./readBody";
+
 import { EventEmitter } from "node:events";
 import type { IncomingMessage } from "node:http";
-
-import { readBody } from "./readBody";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -12,7 +12,9 @@ import { readBody } from "./readBody";
 function makeReq(body: string): IncomingMessage {
   const emitter = new EventEmitter();
   process.nextTick(() => {
-    if (body) emitter.emit("data", body);
+    if (body) {
+      emitter.emit("data", body);
+    }
     emitter.emit("end");
   });
   return emitter as unknown as IncomingMessage;

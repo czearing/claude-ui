@@ -17,17 +17,23 @@ import type { Priority, Task, TaskStatus } from "./tasks.types";
  */
 export function parseTaskFile(content: string): Task {
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(content);
-  if (!match) throw new Error("Invalid task file: missing frontmatter");
+  if (!match) {
+    throw new Error("Invalid task file: missing frontmatter");
+  }
   const frontmatter = match[1];
   const body = match[2].trim();
 
   const meta: Record<string, string> = {};
   for (const line of frontmatter.split("\n")) {
     const idx = line.indexOf(": ");
-    if (idx === -1) continue;
+    if (idx === -1) {
+      continue;
+    }
     const key = line.slice(0, idx).trim();
     const value = line.slice(idx + 2).trim();
-    if (key) meta[key] = value;
+    if (key) {
+      meta[key] = value;
+    }
   }
 
   const task: Task = {
@@ -40,8 +46,12 @@ export function parseTaskFile(content: string): Task {
     createdAt: meta["createdAt"] ?? new Date().toISOString(),
     updatedAt: meta["updatedAt"] ?? new Date().toISOString(),
   };
-  if (meta["sessionId"]) task.sessionId = meta["sessionId"];
-  if (meta["archivedAt"]) task.archivedAt = meta["archivedAt"];
+  if (meta["sessionId"]) {
+    task.sessionId = meta["sessionId"];
+  }
+  if (meta["archivedAt"]) {
+    task.archivedAt = meta["archivedAt"];
+  }
   return task;
 }
 
@@ -58,12 +68,18 @@ export function serializeTaskFile(task: Task): string {
     `priority: ${task.priority}`,
     `repoId: ${task.repoId}`,
   ];
-  if (task.sessionId) lines.push(`sessionId: ${task.sessionId}`);
-  if (task.archivedAt) lines.push(`archivedAt: ${task.archivedAt}`);
+  if (task.sessionId) {
+    lines.push(`sessionId: ${task.sessionId}`);
+  }
+  if (task.archivedAt) {
+    lines.push(`archivedAt: ${task.archivedAt}`);
+  }
   lines.push(`createdAt: ${task.createdAt}`);
   lines.push(`updatedAt: ${task.updatedAt}`);
   lines.push("---");
   lines.push("");
-  if (task.spec) lines.push(task.spec);
+  if (task.spec) {
+    lines.push(task.spec);
+  }
   return lines.join("\n");
 }

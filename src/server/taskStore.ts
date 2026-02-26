@@ -13,6 +13,18 @@ import { join } from "node:path";
 
 export const SPECS_DIR = join(process.cwd(), "specs");
 
+const repoCache = new Map<string, Task[]>();
+let taskIdCounter: number | null = null;
+
+export function invalidateRepoCache(repoId: string): void {
+  repoCache.delete(repoId);
+}
+
+export function clearTaskCache(): void {
+  repoCache.clear();
+  taskIdCounter = null;
+}
+
 export function repoSpecsDir(repoId: string): string {
   return join(SPECS_DIR, repoId);
 }
@@ -43,6 +55,16 @@ export async function writeTask(task: Task): Promise<void> {
     serializeTaskFile(task),
     "utf8",
   );
+  const cached = repoCache.get(task.repoId);
+  if (cached) {
+    const idx = cached.findIndex((t) => t.id === task.id);
+    repoCache.set(
+      task.repoId,
+      idx >= 0
+        ? [...cached.slice(0, idx), task, ...cached.slice(idx + 1)]
+        : [...cached, task],
+    );
+  }
 }
 
 export async function deleteTaskFile(
@@ -57,9 +79,20 @@ export async function deleteTaskFile(
     }
     throw err;
   }
+  const cached = repoCache.get(repoId);
+  if (cached) {
+    repoCache.set(
+      repoId,
+      cached.filter((t) => t.id !== id),
+    );
+  }
 }
 
 export async function readTasksForRepo(repoId: string): Promise<Task[]> {
+  const cached = repoCache.get(repoId);
+  if (cached) {
+    return cached;
+  }
   try {
     const dir = repoSpecsDir(repoId);
     const files = await readdir(dir);
@@ -68,7 +101,9 @@ export async function readTasksForRepo(repoId: string): Promise<Task[]> {
         .filter((f) => f.endsWith(".md"))
         .map((f) => readTask(f.slice(0, -3), repoId)),
     );
-    return tasks.filter((t): t is Task => t !== null);
+    const result = tasks.filter((t): t is Task => t !== null);
+    repoCache.set(repoId, result);
+    return result;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
@@ -96,7 +131,7 @@ export async function readAllTasks(): Promise<Task[]> {
   }
 }
 
-export async function getNextTaskId(): Promise<string> {
+async function scanMaxTaskId(): Promise<number> {
   let max = 0;
   try {
     const dirs = await readdir(SPECS_DIR);
@@ -123,5 +158,11 @@ export async function getNextTaskId(): Promise<string> {
   } catch {
     // SPECS_DIR doesn't exist yet
   }
-  return `TASK-${String(max + 1).padStart(3, "0")}`;
+  return max;
+}
+
+export async function getNextTaskId(): Promise<string> {
+  taskIdCounter ??= await scanMaxTaskId();
+  taskIdCounter += 1;
+  return `TASK-${String(taskIdCounter).padStart(3, "0")}`;
 }

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { PaperPlaneTilt, Robot, X } from "@phosphor-icons/react";
 
-import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
+import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
 import styles from "./SpecEditor.module.css";
 import type { SpecEditorProps } from "./SpecEditor.types";
 import { LexicalEditor } from "../LexicalEditor";
@@ -24,7 +24,9 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
   );
   const [scheduleTitleSave, cancelTitleSave] = useDebouncedCallback(
     (val: string) => {
-      if (val.trim()) updateTask({ id: task?.id ?? "", title: val.trim() });
+      if (val.trim()) {
+        updateTask({ id: task?.id ?? "", title: val.trim() });
+      }
     },
     600,
   );
@@ -46,7 +48,9 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
   const handleSpecChange = (markdown: string) => {
     setSpec(markdown);
     // Skip if content hasn't actually changed (e.g. initial ContentLoader round-trip).
-    if (markdown === (task?.spec ?? "")) return;
+    if (markdown === (task?.spec ?? "")) {
+      return;
+    }
     scheduleSpecSave(markdown);
   };
 

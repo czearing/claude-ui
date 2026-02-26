@@ -1,9 +1,9 @@
 /**
  * @jest-environment node
  */
-import { readFile, writeFile } from "node:fs/promises";
-
 import { readRepos, writeRepos } from "./repoStore";
+
+import { readFile, writeFile } from "node:fs/promises";
 
 jest.mock("node:fs/promises");
 

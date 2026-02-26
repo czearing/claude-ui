@@ -67,8 +67,16 @@ export function useUpdateSkill(scope: SkillScope = "global", repoId?: string) {
       content: string;
     }) => updateSkill(name, description, content, scope, repoId),
     onSuccess: (data) => {
+      // Use exact:true so only the skills LIST is invalidated. Without it,
+      // TanStack Query's default prefix matching would also mark the individual
+      // skill query as stale and trigger a background refetch. That refetch
+      // returns content trimmed by parseFrontmatterDoc, which differs from the
+      // un-trimmed PUT response — breaking the val===content guard in
+      // SkillEditor and causing an infinite save loop that makes the editor
+      // appear to refresh every few seconds while typing.
       void queryClient.invalidateQueries({
         queryKey: skillsKey(scope, repoId),
+        exact: true,
       });
       queryClient.setQueryData(skillKey(scope, repoId, data.name), data);
     },

@@ -1,5 +1,5 @@
 // src/hooks/useDebouncedCallback.ts
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /**
  * Returns a [schedule, cancel] tuple. Calling schedule(...args) debounces the
@@ -14,7 +14,9 @@ export function useDebouncedCallback<Args extends unknown[]>(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackRef = useRef(callback);
   const pendingArgsRef = useRef<Args | null>(null);
-  callbackRef.current = callback;
+  useLayoutEffect(() => {
+    callbackRef.current = callback;
+  });
 
   useEffect(() => {
     return () => {
@@ -27,7 +29,9 @@ export function useDebouncedCallback<Args extends unknown[]>(
 
   function schedule(...args: Args) {
     pendingArgsRef.current = args;
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
     timerRef.current = setTimeout(() => {
       pendingArgsRef.current = null;
       timerRef.current = null;

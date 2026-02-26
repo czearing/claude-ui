@@ -13,16 +13,18 @@ import {
   useDeleteAgent,
   useUpdateAgent,
 } from "@/hooks/useAgents";
-
 import styles from "./AgentsPage.module.css";
 
 interface AgentsPageProps {
   repoId: string;
+  selectedAgentName?: string;
 }
 
-export function AgentsPage({ repoId }: AgentsPageProps) {
+export function AgentsPage({ repoId, selectedAgentName }: AgentsPageProps) {
   const [scope, setScope] = useState<AgentScope>("global");
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(
+    selectedAgentName ?? null,
+  );
 
   const effectiveRepoId = scope === "repo" ? repoId : undefined;
 
@@ -37,9 +39,22 @@ export function AgentsPage({ repoId }: AgentsPageProps) {
   const { mutate: deleteAgent } = useDeleteAgent(scope, effectiveRepoId);
   const counterRef = useRef(0);
 
+  function handleSelect(name: string | null) {
+    setSelectedName(name);
+    if (name) {
+      window.history.replaceState(
+        null,
+        "",
+        `/repos/${repoId}/agents/${encodeURIComponent(name)}`,
+      );
+    } else {
+      window.history.replaceState(null, "", `/repos/${repoId}/agents`);
+    }
+  }
+
   function handleScopeChange(newScope: AgentScope) {
     setScope(newScope);
-    setSelectedName(null);
+    handleSelect(null);
   }
 
   function handleNew() {
@@ -49,12 +64,14 @@ export function AgentsPage({ repoId }: AgentsPageProps) {
     }
     createAgent(
       { name: candidate, description: "", content: "" },
-      { onSuccess: () => setSelectedName(candidate) },
+      { onSuccess: () => handleSelect(candidate) },
     );
   }
 
   function handleRename(newName: string) {
-    if (!selectedName) return;
+    if (!selectedName) {
+      return;
+    }
     const description = selectedAgent?.description ?? "";
     const content = selectedAgent?.content ?? "";
     createAgent(
@@ -62,19 +79,23 @@ export function AgentsPage({ repoId }: AgentsPageProps) {
       {
         onSuccess: () => {
           deleteAgent(selectedName);
-          setSelectedName(newName);
+          handleSelect(newName);
         },
       },
     );
   }
 
   function handleDelete() {
-    if (!selectedName) return;
-    deleteAgent(selectedName, { onSuccess: () => setSelectedName(null) });
+    if (!selectedName) {
+      return;
+    }
+    deleteAgent(selectedName, { onSuccess: () => handleSelect(null) });
   }
 
   function handleChange(description: string, content: string) {
-    if (!selectedName) return;
+    if (!selectedName) {
+      return;
+    }
     updateAgent({ name: selectedName, description, content });
   }
 
@@ -85,7 +106,7 @@ export function AgentsPage({ repoId }: AgentsPageProps) {
         <AgentList
           agents={agents}
           selectedName={selectedName}
-          onSelect={setSelectedName}
+          onSelect={handleSelect}
           onNew={handleNew}
           scope={scope}
           onScopeChange={handleScopeChange}

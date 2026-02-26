@@ -475,7 +475,8 @@ describe("POST /api/tasks/:id/handover", () => {
   });
 
   it("advances directly to Review when spec is empty", async () => {
-    const task = makeTask({ id: "TASK-001", spec: "" });
+    // Both title and spec body must be empty/blank for specText to be falsy.
+    const task = makeTask({ id: "TASK-001", title: "", spec: "" });
     mockReadAllTasks.mockResolvedValueOnce([task]);
     mockExtractTextFromLexical.mockReturnValueOnce("   "); // whitespace only
 
@@ -587,7 +588,9 @@ describe("POST /api/tasks/:id/handover", () => {
 
     expect(result).toBe(true);
 
-    // Verify pty-manager was called with the right payload
+    // Verify pty-manager was called with the right payload.
+    // specText = [title, specBody].filter(Boolean).join("\n\n")
+    // = "Test Task\n\nimplement feature"
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("/sessions"),
       expect.objectContaining({
@@ -595,7 +598,7 @@ describe("POST /api/tasks/:id/handover", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId: "550e8400-e29b-41d4-a716-446655440000",
-          spec: "implement feature",
+          spec: "Test Task\n\nimplement feature",
           cwd: "/repos/my-repo",
         }),
       }),
@@ -637,6 +640,137 @@ describe("POST /api/tasks/:id/handover", () => {
       cwd: string;
     };
     expect(fetchBody.cwd).toBe(process.cwd());
+  });
+
+  it("title-only path: whitespace-only spec body is excluded so spec sent is just the title", async () => {
+    // specBody = "".trim() = "" (falsy), so filter(Boolean) drops it.
+    // specText = "My Task" — truthy, so pty-manager is still called.
+    // The body sent to pty-manager must be spec: "My Task" with no trailing newlines.
+    const task = makeTask({ id: "TASK-001", title: "My Task", spec: "   " });
+    mockReadAllTasks.mockResolvedValueOnce([task]);
+    mockExtractTextFromLexical.mockReturnValueOnce("   "); // whitespace only
+    mockRandomUUID.mockReturnValueOnce(
+      "550e8400-e29b-41d4-a716-446655440000" as ReturnType<typeof randomUUID>,
+    );
+    mockReadRepos.mockResolvedValueOnce([
+      {
+        id: "repo-abc",
+        name: "My Repo",
+        path: "/repos/my-repo",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    mockFetch.mockResolvedValueOnce({ ok: true } as Response);
+
+    const req = makeReq("POST", "/api/tasks/TASK-001/handover");
+    const res = makeRes();
+    const result = await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/tasks/TASK-001/handover"),
+    );
+
+    expect(result).toBe(true);
+    // pty-manager must have been called (specText is truthy because title is present)
+    expect(mockFetch).toHaveBeenCalled();
+    const fetchCall = mockFetch.mock.calls[0] as [string, RequestInit];
+    const fetchBody = JSON.parse(fetchCall[1].body as string) as {
+      spec: string;
+    };
+    // Only the title — no "\n\n" suffix because specBody was empty after trim
+    expect(fetchBody.spec).toBe("My Task");
+    const written = mockWriteTask.mock.calls[0][0];
+    expect(written.status).toBe("In Progress");
+  });
+
+  it("spec-only path: empty title is excluded so spec sent is just the spec text", async () => {
+    // title = "" (falsy), filter(Boolean) drops it.
+    // specText = "do the thing" — no leading "\n\n".
+    const task = makeTask({
+      id: "TASK-001",
+      title: "",
+      spec: "some spec text",
+    });
+    mockReadAllTasks.mockResolvedValueOnce([task]);
+    mockExtractTextFromLexical.mockReturnValueOnce("do the thing");
+    mockRandomUUID.mockReturnValueOnce(
+      "550e8400-e29b-41d4-a716-446655440000" as ReturnType<typeof randomUUID>,
+    );
+    mockReadRepos.mockResolvedValueOnce([
+      {
+        id: "repo-abc",
+        name: "My Repo",
+        path: "/repos/my-repo",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    mockFetch.mockResolvedValueOnce({ ok: true } as Response);
+
+    const req = makeReq("POST", "/api/tasks/TASK-001/handover");
+    const res = makeRes();
+    const result = await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/tasks/TASK-001/handover"),
+    );
+
+    expect(result).toBe(true);
+    expect(mockFetch).toHaveBeenCalled();
+    const fetchCall = mockFetch.mock.calls[0] as [string, RequestInit];
+    const fetchBody = JSON.parse(fetchCall[1].body as string) as {
+      spec: string;
+    };
+    // Only the extracted spec text — no title prefix
+    expect(fetchBody.spec).toBe("do the thing");
+    const written = mockWriteTask.mock.calls[0][0];
+    expect(written.status).toBe("In Progress");
+  });
+
+  it('null spec latent bug: real extractTextFromLexical returns the string "null" when spec is null', async () => {
+    // task.spec is typed as string but can be null at runtime (latent bug).
+    // The mock simulates what the real extractTextFromLexical returns when
+    // called with null: it hits the catch branch and returns "null" as a string.
+    // "null" is a truthy string, so filter(Boolean) keeps it, and the literal
+    // string "null" ends up in the spec sent to Claude.
+    // This test documents the existing bug so regressions are visible.
+    const task = makeTask({
+      id: "TASK-001",
+      title: "My Task",
+      spec: null as unknown as string,
+    });
+    mockReadAllTasks.mockResolvedValueOnce([task]);
+    // Simulate what the real function returns when passed null
+    mockExtractTextFromLexical.mockReturnValueOnce("null");
+    mockRandomUUID.mockReturnValueOnce(
+      "550e8400-e29b-41d4-a716-446655440000" as ReturnType<typeof randomUUID>,
+    );
+    mockReadRepos.mockResolvedValueOnce([
+      {
+        id: "repo-abc",
+        name: "My Repo",
+        path: "/repos/my-repo",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    mockFetch.mockResolvedValueOnce({ ok: true } as Response);
+
+    const req = makeReq("POST", "/api/tasks/TASK-001/handover");
+    const res = makeRes();
+    const result = await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/tasks/TASK-001/handover"),
+    );
+
+    expect(result).toBe(true);
+    // Bug: pty-manager is called because "null" is truthy
+    expect(mockFetch).toHaveBeenCalled();
+    const fetchCall = mockFetch.mock.calls[0] as [string, RequestInit];
+    const fetchBody = JSON.parse(fetchCall[1].body as string) as {
+      spec: string;
+    };
+    // The literal string "null" reaches Claude instead of being treated as empty
+    expect(fetchBody.spec).toBe("My Task\n\nnull");
   });
 });
 
@@ -712,6 +846,109 @@ describe("POST /api/internal/sessions/:id/advance-to-review", () => {
       req,
       res,
       parsedUrl("/api/internal/sessions/unknown-sess/advance-to-review"),
+    );
+
+    expect(result).toBe(true);
+    expect(mockWriteTask).not.toHaveBeenCalled();
+    expect(res.writeHead).toHaveBeenCalledWith(204);
+  });
+});
+
+// ── POST /api/internal/sessions/:id/back-to-in-progress ───────────────────────
+
+describe("POST /api/internal/sessions/:id/back-to-in-progress", () => {
+  it("transitions a Review task matching sessionId back to In Progress, preserves sessionId, broadcasts", async () => {
+    const task = makeTask({
+      id: "TASK-001",
+      status: "Review",
+      sessionId: "sess-abc",
+    });
+    mockReadAllTasks.mockResolvedValueOnce([task]);
+
+    const req = makeReq(
+      "POST",
+      "/api/internal/sessions/sess-abc/back-to-in-progress",
+    );
+    const res = makeRes();
+    const result = await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/internal/sessions/sess-abc/back-to-in-progress"),
+    );
+
+    expect(result).toBe(true);
+    const written = mockWriteTask.mock.calls[0][0];
+    expect(written.status).toBe("In Progress");
+    // sessionId must be preserved — it is still needed to associate with the PTY
+    expect(written.sessionId).toBe("sess-abc");
+    expect(mockBroadcastTaskEvent).toHaveBeenCalledWith(
+      "task:updated",
+      written,
+    );
+    expect(res.writeHead).toHaveBeenCalledWith(204);
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it("does nothing (no write/broadcast) when task is already In Progress", async () => {
+    const task = makeTask({
+      id: "TASK-001",
+      status: "In Progress",
+      sessionId: "sess-abc",
+    });
+    mockReadAllTasks.mockResolvedValueOnce([task]);
+
+    const req = makeReq(
+      "POST",
+      "/api/internal/sessions/sess-abc/back-to-in-progress",
+    );
+    const res = makeRes();
+    const result = await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/internal/sessions/sess-abc/back-to-in-progress"),
+    );
+
+    expect(result).toBe(true);
+    expect(mockWriteTask).not.toHaveBeenCalled();
+    expect(mockBroadcastTaskEvent).not.toHaveBeenCalled();
+    expect(res.writeHead).toHaveBeenCalledWith(204);
+  });
+
+  it("does nothing when task is in Backlog (not Review)", async () => {
+    const task = makeTask({
+      id: "TASK-001",
+      status: "Backlog",
+      sessionId: "sess-abc",
+    });
+    mockReadAllTasks.mockResolvedValueOnce([task]);
+
+    const req = makeReq(
+      "POST",
+      "/api/internal/sessions/sess-abc/back-to-in-progress",
+    );
+    const res = makeRes();
+    await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/internal/sessions/sess-abc/back-to-in-progress"),
+    );
+
+    expect(mockWriteTask).not.toHaveBeenCalled();
+    expect(mockBroadcastTaskEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns 204 when no task matches the sessionId", async () => {
+    mockReadAllTasks.mockResolvedValueOnce([]);
+
+    const req = makeReq(
+      "POST",
+      "/api/internal/sessions/unknown-sess/back-to-in-progress",
+    );
+    const res = makeRes();
+    const result = await handleTaskRoutes(
+      req,
+      res,
+      parsedUrl("/api/internal/sessions/unknown-sess/back-to-in-progress"),
     );
 
     expect(result).toBe(true);

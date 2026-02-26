@@ -2,7 +2,7 @@
 "use client";
 
 import { Plus } from "@phosphor-icons/react";
-import clsx from "clsx";
+import { clsx } from "clsx";
 
 import styles from "./SkillList.module.css";
 import type { SkillListProps } from "./SkillList.types";

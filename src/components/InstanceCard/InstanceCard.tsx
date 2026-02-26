@@ -1,9 +1,9 @@
 "use client";
 
-import { formatRelativeDate } from "../../utils/formatRelativeDate";
-
 import styles from "./InstanceCard.module.css";
 import type { InstanceCardProps } from "./InstanceCard.types";
+
+import { formatRelativeDate } from "../../utils/formatRelativeDate";
 
 export const InstanceCard = ({
   session,

@@ -1,5 +1,5 @@
-import type { Task } from "./tasks.types";
 import { parseTaskFile, serializeTaskFile } from "./taskFile";
+import type { Task } from "./tasks.types";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -270,5 +270,33 @@ describe("round-trip: serialize → parse", () => {
   it("preserves all fields for an archived task", () => {
     const parsed = parseTaskFile(serializeTaskFile(ARCHIVED_TASK));
     expect(parsed).toEqual(ARCHIVED_TASK);
+  });
+
+  it("preserves spec body containing --- on its own line", () => {
+    // The serialized form places the spec after the closing ---.
+    // The frontmatter regex is non-greedy so it terminates at the first
+    // occurrence of \n---\n, which is the frontmatter closing delimiter.
+    // A --- inside the spec body is therefore part of group 2 (the body)
+    // and must survive the round-trip unchanged.
+    const task: Task = {
+      ...MINIMAL_TASK,
+      spec: "Step 1\n---\nStep 2",
+    };
+    const parsed = parseTaskFile(serializeTaskFile(task));
+    expect(parsed.spec).toBe("Step 1\n---\nStep 2");
+  });
+
+  it("preserves title containing colon-space", () => {
+    // The frontmatter parser splits on the first ": " occurrence.
+    // A title like "Fix: handle null" has ": " at index 3, so the key is
+    // "title" and the value is everything after that first ": ", which
+    // correctly includes the rest of the string ("Fix: handle null values
+    // in parser"). The colon-space inside the value must not be lost.
+    const task: Task = {
+      ...MINIMAL_TASK,
+      title: "Fix: handle null values in parser",
+    };
+    const parsed = parseTaskFile(serializeTaskFile(task));
+    expect(parsed.title).toBe("Fix: handle null values in parser");
   });
 });

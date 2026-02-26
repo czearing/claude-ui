@@ -100,7 +100,7 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
                 onRemoveTask={deleteTask}
                 onRecall={recallTask}
                 onHandover={onHandover}
-                isDropDisabled={!!activeTask && isDropDisabled}
+                isDropDisabled={Boolean(activeTask) && isDropDisabled}
               />
             );
           })}

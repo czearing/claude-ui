@@ -12,7 +12,7 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import clsx from "clsx";
+import { clsx } from "clsx";
 
 import styles from "./TaskCard.module.css";
 import type { TaskCardProps } from "./TaskCard.types";

@@ -76,6 +76,17 @@ export type SessionEntry = {
 
 export const sessions = new Map<string, SessionEntry>();
 
+/**
+ * Sessions that have exited naturally (e.g. handover `-p` sessions that
+ * completed their task).  wsSessionHandler checks this map before spawning a
+ * `--continue` session so it doesn't accidentally resume the caller's own
+ * Claude Code session when a user views a completed task's terminal.
+ *
+ * The stored Buffer is the concatenated final output so it can be replayed
+ * to the client — ensuring "Session ended." is never the first visible line.
+ */
+export const completedSessions = new Map<string, Buffer>();
+
 // ─── Buffer / status helpers ─────────────────────────────────────────────────
 
 export function appendToBuffer(entry: SessionEntry, chunk: Buffer): void {
@@ -118,21 +129,39 @@ export function scheduleIdleStatus(
       e.currentStatus = "waiting";
       emitStatus(e.activeWs, "waiting");
     }
-    // Only advance when:
-    //  - hadMeaningfulActivity: we saw the thinking spinner (Claude actually
-    //    processed the spec), guarding against startup splash text that also
-    //    looks like typing
-    //  - lastMeaningfulStatus === "typing": silence followed streamed response,
-    //    not a tool-use gap (thinking → silence = bash/file/API still running)
+    // Advance to Review when one of two conditions is met:
+    //  1. Primary: meaningful activity (spinner/tool use) followed by a typed
+    //     response that ended in silence — the normal happy path.
+    //  2. Fallback: Claude returned to the ❯ prompt (lastMeaningfulStatus ===
+    //     "waiting") and has been silent for SESSION_IDLE_MS. This covers
+    //     cases where the thinking spinner fired within the SPEC_ECHO_WINDOW_MS
+    //     startup gate so hadMeaningfulActivity was never set, yet Claude
+    //     clearly finished processing and is waiting for input.
     if (
       e.handoverPhase === "spec_sent" &&
-      e.hadMeaningfulActivity &&
-      e.lastMeaningfulStatus === "typing"
+      ((e.hadMeaningfulActivity && e.lastMeaningfulStatus === "typing") ||
+        e.lastMeaningfulStatus === "waiting")
     ) {
       e.handoverPhase = "done";
       advanceToReview(sessionId);
     }
   }, SESSION_IDLE_MS);
+}
+
+/**
+ * Callback to server.ts to move a task from "Review" back to "In Progress".
+ *
+ * Called when the user sends input to an active session after the task has
+ * already been advanced to Review — e.g. typing "Keep going" in the terminal.
+ */
+export function backToInProgress(sessionId: string): void {
+  const SERVER_PORT = process.env.SERVER_PORT ?? "3000";
+  void fetch(
+    `http://localhost:${SERVER_PORT}/api/internal/sessions/${sessionId}/back-to-in-progress`,
+    { method: "POST" },
+  ).catch(() => {
+    // server may not be running yet or restarting — safe to swallow
+  });
 }
 
 /**

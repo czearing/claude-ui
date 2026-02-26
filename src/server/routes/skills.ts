@@ -132,8 +132,13 @@ export async function handleSkillRoutes(
       typeof body["description"] === "string"
         ? body["description"]
         : existing.description;
-    const content =
+    // Trim content to match what parseFrontmatterDoc returns on GET, so the
+    // PUT response is consistent with a subsequent GET. Without this, the
+    // client's val===content guard in SkillEditor can fail on trailing
+    // newlines, which the file round-trip strips via .trim().
+    const rawContent =
       typeof body["content"] === "string" ? body["content"] : existing.content;
+    const content = rawContent.trim();
     const skill: Skill = { name, description, content };
     await writeSkill(dir, skill);
     res.writeHead(200, { "Content-Type": "application/json" });

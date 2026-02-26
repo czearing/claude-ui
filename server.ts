@@ -1,13 +1,13 @@
 import next from "next";
 import { WebSocketServer } from "ws";
 
-import { boardClients } from "./src/server/boardBroadcast";
+import { boardClients, broadcastTaskEvent } from "./src/server/boardBroadcast";
 import { readRepos, writeRepos } from "./src/server/repoStore";
 import { handleAgentRoutes } from "./src/server/routes/agents";
 import { handleRepoRoutes } from "./src/server/routes/repos";
 import { handleSkillRoutes } from "./src/server/routes/skills";
 import { handleTaskRoutes } from "./src/server/routes/tasks";
-import { readTask, writeTask } from "./src/server/taskStore";
+import { readAllTasks, readTask, writeTask } from "./src/server/taskStore";
 import { handleTerminalUpgrade } from "./src/server/wsProxy";
 import { extractTextFromLexical } from "./src/utils/lexical";
 import type { Task } from "./src/utils/tasks.types";
@@ -93,6 +93,50 @@ async function ensureDefaultRepo(): Promise<void> {
   }
 }
 
+// ─── Startup recovery ─────────────────────────────────────────────────────────
+
+/**
+ * Advance any "In Progress" tasks whose PTY sessions are no longer live in
+ * the pty-manager.  Runs once after the server starts listening so that tasks
+ * persisted as "In Progress" from a previous run are not left stuck forever.
+ *
+ * If the pty-manager reports a session as live we leave it alone — Claude may
+ * still be actively working.  If the pty-manager is unreachable we treat every
+ * "In Progress" task as stale and advance them all.
+ */
+async function recoverInProgressTasks(): Promise<void> {
+  const tasks = await readAllTasks();
+  const stuckTasks = tasks.filter(
+    (t) => t.status === "In Progress" && t.sessionId,
+  );
+  if (!stuckTasks.length) {
+    return;
+  }
+
+  let liveSessions = new Set<string>();
+  try {
+    const res = await fetch(`http://localhost:${PTY_MANAGER_PORT}/sessions`);
+    if (res.ok) {
+      const data = (await res.json()) as { sessions: string[] };
+      liveSessions = new Set(data.sessions);
+    }
+  } catch {
+    // pty-manager not reachable — treat all "In Progress" tasks as stale
+  }
+
+  for (const task of stuckTasks) {
+    if (!liveSessions.has(task.sessionId!)) {
+      const updated: Task = {
+        ...task,
+        status: "Review",
+        updatedAt: new Date().toISOString(),
+      };
+      await writeTask(updated);
+      broadcastTaskEvent("task:updated", updated);
+    }
+  }
+}
+
 // ─── Server startup ───────────────────────────────────────────────────────────
 
 app
@@ -149,6 +193,7 @@ app
 
     server.listen(port, () => {
       console.error(`> Ready on http://localhost:${port}`);
+      void recoverInProgressTasks();
     });
   })
   .catch((err: unknown) => {

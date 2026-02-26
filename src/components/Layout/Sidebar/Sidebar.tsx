@@ -8,7 +8,7 @@ import {
   Robot,
   SquaresFour,
 } from "@phosphor-icons/react";
-import clsx from "clsx";
+import { clsx } from "clsx";
 import { useRouter } from "next/navigation";
 
 import { RepoSwitcher } from "./RepoSwitcher";

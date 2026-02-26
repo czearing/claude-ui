@@ -1,5 +1,4 @@
 import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
-
 import styles from "./StatusIndicator.module.css";
 import type { StatusIndicatorProps } from "./StatusIndicator.types";
 

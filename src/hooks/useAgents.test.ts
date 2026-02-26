@@ -1,8 +1,15 @@
 // src/hooks/useAgents.test.ts
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
+import {
+  createAgent,
+  deleteAgent,
+  fetchAgent,
+  fetchAgents,
+  updateAgent,
+} from "@/utils/agents.client";
 import {
   useAgents,
   useAgent,
@@ -18,14 +25,6 @@ jest.mock("@/utils/agents.client", () => ({
   updateAgent: jest.fn(),
   deleteAgent: jest.fn(),
 }));
-
-import {
-  createAgent,
-  deleteAgent,
-  fetchAgent,
-  fetchAgents,
-  updateAgent,
-} from "@/utils/agents.client";
 
 afterEach(() => jest.clearAllMocks());
 

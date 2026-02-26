@@ -29,9 +29,12 @@ export function useTasksSocket() {
       ws = new WebSocket(`${protocol}//${window.location.host}/ws/board`);
 
       ws.onopen = () => {
+        const isReconnect = attempt > 0;
         attempt = 0; // reset backoff on successful connection
-        // Catch up on any events missed while disconnected
-        void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        // Catch up on any events missed while disconnected (skip on initial connect)
+        if (isReconnect) {
+          void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        }
       };
 
       ws.onmessage = (event) => {
@@ -42,7 +45,9 @@ export function useTasksSocket() {
             queryClient.setQueryData<Task[]>(
               ["tasks", msg.data.repoId],
               (prev) => {
-                if (!prev) return prev;
+                if (!prev) {
+                  return prev;
+                }
                 return prev.map((t) => (t.id === msg.data.id ? msg.data : t));
               },
             );
@@ -50,7 +55,9 @@ export function useTasksSocket() {
             queryClient.setQueryData<Task[]>(
               ["tasks", msg.data.repoId],
               (prev) => {
-                if (!prev) return prev;
+                if (!prev) {
+                  return prev;
+                }
                 return [...prev, msg.data];
               },
             );
@@ -59,7 +66,9 @@ export function useTasksSocket() {
               queryClient.setQueryData<Task[]>(
                 ["tasks", msg.data.repoId],
                 (prev) => {
-                  if (!prev) return prev;
+                  if (!prev) {
+                    return prev;
+                  }
                   return prev.filter((t) => t.id !== msg.data.id);
                 },
               );
@@ -84,7 +93,9 @@ export function useTasksSocket() {
       };
 
       ws.onclose = () => {
-        if (dead) return;
+        if (dead) {
+          return;
+        }
         const delay = Math.min(BASE_BACKOFF_MS * 2 ** attempt, MAX_BACKOFF_MS);
         attempt++;
         reconnectTimer = setTimeout(connect, delay);
@@ -95,7 +106,9 @@ export function useTasksSocket() {
 
     return () => {
       dead = true;
-      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+      }
       ws?.close();
     };
   }, [queryClient]);

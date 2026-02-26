@@ -15,7 +15,9 @@ export async function readRepos(): Promise<Repo[]> {
     const raw = await readFile(REPOS_FILE, "utf8");
     return JSON.parse(raw) as Repo[];
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
     throw err;
   }
 }

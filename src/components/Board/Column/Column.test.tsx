@@ -10,9 +10,8 @@ jest.mock("@dnd-kit/core", () => ({
 }));
 
 jest.mock("@dnd-kit/sortable", () => ({
-  SortableContext: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
+  SortableContext: ({ children }: { children: React.ReactNode }) =>
+    children as React.ReactElement,
   verticalListSortingStrategy: jest.fn(),
   useSortable: () => ({
     attributes: {},

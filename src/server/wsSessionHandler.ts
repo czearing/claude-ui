@@ -9,7 +9,13 @@ import * as pty from "node-pty";
 import type { WebSocket } from "ws";
 
 import { attachTerminalHandlers } from "./ptyHandlers";
-import { advanceToReview, emitStatus, sessions } from "./ptyStore";
+import {
+  advanceToReview,
+  backToInProgress,
+  completedSessions,
+  emitStatus,
+  sessions,
+} from "./ptyStore";
 import type { SessionRegistryEntry } from "../utils/sessionRegistry";
 
 import type { IncomingMessage } from "node:http";
@@ -52,6 +58,37 @@ export function handleWsConnection(
       );
     }
     emitStatus(ws, entry.currentStatus);
+
+    // Recover stale handover sessions: the spec was sent but the idle timer
+    // may have fired before meaningful activity was detected (e.g. spinner
+    // within the echo window), leaving the task "In Progress" forever with
+    // Claude idle at the ❯ prompt.  Advance to Review now that the user has
+    // reconnected and we can confirm Claude is waiting.
+    if (
+      entry.handoverPhase === "spec_sent" &&
+      entry.currentStatus === "waiting"
+    ) {
+      entry.handoverPhase = "done";
+      advanceToReview(sessionId);
+    }
+  } else if (completedSessions.has(sessionId)) {
+    // The handover session already exited — replay its output so the client
+    // has context before seeing "Session ended.", then close.
+    // Do NOT spawn --continue, which would resume the caller's own Claude
+    // Code session instead of showing the completed task's output.
+    const finalOutput = completedSessions.get(sessionId)!;
+    if (finalOutput.length > 0) {
+      ws.send(
+        JSON.stringify({
+          type: "replay",
+          data: finalOutput.toString("base64"),
+        }),
+      );
+    }
+    ws.send(JSON.stringify({ type: "status", value: "exited" }));
+    ws.send(JSON.stringify({ type: "exit", code: 0 }));
+    ws.close();
+    return;
   } else {
     // New or resumed session: spawn pty
     const registryEntry = sessionRegistry.get(sessionId);
@@ -60,6 +97,12 @@ export function handleWsConnection(
       ? ["--dangerously-skip-permissions", "--continue"]
       : ["--dangerously-skip-permissions"];
 
+    // Unset CLAUDECODE so nested Claude instances are not blocked by the
+    // "cannot be launched inside another Claude Code session" guard.
+    const { CLAUDECODE: _cc, ...spawnEnv } = process.env as Record<
+      string,
+      string
+    >;
     let ptyProcess: pty.IPty;
     try {
       ptyProcess = pty.spawn(command, spawnArgs, {
@@ -67,7 +110,7 @@ export function handleWsConnection(
         cols: 80,
         rows: 24,
         cwd: sessionCwd,
-        env: process.env as Record<string, string>,
+        env: spawnEnv,
       });
     } catch (err) {
       ws.send(JSON.stringify({ type: "error", message: String(err) }));
@@ -127,6 +170,12 @@ export function handleWsConnection(
       return;
     }
     if (isBinary) {
+      // User sent input — if Claude had already done meaningful work, the task
+      // may be sitting in "Review".  Reset state and move it back to "In Progress".
+      if (e.hadMeaningfulActivity) {
+        e.hadMeaningfulActivity = false;
+        backToInProgress(sessionId);
+      }
       e.pty.write(Buffer.from(data as ArrayBuffer).toString());
     } else {
       const text = (data as Buffer).toString("utf8");
@@ -142,6 +191,12 @@ export function handleWsConnection(
         }
       } catch {
         // not JSON — write raw to PTY
+      }
+      // User sent input — if Claude had already done meaningful work, the task
+      // may be sitting in "Review".  Reset state and move it back to "In Progress".
+      if (e.hadMeaningfulActivity) {
+        e.hadMeaningfulActivity = false;
+        backToInProgress(sessionId);
       }
       e.pty.write(text);
     }

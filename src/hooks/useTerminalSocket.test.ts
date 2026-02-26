@@ -150,6 +150,38 @@ describe("useTerminalSocket", () => {
     expect(onStatus).toHaveBeenCalledWith("exited");
   });
 
+  it("writes 'Session ended.' to terminal on exit message", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    MockWebSocket.lastInstance.onmessage?.({
+      data: JSON.stringify({ type: "exit" }),
+    } as MessageEvent);
+
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining("Session ended."),
+    );
+  });
+
+  it("does not reconnect after an exit message closes the WebSocket", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    // Receive exit message — marks session as cleanly exited
+    act(() => {
+      MockWebSocket.lastInstance.onmessage?.({
+        data: JSON.stringify({ type: "exit" }),
+      } as MessageEvent);
+    });
+
+    // WebSocket closes after the server sends exit
+    act(() => {
+      MockWebSocket.lastInstance.onclose?.();
+      jest.advanceTimersByTime(5_000);
+    });
+
+    // Still only one WebSocket — no reconnect should have been scheduled
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
   it("calls onStatus('disconnected') and schedules reconnect on WS close", () => {
     const onStatus = jest.fn();
     renderHook(() =>
@@ -220,5 +252,50 @@ describe("useTerminalSocket", () => {
 
     // Three reconnect attempts = 4 total WS instances (original + 3 reconnects)
     expect(MockWebSocket.instances.length).toBe(4);
+  });
+
+  it("writes error message to xterm when an error frame is received", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    MockWebSocket.lastInstance.onmessage?.({
+      data: JSON.stringify({ type: "error", message: "oops" }),
+    } as MessageEvent);
+
+    expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining("oops"));
+  });
+
+  it("sends a resize message when xterm fires onResize", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    const ws = MockWebSocket.lastInstance;
+    // Simulate WebSocket opening so readyState is OPEN
+    ws.onopen?.();
+
+    // Retrieve the onResize callback registered with xterm
+    const onResizeCallback = mockOnResize.mock.calls[0][0] as (dims: {
+      cols: number;
+      rows: number;
+    }) => void;
+    onResizeCallback({ cols: 120, rows: 40 });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "resize", cols: 120, rows: 40 }),
+    );
+  });
+
+  it("does not send data when WebSocket is not OPEN", () => {
+    renderHook(() => useTerminalSocket(mockXterm as never, "session-abc"));
+
+    const ws = MockWebSocket.lastInstance;
+    // Set readyState to CONNECTING (0) — not OPEN (1)
+    ws.readyState = 0;
+
+    // Retrieve the onData callback captured by the mock and invoke it
+    const onDataCallback = mockOnData.mock.calls[0][0] as (
+      data: string,
+    ) => void;
+    onDataCallback("hello");
+
+    expect(ws.send).not.toHaveBeenCalled();
   });
 });

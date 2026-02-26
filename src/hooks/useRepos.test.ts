@@ -1,10 +1,10 @@
 // src/hooks/useRepos.test.ts
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
 
-import { useCreateRepo, useDeleteRepo, useRepos } from "./useRepos";
 import type { Repo } from "@/utils/tasks.types";
+import { useCreateRepo, useDeleteRepo, useRepos } from "./useRepos";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;

@@ -1,5 +1,5 @@
 // src/components/Skills/SkillEditor/SkillEditor.test.tsx
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillEditor } from "./SkillEditor";
@@ -94,5 +94,64 @@ describe("SkillEditor", () => {
     await userEvent.click(nameInput);
     await userEvent.tab();
     expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it("pressing Enter on name input after changing name calls onRename", async () => {
+    const onRename = jest.fn();
+    render(
+      <SkillEditor
+        name="bugfix"
+        description=""
+        content=""
+        onChange={jest.fn()}
+        onRename={onRename}
+        onDelete={jest.fn()}
+      />,
+    );
+    const nameInput = screen.getByRole("textbox", { name: "Skill name" });
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, "New Feature");
+    await userEvent.keyboard("{Enter}");
+    expect(onRename).toHaveBeenCalledWith("new-feature");
+  });
+
+  it("pressing Escape on name input reverts the displayed name to original", async () => {
+    render(
+      <SkillEditor
+        name="bugfix"
+        description=""
+        content=""
+        onChange={jest.fn()}
+        onRename={jest.fn()}
+        onDelete={jest.fn()}
+      />,
+    );
+    const nameInput = screen.getByRole("textbox", { name: "Skill name" });
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, "Some other name");
+    await userEvent.keyboard("{Escape}");
+    // After Escape, the input should display the original name
+    expect(nameInput).toHaveValue("bugfix");
+  });
+
+  it("changing description input calls onChange after debounce flushes on unmount", () => {
+    const onChange = jest.fn();
+    const { unmount } = render(
+      <SkillEditor
+        name="bugfix"
+        description="old description"
+        content="some content"
+        onChange={onChange}
+        onRename={jest.fn()}
+        onDelete={jest.fn()}
+      />,
+    );
+    const descInput = screen.getByRole("textbox", {
+      name: "Skill description",
+    });
+    fireEvent.change(descInput, { target: { value: "new description" } });
+    // Unmount flushes the pending debounced callback
+    unmount();
+    expect(onChange).toHaveBeenCalledWith("new description", "some content");
   });
 });

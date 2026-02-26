@@ -3,11 +3,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Trash } from "@phosphor-icons/react";
-import clsx from "clsx";
+import { clsx } from "clsx";
 
 import { LexicalEditor } from "@/components/Editor/LexicalEditor";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-
 import styles from "./SkillEditor.module.css";
 import type { SkillEditorProps } from "./SkillEditor.types";
 
@@ -47,7 +46,9 @@ export function SkillEditor({
   function handleContentChange(val: string) {
     // Skip if the editor round-tripped to the same markdown that was loaded
     // (e.g. OnChangePlugin firing immediately after ContentLoader).
-    if (val === content) return;
+    if (val === content) {
+      return;
+    }
     scheduleSave(localDescription, val);
   }
 
@@ -66,7 +67,9 @@ export function SkillEditor({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") e.currentTarget.blur();
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
     if (e.key === "Escape") {
       setLocalName(name);
       e.currentTarget.blur();

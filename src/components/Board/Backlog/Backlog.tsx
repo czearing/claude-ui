@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { FileText, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 
 import {
@@ -15,6 +15,9 @@ import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
 import { BacklogRow } from "./BacklogRow";
+
+const selectBacklogTasks = (tasks: Task[]) =>
+  tasks.filter((t) => t.status === "Backlog");
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest" },
@@ -57,19 +60,19 @@ export function Backlog({
   onNewTask,
   selectedTaskId,
 }: BacklogProps) {
-  const { data: allTasks = [] } = useTasks(repoId);
+  const { data: backlogTasks = [] } = useTasks(repoId, selectBacklogTasks);
   const { mutate: deleteTask } = useDeleteTask(repoId);
   const { mutate: handoverTask } = useHandoverTask(repoId);
-
-  const backlogTasks = allTasks.filter((t) => t.status === "Backlog");
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const filtered = search.trim()
+  const deferredSearch = useDeferredValue(search);
+
+  const filtered = deferredSearch.trim()
     ? backlogTasks.filter((t) =>
-        t.title.toLowerCase().includes(search.toLowerCase()),
+        t.title.toLowerCase().includes(deferredSearch.toLowerCase()),
       )
     : backlogTasks;
 

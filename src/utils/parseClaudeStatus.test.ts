@@ -139,3 +139,51 @@ describe("parseClaudeStatus", () => {
     });
   });
 });
+
+describe("real Claude CLI output regression fixtures", () => {
+  // Frozen captures from actual Claude CLI output sequences.
+  // These prevent silent breakage when Claude CLI updates its rendering.
+  // If any of these fail after a Claude CLI upgrade, update the fixture
+  // AND verify the detector still works correctly with the new format.
+
+  it("Claude startup spinner (within echo window) returns 'thinking'", () => {
+    // Captured from Claude Code startup before the first prompt appears.
+    // The spinner rotates through braille chars while Claude initializes.
+    const startupSpinnerChunk = "\r⣾ Loading...";
+    expect(parseClaudeStatus(startupSpinnerChunk)).toBe("thinking");
+  });
+
+  it("Claude v2 (thinking) label returns 'thinking'", () => {
+    // Captured from Claude Code v2 during extended thinking mode.
+    // The (thinking) label appears with ANSI positioning and color.
+    const thinkingLabelChunk = "\x1b[38;2;174;174;174m\x1b[8;13H(thinking)";
+    expect(parseClaudeStatus(thinkingLabelChunk)).toBe("thinking");
+  });
+
+  it("prompt chunk with hint text (v2.1.58+) returns 'waiting'", () => {
+    // Captured from Claude Code v2.1.58+ which dropped the bracketed-paste
+    // escape sequence. The unicode prompt character is the primary
+    // waiting-state detector for these newer versions.
+    const v2PromptChunk = `❯ Try "how does <filepath> work?"`;
+    expect(parseClaudeStatus(v2PromptChunk)).toBe("waiting");
+  });
+
+  it("tool result prefix chunk returns 'typing'", () => {
+    // Captured from Claude Code tool result output.
+    // The prefix indicates a completed tool call. parseClaudeStatus treats
+    // this as plain content because activity detection via that character
+    // happens in ptyHandlers, not here. The string is long enough to cross
+    // the typing threshold.
+    const toolResultChunk = "  Read 42 lines from src/utils/parser.ts";
+    expect(parseClaudeStatus(toolResultChunk)).toBe("typing");
+  });
+
+  it("full-screen repaint with both prompt and spinner returns 'thinking'", () => {
+    // Captured during active Claude processing: a full-screen repaint
+    // includes the spinner at the top and the input area at the bottom of
+    // the same buffer flush. The spinner must take priority so the handover
+    // logic does not false-advance to the waiting state.
+    const fullRepaintChunk = `\r✻ Thinking...\n❯ `;
+    expect(parseClaudeStatus(fullRepaintChunk)).toBe("thinking");
+  });
+});

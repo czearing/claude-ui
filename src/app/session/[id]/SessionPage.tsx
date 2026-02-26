@@ -3,11 +3,10 @@
 import { use, useState } from "react";
 import Link from "next/link";
 
-import { useSessionStore } from "@/hooks/useSessionStore";
 import { TerminalPage } from "@/app/TerminalPage";
 import { StatusIndicator } from "@/components";
+import { useSessionStore } from "@/hooks/useSessionStore";
 import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
-
 import styles from "./SessionPage.module.css";
 
 type SessionPageProps = {

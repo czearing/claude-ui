@@ -2,7 +2,7 @@
 
 import { CaretDown, Check } from "@phosphor-icons/react";
 import * as RadixSelect from "@radix-ui/react-select";
-import clsx from "clsx";
+import { clsx } from "clsx";
 
 import styles from "./Select.module.css";
 import type {

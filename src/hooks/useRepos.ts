@@ -45,7 +45,9 @@ export function useDeleteRepo() {
   return useMutation({
     mutationFn: async (id: string) => {
       const r = await fetch(`/api/repos/${id}`, { method: "DELETE" });
-      if (!r.ok && r.status !== 404) throw new Error("Failed to delete repo");
+      if (!r.ok && r.status !== 404) {
+        throw new Error("Failed to delete repo");
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: REPOS_KEY }),
   });

@@ -1,8 +1,9 @@
 // src/hooks/useTasks.test.ts
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
+import type { Task } from "@/utils/tasks.types";
 import {
   useCreateTask,
   useDeleteTask,
@@ -11,7 +12,6 @@ import {
   useTasks,
   useUpdateTask,
 } from "./useTasks";
-import type { Task } from "@/utils/tasks.types";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -76,6 +76,17 @@ describe("useTasks", () => {
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useTasks(REPO_ID), { wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it("applies a select transform to the fetched tasks", async () => {
+    mockFetch.mockResolvedValue(okJson([mockTask]));
+    const { wrapper } = makeWrapper();
+    const { result } = renderHook(
+      () => useTasks(REPO_ID, (tasks) => tasks.length),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe(1);
   });
 });
 
@@ -204,6 +215,19 @@ describe("useDeleteTask", () => {
       mockTask,
     ]);
     expect(result.current.isError).toBe(true);
+  });
+
+  it("treats a 404 response as success (does not throw)", async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404 });
+    const { wrapper } = makeWrapper();
+    const { result } = renderHook(() => useDeleteTask(REPO_ID), { wrapper });
+
+    act(() => {
+      result.current.mutate("task-1");
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.isError).toBe(false);
   });
 });
 

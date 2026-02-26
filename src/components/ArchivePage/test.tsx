@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { ArchivePage } from "./ArchivePage";
 
@@ -108,5 +109,40 @@ describe("ArchivePage", () => {
     mockUseTasks.mockReturnValueOnce({ data: [] });
     render(<ArchivePage repoId="repo-1" />);
     expect(screen.getByText(/No archived tasks yet/)).toBeInTheDocument();
+  });
+
+  it("renders without crashing when a Done task has no archivedAt (sort fallback to 0)", () => {
+    mockUseTasks.mockReturnValueOnce({
+      data: [
+        {
+          id: "TASK-003",
+          title: "No archived date task",
+          status: "Done",
+          priority: "Low",
+          spec: "",
+          repoId: "repo-1",
+          createdAt: "2026-02-20T10:00:00.000Z",
+          updatedAt: "2026-02-25T10:00:00.000Z",
+          // intentionally no archivedAt field
+        },
+      ],
+    });
+    render(<ArchivePage repoId="repo-1" />);
+    expect(screen.getByText("No archived date task")).toBeInTheDocument();
+  });
+
+  it("calls deleteTask with task id when Delete is selected from dropdown", async () => {
+    const user = userEvent.setup();
+    render(<ArchivePage repoId="repo-1" />);
+
+    const trigger = screen.getByRole("button", {
+      name: "More actions for Finished feature",
+    });
+    await user.click(trigger);
+
+    const deleteItem = await screen.findByText("Delete");
+    await user.click(deleteItem);
+
+    expect(mockDeleteTask).toHaveBeenCalledWith("TASK-001");
   });
 });
