@@ -29,8 +29,7 @@ export function ChatPage({ taskId, onStatus }: ChatPageProps) {
     onStatus ?? (() => {}),
   );
   const bottomRef = useRef<HTMLDivElement>(null);
-  const isStreaming =
-    streamSessionId === "" && messages.length === 0;
+  const isStreaming = streamSessionId === "" && messages.length === 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

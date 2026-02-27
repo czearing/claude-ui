@@ -34,7 +34,8 @@ async function handleHistoryRoute(
     return false;
   }
 
-  const params = new URLSearchParams(parsedUrl.query ?? "");
+  const rawQuery = typeof parsedUrl.query === "string" ? parsedUrl.query : "";
+  const params = new URLSearchParams(rawQuery);
   const sessionId = params.get("sessionId") ?? "";
   const cwd = params.get("cwd") ?? process.cwd();
 

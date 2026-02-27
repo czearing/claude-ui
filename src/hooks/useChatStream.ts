@@ -108,9 +108,16 @@ export function useChatStream(
 
       if (type === "assistant") {
         onStatusRef.current("typing");
-        const msg = event.message as {
-          content?: { type: string; text?: string; name?: string; id?: string }[];
-        } | undefined;
+        const msg = event.message as
+          | {
+              content?: {
+                type: string;
+                text?: string;
+                name?: string;
+                id?: string;
+              }[];
+            }
+          | undefined;
         if (!msg?.content) {
           return;
         }
@@ -138,9 +145,15 @@ export function useChatStream(
       }
 
       if (type === "user") {
-        const msg = event.message as {
-          content?: { type: string; tool_use_id?: string; content?: unknown }[];
-        } | undefined;
+        const msg = event.message as
+          | {
+              content?: {
+                type: string;
+                tool_use_id?: string;
+                content?: unknown;
+              }[];
+            }
+          | undefined;
         if (!msg?.content) {
           return;
         }
