@@ -14,4 +14,3 @@ export * from "./Skills/SkillEditor";
 export * from "./Skills/SkillList";
 export * from "./Select";
 export * from "./StatusIndicator";
-export * from "./Terminal";

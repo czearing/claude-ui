@@ -1,4 +1,4 @@
-import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
+import type { ClaudeStatus } from "@/hooks/useChatStream.types";
 import styles from "./StatusIndicator.module.css";
 import type { StatusIndicatorProps } from "./StatusIndicator.types";
 
@@ -7,6 +7,8 @@ const LABELS: Record<ClaudeStatus, string> = {
   thinking: "Thinking",
   typing: "Typing",
   waiting: "Waiting",
+  done: "Done",
+  idle: "Idle",
   exited: "Exited",
   disconnected: "Disconnected",
 };

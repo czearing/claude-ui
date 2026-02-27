@@ -4,10 +4,10 @@
 import { use, useState } from "react";
 import Link from "next/link";
 
-import { TerminalPage } from "@/app/TerminalPage";
+import { ChatPage } from "@/app/ChatPage";
 import { StatusIndicator } from "@/components";
+import type { ClaudeStatus } from "@/hooks/useChatStream.types";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
-import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
 import styles from "./SessionPage.module.css";
 
 type SessionPageProps = {
@@ -35,7 +35,7 @@ export const SessionPage = ({ params }: SessionPageProps) => {
         <StatusIndicator status={status} />
       </header>
       <div className={styles.terminal}>
-        <TerminalPage sessionId={sessionId} onStatus={handleStatus} />
+        <ChatPage taskId={sessionId} sessionId={sessionId} onStatus={handleStatus} />
       </div>
     </div>
   );

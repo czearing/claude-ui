@@ -1,4 +1,4 @@
-import type { ClaudeStatus } from "@/hooks/useTerminalSocket.types";
+import type { ClaudeStatus } from "@/hooks/useChatStream.types";
 
 export type { ClaudeStatus };
 

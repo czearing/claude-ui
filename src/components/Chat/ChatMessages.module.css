@@ -1,0 +1,67 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.userBubble {
+  align-self: flex-end;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 1rem 1rem 0.25rem 1rem;
+  padding: 0.5rem 0.875rem;
+  max-width: 75%;
+}
+
+.assistantBubble {
+  align-self: flex-start;
+  background: #1e2128;
+  color: #e5e7eb;
+  border-radius: 1rem 1rem 1rem 0.25rem;
+  padding: 0.5rem 0.875rem;
+  max-width: 75%;
+}
+
+.bubbleText {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.toolCard {
+  align-self: flex-start;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.toolLabel {
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: #9ca3af;
+}
+
+.systemCard {
+  align-self: flex-start;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.systemPre {
+  margin: 0;
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: #8b949e;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
