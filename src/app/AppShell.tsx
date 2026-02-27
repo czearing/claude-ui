@@ -47,7 +47,7 @@ export function AppShell({
   const { mutate: createTask } = useCreateTask(repo);
   const { contentRef, leftRef, leftWidth, openPane, handleDividerMouseDown } =
     useSplitPane();
-  const paneInitRef = useRef(false);
+  const paneInitRef = useRef<string | null>(null);
 
   const boardTasks = tasks.filter((t) => t.status !== "Backlog");
 
@@ -77,10 +77,14 @@ export function AppShell({
   });
 
   useEffect(() => {
-    if (paneInitRef.current || !initialTaskId || !selectedTask) {
+    if (
+      !initialTaskId ||
+      !selectedTask ||
+      paneInitRef.current === initialTaskId
+    ) {
       return;
     }
-    paneInitRef.current = true;
+    paneInitRef.current = initialTaskId;
     openPane();
   }, [initialTaskId, selectedTask, openPane]);
 

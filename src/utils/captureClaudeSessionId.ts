@@ -46,17 +46,23 @@ export async function captureClaudeSessionId(
     let bestFile: string | null = null;
     let bestMtime = 0;
     for (const name of entries) {
-      if (!name.endsWith(".jsonl")) { continue; }
+      if (!name.endsWith(".jsonl")) {
+        continue;
+      }
       const filePath = join(projectDir, name);
       const info = await stat(filePath).catch(() => null);
-      if (!info) { continue; }
+      if (!info) {
+        continue;
+      }
       const mtime = info.mtimeMs;
       if (mtime >= spawnTimestamp && mtime > bestMtime) {
         bestMtime = mtime;
         bestFile = name;
       }
     }
-    if (!bestFile) { return null; }
+    if (!bestFile) {
+      return null;
+    }
     return basename(bestFile, ".jsonl");
   } catch (err) {
     process.stderr.write(

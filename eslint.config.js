@@ -12,6 +12,7 @@ export default config(
       "node_modules/",
       ".next/",
       ".worktrees/",
+      ".claude/",
       "out/",
       "dist/",
       "coverage/",

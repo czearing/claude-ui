@@ -26,8 +26,7 @@ export async function handleSkillRoutes(
   if (req.method === "GET" && parsedUrl.pathname === "/api/skills") {
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const skills = await listSkills(dir);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -49,8 +48,7 @@ export async function handleSkillRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const skill = await readSkill(dir, name);
     if (skill === null) {
@@ -77,8 +75,7 @@ export async function handleSkillRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing !== null) {
@@ -107,8 +104,7 @@ export async function handleSkillRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing === null) {
@@ -149,8 +145,7 @@ export async function handleSkillRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing === null) {

@@ -69,7 +69,9 @@ describe("Terminal", () => {
     render(<Terminal onReady={jest.fn()} />);
 
     const callsBefore = mockFit.mock.calls.length;
-    if (capturedCallback) { capturedCallback(); }
+    if (capturedCallback) {
+      capturedCallback();
+    }
 
     expect(mockFit.mock.calls.length).toBe(callsBefore + 1);
   });

@@ -26,8 +26,7 @@ export async function handleAgentRoutes(
   if (req.method === "GET" && parsedUrl.pathname === "/api/agents") {
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const agents = await listAgents(dir);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -49,8 +48,7 @@ export async function handleAgentRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const agent = await readAgent(dir, name);
     if (agent === null) {
@@ -77,8 +75,7 @@ export async function handleAgentRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const existing = await readAgent(dir, name);
     if (existing !== null) {
@@ -107,8 +104,7 @@ export async function handleAgentRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const existing = await readAgent(dir, name);
     if (existing === null) {
@@ -144,8 +140,7 @@ export async function handleAgentRoutes(
     }
     const scope =
       typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId =
-      typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const existing = await readAgent(dir, name);
     if (existing === null) {

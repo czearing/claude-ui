@@ -36,6 +36,19 @@ export function Board({ repo, tasks, onSelectTask, onHandover }: BoardProps) {
   const { mutate: recallTask } = useRecallTask(repo);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
+  const tasksByStatus = (() => {
+    const map = new Map<TaskStatus, Task[]>();
+    for (const task of tasks) {
+      const list = map.get(task.status);
+      if (list) {
+        list.push(task);
+      } else {
+        map.set(task.status, [task]);
+      }
+    }
+    return map;
+  })();
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -99,7 +112,7 @@ export function Board({ repo, tasks, onSelectTask, onHandover }: BoardProps) {
                 tasks={
                   status === "Done"
                     ? EMPTY
-                    : tasks.filter((t) => t.status === status)
+                    : (tasksByStatus.get(status) ?? EMPTY)
                 }
                 onSelectTask={onSelectTask}
                 onRemoveTask={deleteTask}

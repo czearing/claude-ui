@@ -12,7 +12,8 @@ export interface Task {
   status: TaskStatus;
   spec: string; // Lexical editor state JSON
   repo: string; // repo name (e.g. "book-cook"), encoded in folder path
-  sessionId?: string; // linked Claude PTY session
+  sessionId?: string; // linked Claude PTY session (UI correlation id)
+  claudeSessionId?: string; // Claude internal session_id for --resume
   archivedAt?: string; // ISO timestamp, set when status → "Done"
 }
 

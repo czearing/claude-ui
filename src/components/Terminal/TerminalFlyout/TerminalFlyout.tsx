@@ -18,7 +18,9 @@ const MAX_HEIGHT = 800;
 const MAX_SCREEN_RATIO = 0.8;
 
 function getScreenMax(): number {
-  if (typeof window === "undefined") { return MAX_HEIGHT; }
+  if (typeof window === "undefined") {
+    return MAX_HEIGHT;
+  }
   return Math.min(
     MAX_HEIGHT,
     Math.floor(window.innerHeight * MAX_SCREEN_RATIO),
@@ -34,7 +36,9 @@ function readStoredHeight(): number {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const n = parseInt(raw, 10);
-      if (!isNaN(n)) { return clampHeight(n); }
+      if (!isNaN(n)) {
+        return clampHeight(n);
+      }
     }
   } catch {
     // localStorage unavailable (SSR / private browsing)
@@ -72,7 +76,9 @@ export function TerminalFlyout({
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
-      if (!dragging.current) { return; }
+      if (!dragging.current) {
+        return;
+      }
       const delta = startY.current - e.clientY;
       const next = clampHeight(startHeight.current + delta);
       heightRef.current = next;
