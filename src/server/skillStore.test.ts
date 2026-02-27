@@ -89,7 +89,7 @@ describe("resolveSkillsDir", () => {
       },
     ]);
 
-    const result = await resolveSkillsDir("repo", "repo-1");
+    const result = await resolveSkillsDir("repo", "My Repo");
 
     expect(result).toBe(join("/projects/my-repo", ".claude", "skills"));
   });

@@ -10,6 +10,10 @@ import { WebSocket } from "ws";
 
 import type { SessionRegistryEntry } from "../utils/sessionRegistry";
 
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** Rolling output buffer cap per session (500 KB). */
@@ -99,6 +103,64 @@ export function advanceToReview(sessionId: string): void {
   });
 }
 
+// ─── Disk persistence helpers ─────────────────────────────────────────────────
+
+/** Path for a session's persisted buffer file. Evaluated lazily so tests can
+ *  mock `node:os` before the path is first computed. */
+export function bufferFilePath(sessionId: string): string {
+  return join(tmpdir(), "claude-code-ui-buffers", `${sessionId}.bin`);
+}
+
+/**
+ * Write the final output buffer for a completed session to disk.
+ * Failures are non-fatal: they are logged to stderr and ignored.
+ */
+export async function writeBufferToDisk(
+  sessionId: string,
+  data: Buffer,
+): Promise<void> {
+  try {
+    const buffersDir = join(tmpdir(), "claude-code-ui-buffers");
+    await mkdir(buffersDir, { recursive: true });
+    await writeFile(bufferFilePath(sessionId), data);
+  } catch (err) {
+    process.stderr.write(
+      `ptyStore: failed to persist buffer for ${sessionId}: ${String(err)}\n`,
+    );
+  }
+}
+
+/**
+ * Load persisted buffers from disk for the given session IDs and populate
+ * completedSessions. Missing files are silently skipped.
+ */
+export async function loadPersistedBuffers(
+  sessionIds: string[],
+): Promise<void> {
+  await Promise.all(
+    sessionIds.map(async (id) => {
+      try {
+        const data = await readFile(bufferFilePath(id));
+        completedSessions.set(id, data);
+      } catch {
+        // File absent or unreadable — skip silently.
+      }
+    }),
+  );
+}
+
+/**
+ * Delete the persisted buffer file for a session.
+ * Missing files are silently ignored.
+ */
+export async function deletePersistedBuffer(sessionId: string): Promise<void> {
+  try {
+    await unlink(bufferFilePath(sessionId));
+  } catch {
+    // File may not exist — that's fine.
+  }
+}
+
 // ─── Kill helper (shared by DELETE and POST /kill) ───────────────────────────
 
 export function killSession(
@@ -115,6 +177,8 @@ export function killSession(
     entry.pty.kill();
     sessions.delete(id);
   }
+  completedSessions.delete(id);
+  void deletePersistedBuffer(id);
   sessionRegistry.delete(id);
   void saveRegistry();
 }

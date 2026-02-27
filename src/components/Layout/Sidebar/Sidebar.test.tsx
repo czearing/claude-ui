@@ -2,9 +2,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import type { Task } from "@/utils/tasks.types";
 import { Sidebar } from "./Sidebar";
 
 const mockPush = jest.fn();
+const mockUseTasks = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -14,8 +16,23 @@ jest.mock("./RepoSwitcher", () => ({
   RepoSwitcher: () => <div data-testid="repo-switcher" />,
 }));
 
+jest.mock("@/hooks/useTasks", () => ({
+  useTasks: (...args: unknown[]) => mockUseTasks(...args),
+}));
+
+const baseTask: Task = {
+  id: "t-1",
+  title: "Fix bug",
+  status: "Backlog",
+  spec: "",
+  repo: "repo-1",
+};
+
 describe("Sidebar", () => {
-  beforeEach(() => mockPush.mockClear());
+  beforeEach(() => {
+    mockPush.mockClear();
+    mockUseTasks.mockReturnValue({ data: [] });
+  });
 
   it("renders all nav items", () => {
     render(<Sidebar currentView="Board" repo="repo-1" />);
@@ -33,13 +50,17 @@ describe("Sidebar", () => {
     expect(screen.getByTestId("repo-switcher")).toBeInTheDocument();
   });
 
-  it('shows "Idle" when agentActive is false', () => {
-    render(<Sidebar currentView="Board" repo="repo-1" agentActive={false} />);
+  it('shows "Idle" when no task is In Progress', () => {
+    mockUseTasks.mockReturnValue({ data: [baseTask] });
+    render(<Sidebar currentView="Board" repo="repo-1" />);
     expect(screen.getByText("Idle")).toBeInTheDocument();
   });
 
-  it('shows "Active" when agentActive is true', () => {
-    render(<Sidebar currentView="Board" repo="repo-1" agentActive={true} />);
+  it('shows "Active" when a task is In Progress', () => {
+    mockUseTasks.mockReturnValue({
+      data: [{ ...baseTask, status: "In Progress" }],
+    });
+    render(<Sidebar currentView="Board" repo="repo-1" />);
     expect(screen.getByText("Active")).toBeInTheDocument();
   });
 

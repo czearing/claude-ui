@@ -342,8 +342,8 @@ describe("handleWsConnection", () => {
       });
     });
 
-    describe("with registry entry (spawn fresh interactive session)", () => {
-      it("replays prior output, spawns fresh PTY, sends resumed", () => {
+    describe("with registry entry but no claudeSessionId (no --resume)", () => {
+      it("replays prior output, spawns fresh PTY, does NOT send resumed", () => {
         setSessionId(SESSION_ID);
         const priorOutput = Buffer.from("Task completed successfully");
         completedSessionsMap.set(SESSION_ID, priorOutput);
@@ -368,7 +368,7 @@ describe("handleWsConnection", () => {
           "claude",
         );
 
-        // PTY spawned without --continue using registry cwd
+        // PTY spawned without --continue or --resume using registry cwd
         expect(mockSpawn).toHaveBeenCalledTimes(1);
         const [cmd, args, opts] = mockSpawn.mock.calls[0] as [
           string,
@@ -377,19 +377,15 @@ describe("handleWsConnection", () => {
         ];
         expect(cmd).toBe("claude");
         expect(args).not.toContain("--continue");
+        expect(args).not.toContain("--resume");
         expect(opts.cwd).toBe("/home/user/project");
 
         // completedSessions entry consumed
         expect(completedSessionsMap.has(SESSION_ID)).toBe(false);
 
-        // Two sends: replay (prior output) + resumed
-        expect(ws.send).toHaveBeenCalledTimes(2);
-
-        const [replayCall, resumedCall] = ws.send.mock.calls as [
-          [string],
-          [string],
-        ];
-
+        // Only one send: replay (NO "resumed" — no claudeSessionId)
+        expect(ws.send).toHaveBeenCalledTimes(1);
+        const [replayCall] = ws.send.mock.calls as [[string]];
         const replayMsg = JSON.parse(replayCall[0]) as {
           type: string;
           data: string;
@@ -397,9 +393,6 @@ describe("handleWsConnection", () => {
         expect(replayMsg.type).toBe("replay");
         const decoded = Buffer.from(replayMsg.data, "base64").toString();
         expect(decoded).toBe("Task completed successfully");
-
-        const resumedMsg = JSON.parse(resumedCall[0]) as { type: string };
-        expect(resumedMsg.type).toBe("resumed");
 
         // WS not closed
         expect(ws.close).not.toHaveBeenCalled();
@@ -414,7 +407,7 @@ describe("handleWsConnection", () => {
         expect(sessionsMap.has(SESSION_ID)).toBe(true);
       });
 
-      it("spawns fresh PTY without replay when prior output is empty", () => {
+      it("spawns fresh PTY without replay and without resumed when prior output is empty", () => {
         setSessionId(SESSION_ID);
         completedSessionsMap.set(SESSION_ID, Buffer.alloc(0));
 
@@ -437,6 +430,105 @@ describe("handleWsConnection", () => {
           "claude",
         );
 
+        // No sends at all (no replay, no resumed)
+        expect(ws.send).not.toHaveBeenCalled();
+
+        expect(mockSpawn).toHaveBeenCalledTimes(1);
+        expect(ws.close).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("with registry entry WITH claudeSessionId (uses --resume)", () => {
+      it("replays prior output, spawns with --resume, sends resumed", () => {
+        setSessionId(SESSION_ID);
+        const priorOutput = Buffer.from("Task completed successfully");
+        completedSessionsMap.set(SESSION_ID, priorOutput);
+
+        const registry = new Map<
+          string,
+          { id: string; cwd: string; createdAt: string; claudeSessionId?: string }
+        >();
+        registry.set(SESSION_ID, {
+          id: SESSION_ID,
+          cwd: "/home/user/project",
+          createdAt: new Date().toISOString(),
+          claudeSessionId: "uuid-abc-123",
+        });
+        const save = makeSave();
+        const ws = new MockWs();
+
+        handleWsConnection(
+          ws as never,
+          makeReq(),
+          registry as never,
+          save,
+          "claude",
+        );
+
+        // PTY spawned WITH --resume <claudeSessionId>
+        expect(mockSpawn).toHaveBeenCalledTimes(1);
+        const [cmd, args, opts] = mockSpawn.mock.calls[0] as [
+          string,
+          string[],
+          { cwd: string },
+        ];
+        expect(cmd).toBe("claude");
+        expect(args).toContain("--resume");
+        expect(args).toContain("uuid-abc-123");
+        expect(args).not.toContain("--continue");
+        expect(opts.cwd).toBe("/home/user/project");
+
+        // completedSessions entry consumed
+        expect(completedSessionsMap.has(SESSION_ID)).toBe(false);
+
+        // Two sends: replay (prior output) + resumed
+        expect(ws.send).toHaveBeenCalledTimes(2);
+        const [replayCall, resumedCall] = ws.send.mock.calls as [
+          [string],
+          [string],
+        ];
+        const replayMsg = JSON.parse(replayCall[0]) as {
+          type: string;
+          data: string;
+        };
+        expect(replayMsg.type).toBe("replay");
+        const decoded = Buffer.from(replayMsg.data, "base64").toString();
+        expect(decoded).toBe("Task completed successfully");
+
+        const resumedMsg = JSON.parse(resumedCall[0]) as { type: string };
+        expect(resumedMsg.type).toBe("resumed");
+
+        // WS not closed
+        expect(ws.close).not.toHaveBeenCalled();
+
+        // saveSessionRegistry NOT called (entry already exists)
+        expect(save).not.toHaveBeenCalled();
+      });
+
+      it("sends only resumed (no replay) when prior output is empty but claudeSessionId present", () => {
+        setSessionId(SESSION_ID);
+        completedSessionsMap.set(SESSION_ID, Buffer.alloc(0));
+
+        const registry = new Map<
+          string,
+          { id: string; cwd: string; createdAt: string; claudeSessionId?: string }
+        >();
+        registry.set(SESSION_ID, {
+          id: SESSION_ID,
+          cwd: "/home/user/project",
+          createdAt: new Date().toISOString(),
+          claudeSessionId: "uuid-def-456",
+        });
+        const ws = new MockWs();
+
+        handleWsConnection(
+          ws as never,
+          makeReq(),
+          registry as never,
+          makeSave(),
+          "claude",
+        );
+
         // Only one send: resumed (no replay when buffer is empty)
         expect(ws.send).toHaveBeenCalledTimes(1);
         const msg = JSON.parse(ws.send.mock.calls[0][0] as string) as {
@@ -445,6 +537,10 @@ describe("handleWsConnection", () => {
         expect(msg.type).toBe("resumed");
 
         expect(mockSpawn).toHaveBeenCalledTimes(1);
+        const [, args] = mockSpawn.mock.calls[0] as [string, string[]];
+        expect(args).toContain("--resume");
+        expect(args).toContain("uuid-def-456");
+
         expect(ws.close).not.toHaveBeenCalled();
       });
     });
@@ -506,7 +602,7 @@ describe("handleWsConnection", () => {
   describe("resumed session (in registry, not in sessions map)", () => {
     const SESSION_ID = "resumed-session-1";
 
-    it("spawns fresh PTY, uses registry cwd, sends 'resumed'", () => {
+    it("spawns fresh PTY without --resume when no claudeSessionId, sends no 'resumed'", () => {
       setSessionId(SESSION_ID);
       const registry = new Map<
         string,
@@ -528,7 +624,7 @@ describe("handleWsConnection", () => {
         "claude",
       );
 
-      // PTY spawned without --continue.
+      // PTY spawned without --continue or --resume.
       expect(mockSpawn).toHaveBeenCalledTimes(1);
       const [cmd, args, opts] = mockSpawn.mock.calls[0] as [
         string,
@@ -536,6 +632,56 @@ describe("handleWsConnection", () => {
         { cwd: string },
       ];
       expect(cmd).toBe("claude");
+      expect(args).not.toContain("--continue");
+      expect(args).not.toContain("--resume");
+      expect(opts.cwd).toBe("/home/user/project");
+
+      // No "resumed" message — claudeSessionId absent, no --resume used.
+      expect(ws.send).not.toHaveBeenCalled();
+
+      // saveSessionRegistry NOT called (entry already exists).
+      expect(save).not.toHaveBeenCalled();
+
+      // emitStatus with "connecting".
+      expect(emitStatus).toHaveBeenCalledWith(ws, "connecting");
+
+      // advanceToReview NOT called.
+      expect(advanceToReview).not.toHaveBeenCalled();
+    });
+
+    it("spawns with --resume and sends 'resumed' when claudeSessionId is present", () => {
+      setSessionId(SESSION_ID);
+      const registry = new Map<
+        string,
+        { id: string; cwd: string; createdAt: string; claudeSessionId?: string }
+      >();
+      registry.set(SESSION_ID, {
+        id: SESSION_ID,
+        cwd: "/home/user/project",
+        createdAt: new Date().toISOString(),
+        claudeSessionId: "uuid-resume-789",
+      });
+      const save = makeSave();
+      const ws = new MockWs();
+
+      handleWsConnection(
+        ws as never,
+        makeReq(),
+        registry as never,
+        save,
+        "claude",
+      );
+
+      // PTY spawned WITH --resume <claudeSessionId>.
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+      const [cmd, args, opts] = mockSpawn.mock.calls[0] as [
+        string,
+        string[],
+        { cwd: string },
+      ];
+      expect(cmd).toBe("claude");
+      expect(args).toContain("--resume");
+      expect(args).toContain("uuid-resume-789");
       expect(args).not.toContain("--continue");
       expect(opts.cwd).toBe("/home/user/project");
 
@@ -551,9 +697,6 @@ describe("handleWsConnection", () => {
 
       // emitStatus with "connecting".
       expect(emitStatus).toHaveBeenCalledWith(ws, "connecting");
-
-      // advanceToReview NOT called.
-      expect(advanceToReview).not.toHaveBeenCalled();
     });
   });
 

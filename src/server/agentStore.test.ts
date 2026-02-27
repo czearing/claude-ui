@@ -89,7 +89,7 @@ describe("resolveAgentsDir", () => {
       },
     ]);
 
-    const result = await resolveAgentsDir("repo", "repo-abc");
+    const result = await resolveAgentsDir("repo", "My Repo");
 
     expect(result).toBe(
       join("/home/user/projects/my-repo", ".claude", "agents"),

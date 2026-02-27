@@ -5,11 +5,10 @@ import dynamic from "next/dynamic";
 
 import { Backlog } from "@/components/Board/Backlog";
 import { Board } from "@/components/Board/Board";
-import { Sidebar, type View } from "@/components/Layout/Sidebar";
+import { type View } from "@/components/Layout/Sidebar";
 import { TopBar } from "@/components/Layout/TopBar";
 import { TerminalFlyout } from "@/components/Terminal/TerminalFlyout";
 import { useCreateTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
-import { useTasksSocket } from "@/hooks/useTasksSocket";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./AppShell.module.css";
 import { useSplitPane } from "./useSplitPane";
@@ -49,8 +48,6 @@ export function AppShell({
   const { contentRef, leftRef, leftWidth, openPane, handleDividerMouseDown } =
     useSplitPane();
   const paneInitRef = useRef(false);
-
-  useTasksSocket();
 
   const boardTasks = tasks.filter((t) => t.status !== "Backlog");
 
@@ -173,67 +170,63 @@ export function AppShell({
   }
 
   return (
-    <div className={styles.shell}>
-      <Sidebar repo={repo} currentView={currentView} />
+    <main className={styles.main}>
+      <TopBar repo={repo} currentView={currentView} />
 
-      <main className={styles.main}>
-        <TopBar repo={repo} currentView={currentView} />
-
-        <div ref={contentRef} className={styles.content}>
-          <div
-            ref={leftRef}
-            className={styles.left}
-            style={{ width: selectedTask ? `${leftWidth}px` : "100%" }}
-          >
-            {currentView === "Board" ? (
-              <Board
-                repo={repo}
-                tasks={boardTasks}
-                onSelectTask={handleSelectTask}
-                onHandover={handleHandover}
-              />
-            ) : (
-              <Backlog
-                repo={repo}
-                onSelectTask={handleSelectTask}
-                onNewTask={handleNewTask}
-                selectedTaskId={selectedTaskId ?? undefined}
-              />
-            )}
-          </div>
-
-          {selectedTask && (
-            <>
-              <div
-                className={styles.divider}
-                onMouseDown={handleDividerMouseDown}
-              />
-              <div className={styles.right}>
-                <SpecEditor
-                  key={selectedTask.id}
-                  repo={repo}
-                  task={selectedTask}
-                  onClose={deselect}
-                  inline
-                />
-              </div>
-            </>
+      <div ref={contentRef} className={styles.content}>
+        <div
+          ref={leftRef}
+          className={styles.left}
+          style={{ width: selectedTask ? `${leftWidth}px` : "100%" }}
+        >
+          {currentView === "Board" ? (
+            <Board
+              repo={repo}
+              tasks={boardTasks}
+              onSelectTask={handleSelectTask}
+              onHandover={handleHandover}
+            />
+          ) : (
+            <Backlog
+              repo={repo}
+              onSelectTask={handleSelectTask}
+              onNewTask={handleNewTask}
+              selectedTaskId={selectedTaskId ?? undefined}
+            />
           )}
         </div>
 
-        {visibleSessionIds.length > 0 && visibleActiveSessionId && (
-          <TerminalFlyout
-            sessions={flyoutSessions}
-            activeSessionId={visibleActiveSessionId}
-            onSelectSession={setActiveSessionId}
-            onCloseTab={handleCloseTab}
-            onClose={() => {
-              setOpenSessionIds([]);
-              setActiveSessionId(null);
-            }}
-          />
+        {selectedTask && (
+          <>
+            <div
+              className={styles.divider}
+              onMouseDown={handleDividerMouseDown}
+            />
+            <div className={styles.right}>
+              <SpecEditor
+                key={selectedTask.id}
+                repo={repo}
+                task={selectedTask}
+                onClose={deselect}
+                inline
+              />
+            </div>
+          </>
         )}
-      </main>
-    </div>
+      </div>
+
+      {visibleSessionIds.length > 0 && visibleActiveSessionId && (
+        <TerminalFlyout
+          sessions={flyoutSessions}
+          activeSessionId={visibleActiveSessionId}
+          onSelectSession={setActiveSessionId}
+          onCloseTab={handleCloseTab}
+          onClose={() => {
+            setOpenSessionIds([]);
+            setActiveSessionId(null);
+          }}
+        />
+      )}
+    </main>
   );
 }

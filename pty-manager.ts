@@ -26,9 +26,12 @@ import {
   completedSessions,
   sessions,
   killSession,
+  loadPersistedBuffers,
+  writeBufferToDisk,
 } from "./src/server/ptyStore";
 import type { SessionEntry } from "./src/server/ptyStore";
 import { handleWsConnection } from "./src/server/wsSessionHandler";
+import { captureClaudeSessionId } from "./src/utils/captureClaudeSessionId";
 import {
   createHookSettingsFile,
   cleanupHookSettingsDir,
@@ -97,6 +100,7 @@ async function handleRequest(
       }
 
       let ptyProcess: pty.IPty;
+      const spawnTimestamp = Date.now();
       try {
         // Spawn Claude in print mode (-p) with the spec as the prompt.
         // This avoids the need to inject text into an interactive PTY — which
@@ -127,6 +131,7 @@ async function handleRequest(
             rows: 24,
             cwd,
             env: { ...spawnEnv, CLAUDE_CODE_UI_SESSION_ID: sessionId },
+            useConptyDll: process.platform === "win32",
           },
         );
       } catch (err) {
@@ -181,9 +186,21 @@ async function handleRequest(
         sessions.delete(sessionId);
         completedSessions.set(sessionId, finalBuffer);
         cleanupHookSettingsDir(sessionId);
-        // Keep registry entry so wsSessionHandler knows the cwd when the client reconnects.
-        // The file watcher in server.ts handles task status updates when Claude
-        // moves files between folders — no advanceToReview call needed here.
+        // Keep registry entry so wsSessionHandler knows the cwd when the
+        // client reconnects.  Capture the Claude internal session ID so the
+        // interactive follow-up can use --resume to continue the conversation.
+        void (async () => {
+          const claudeSessionId = await captureClaudeSessionId(
+            cwd,
+            spawnTimestamp,
+          );
+          const reg = sessionRegistry.get(sessionId);
+          if (reg && claudeSessionId) {
+            reg.claudeSessionId = claudeSessionId;
+            void saveSessionRegistry();
+          }
+          void writeBufferToDisk(sessionId, finalBuffer);
+        })();
       });
 
       res.writeHead(201, { "Content-Type": "application/json" });
@@ -227,6 +244,8 @@ async function handleRequest(
 
 async function main(): Promise<void> {
   await loadSessionRegistry();
+  // Reload any output buffers that were persisted before a pty-manager restart
+  await loadPersistedBuffers([...sessionRegistry.keys()]);
 
   const server = createServer((req, res) => {
     void handleRequest(req, res);

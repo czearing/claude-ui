@@ -5,6 +5,7 @@ export type SessionRegistryEntry = {
   cwd: string;
   taskId?: string;
   createdAt: string;
+  claudeSessionId?: string;
 };
 
 export async function loadRegistry(

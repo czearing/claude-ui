@@ -95,7 +95,7 @@ const backlogTask: Task = {
   repo: "repo-1",
 };
 
-const inProgressTask: Task = {
+const _inProgressTask: Task = {
   ...backlogTask,
   id: "t-2",
   status: "In Progress",
@@ -122,24 +122,6 @@ describe("AppShell", () => {
     render(<AppShell repo="repo-1" view="Tasks" />);
     expect(screen.getByTestId("backlog")).toBeInTheDocument();
     expect(screen.queryByTestId("board")).not.toBeInTheDocument();
-  });
-
-  it("passes agentActive=false to Sidebar when no task is In Progress", () => {
-    mockUseTasks.mockReturnValue({ data: [backlogTask] });
-    render(<AppShell repo="repo-1" view="Board" />);
-    expect(screen.getByTestId("sidebar")).toHaveAttribute(
-      "data-agent-active",
-      "false",
-    );
-  });
-
-  it("passes agentActive=true to Sidebar when a task is In Progress", () => {
-    mockUseTasks.mockReturnValue({ data: [inProgressTask] });
-    render(<AppShell repo="repo-1" view="Board" />);
-    expect(screen.getByTestId("sidebar")).toHaveAttribute(
-      "data-agent-active",
-      "true",
-    );
   });
 
   it("filters Backlog tasks out of the Board task list", () => {

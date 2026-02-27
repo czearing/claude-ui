@@ -1,7 +1,17 @@
 // src/hooks/useRepos.ts
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { CreateRepoInput, Repo } from "@/utils/tasks.types";
+export interface Repo {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: string;
+}
+
+export interface CreateRepoInput {
+  name: string;
+  path: string;
+}
 
 const REPOS_KEY = ["repos"] as const;
 

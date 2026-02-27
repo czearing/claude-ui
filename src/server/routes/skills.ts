@@ -17,16 +17,17 @@ export async function handleSkillRoutes(
   res: ServerResponse,
   parsedUrl: ReturnType<typeof parse>,
 ): Promise<boolean> {
+  const query =
+    parsedUrl.query && typeof parsedUrl.query === "object"
+      ? (parsedUrl.query as Record<string, string | string[] | undefined>)
+      : ({} as Record<string, string | string[] | undefined>);
+
   // GET /api/skills
   if (req.method === "GET" && parsedUrl.pathname === "/api/skills") {
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const skills = await listSkills(dir);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -47,13 +48,9 @@ export async function handleSkillRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const skill = await readSkill(dir, name);
     if (skill === null) {
@@ -79,13 +76,9 @@ export async function handleSkillRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing !== null) {
@@ -113,13 +106,9 @@ export async function handleSkillRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing === null) {
@@ -159,13 +148,9 @@ export async function handleSkillRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing === null) {

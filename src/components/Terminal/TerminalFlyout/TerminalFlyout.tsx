@@ -11,9 +11,44 @@ const TerminalPage = dynamic(
   { ssr: false },
 );
 
+const STORAGE_KEY = "terminal-flyout-height";
 const DEFAULT_HEIGHT = 360;
 const MIN_HEIGHT = 160;
 const MAX_HEIGHT = 800;
+const MAX_SCREEN_RATIO = 0.8;
+
+function getScreenMax(): number {
+  if (typeof window === "undefined") { return MAX_HEIGHT; }
+  return Math.min(
+    MAX_HEIGHT,
+    Math.floor(window.innerHeight * MAX_SCREEN_RATIO),
+  );
+}
+
+function clampHeight(h: number): number {
+  return Math.min(getScreenMax(), Math.max(MIN_HEIGHT, h));
+}
+
+function readStoredHeight(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const n = parseInt(raw, 10);
+      if (!isNaN(n)) { return clampHeight(n); }
+    }
+  } catch {
+    // localStorage unavailable (SSR / private browsing)
+  }
+  return clampHeight(DEFAULT_HEIGHT);
+}
+
+function storeHeight(h: number) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(h));
+  } catch {
+    // ignore
+  }
+}
 
 export function TerminalFlyout({
   sessions,
@@ -22,32 +57,32 @@ export function TerminalFlyout({
   onCloseTab,
   onClose,
 }: TerminalFlyoutProps) {
-  const [height, setHeight] = useState(DEFAULT_HEIGHT);
+  const [height, setHeight] = useState(() => readStoredHeight());
   const dragging = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(0);
+  const heightRef = useRef(height);
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     dragging.current = true;
     startY.current = e.clientY;
-    startHeight.current = height;
+    startHeight.current = heightRef.current;
     e.preventDefault();
   };
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
-      if (!dragging.current) {
-        return;
-      }
+      if (!dragging.current) { return; }
       const delta = startY.current - e.clientY;
-      const next = Math.min(
-        MAX_HEIGHT,
-        Math.max(MIN_HEIGHT, startHeight.current + delta),
-      );
+      const next = clampHeight(startHeight.current + delta);
+      heightRef.current = next;
       setHeight(next);
     };
     const onMouseUp = () => {
-      dragging.current = false;
+      if (dragging.current) {
+        dragging.current = false;
+        storeHeight(heightRef.current);
+      }
     };
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
@@ -55,6 +90,18 @@ export function TerminalFlyout({
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      setHeight((h) => {
+        const clamped = clampHeight(h);
+        heightRef.current = clamped;
+        return clamped;
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   useEffect(() => {

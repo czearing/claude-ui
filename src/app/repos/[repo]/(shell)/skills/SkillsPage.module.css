@@ -1,9 +1,4 @@
-.shell {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-  background-color: var(--color-bg);
-}
+/* src/app/repos/[repoId]/skills/SkillsPage.module.css */
 
 .page {
   display: flex;

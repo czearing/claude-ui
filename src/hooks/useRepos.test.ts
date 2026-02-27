@@ -3,8 +3,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 
-import type { Repo } from "@/utils/tasks.types";
-import { useCreateRepo, useDeleteRepo, useRepos } from "./useRepos";
+import { useCreateRepo, useDeleteRepo, useRepos, type Repo } from "./useRepos";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;

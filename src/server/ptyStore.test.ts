@@ -7,12 +7,37 @@ import {
   advanceToReview,
   appendToBuffer,
   backToInProgress,
+  bufferFilePath,
   BUFFER_CAP,
+  completedSessions,
+  deletePersistedBuffer,
   emitStatus,
+  loadPersistedBuffers,
   sessions,
+  writeBufferToDisk,
   type ClaudeStatus,
   type SessionEntry,
 } from "./ptyStore";
+
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+jest.mock("node:fs/promises");
+jest.mock("node:os");
+
+const mockMkdir = mkdir as jest.MockedFunction<typeof mkdir>;
+const mockReadFile = readFile as jest.MockedFunction<typeof readFile>;
+const mockWriteFile = writeFile as jest.MockedFunction<typeof writeFile>;
+const mockUnlink = unlink as jest.MockedFunction<typeof unlink>;
+const mockTmpdir = tmpdir as jest.MockedFunction<typeof tmpdir>;
+
+// ─── Global mock setup ────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  jest.resetAllMocks();
+  mockTmpdir.mockReturnValue("/tmp");
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -271,5 +296,128 @@ describe("sessions map", () => {
     const entry = makeEntry({ currentStatus: "thinking" });
     sessions.set("test-id", entry);
     expect(sessions.get("test-id")).toBe(entry);
+  });
+});
+
+// ─── bufferFilePath ───────────────────────────────────────────────────────────
+
+describe("bufferFilePath", () => {
+  it("returns path under tmpdir/claude-code-ui-buffers/<id>.bin", () => {
+    const result = bufferFilePath("session-abc");
+    expect(result).toBe(
+      join("/tmp", "claude-code-ui-buffers", "session-abc.bin"),
+    );
+  });
+});
+
+// ─── writeBufferToDisk ────────────────────────────────────────────────────────
+
+describe("writeBufferToDisk", () => {
+  it("creates the buffers directory and writes the file", async () => {
+    mockMkdir.mockResolvedValueOnce(undefined);
+    mockWriteFile.mockResolvedValueOnce(undefined);
+
+    const data = Buffer.from("hello output");
+    await writeBufferToDisk("sess-1", data);
+
+    expect(mockMkdir).toHaveBeenCalledWith(
+      join("/tmp", "claude-code-ui-buffers"),
+      { recursive: true },
+    );
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      join("/tmp", "claude-code-ui-buffers", "sess-1.bin"),
+      data,
+    );
+  });
+
+  it("logs to stderr but does not throw when mkdir fails", async () => {
+    mockMkdir.mockRejectedValueOnce(new Error("EACCES: permission denied"));
+    const stderrSpy = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      writeBufferToDisk("sess-err", Buffer.from("data")),
+    ).resolves.toBeUndefined();
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("sess-err"),
+    );
+    stderrSpy.mockRestore();
+  });
+
+  it("logs to stderr but does not throw when writeFile fails", async () => {
+    mockMkdir.mockResolvedValueOnce(undefined);
+    mockWriteFile.mockRejectedValueOnce(new Error("ENOSPC: disk full"));
+    const stderrSpy = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      writeBufferToDisk("sess-err2", Buffer.from("data")),
+    ).resolves.toBeUndefined();
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("sess-err2"),
+    );
+    stderrSpy.mockRestore();
+  });
+});
+
+// ─── loadPersistedBuffers ────────────────────────────────────────────────────
+
+describe("loadPersistedBuffers", () => {
+  afterEach(() => {
+    completedSessions.clear();
+  });
+
+  it("populates completedSessions for each readable file", async () => {
+    const buf1 = Buffer.from("output for session 1");
+    const buf2 = Buffer.from("output for session 2");
+    mockReadFile
+      .mockResolvedValueOnce(buf1 as never)
+      .mockResolvedValueOnce(buf2 as never);
+
+    await loadPersistedBuffers(["id-1", "id-2"]);
+
+    expect(completedSessions.get("id-1")).toEqual(buf1);
+    expect(completedSessions.get("id-2")).toEqual(buf2);
+  });
+
+  it("silently skips session IDs whose files are missing", async () => {
+    mockReadFile.mockRejectedValueOnce(
+      Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+    );
+
+    await expect(loadPersistedBuffers(["missing-id"])).resolves.toBeUndefined();
+
+    expect(completedSessions.has("missing-id")).toBe(false);
+  });
+
+  it("resolves immediately when given an empty list", async () => {
+    await expect(loadPersistedBuffers([])).resolves.toBeUndefined();
+    expect(mockReadFile).not.toHaveBeenCalled();
+  });
+});
+
+// ─── deletePersistedBuffer ────────────────────────────────────────────────────
+
+describe("deletePersistedBuffer", () => {
+  it("calls unlink with the correct path", async () => {
+    mockUnlink.mockResolvedValueOnce(undefined);
+
+    await deletePersistedBuffer("sess-del");
+
+    expect(mockUnlink).toHaveBeenCalledWith(
+      join("/tmp", "claude-code-ui-buffers", "sess-del.bin"),
+    );
+  });
+
+  it("silently ignores ENOENT when file does not exist", async () => {
+    mockUnlink.mockRejectedValueOnce(
+      Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+    );
+
+    await expect(deletePersistedBuffer("gone")).resolves.toBeUndefined();
   });
 });

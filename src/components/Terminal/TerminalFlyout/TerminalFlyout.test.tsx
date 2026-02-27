@@ -37,6 +37,7 @@ beforeEach(() => {
   onSelectSession.mockClear();
   onCloseTab.mockClear();
   onClose.mockClear();
+  localStorage.clear();
 });
 
 describe("TerminalFlyout", () => {
@@ -108,5 +109,68 @@ describe("TerminalFlyout", () => {
       />,
     );
     expect(screen.getByText("Untitled")).toBeInTheDocument();
+  });
+
+  describe("height caching", () => {
+    it("restores a previously stored height from localStorage", () => {
+      localStorage.setItem("terminal-flyout-height", "500");
+      renderFlyout();
+      const flyout = screen.getByTestId("terminal-flyout");
+      expect(flyout).toHaveStyle({ height: "500px" });
+    });
+
+    it("clamps a stored height that exceeds 80% of the viewport on load", () => {
+      // jsdom default innerHeight is 768; 80% = 614
+      const maxAllowed = Math.floor(window.innerHeight * 0.8);
+      localStorage.setItem("terminal-flyout-height", "9999");
+      renderFlyout();
+      const flyout = screen.getByTestId("terminal-flyout");
+      expect(flyout).toHaveStyle({ height: `${maxAllowed}px` });
+    });
+
+    it("clamps a stored height below the minimum", () => {
+      localStorage.setItem("terminal-flyout-height", "50");
+      renderFlyout();
+      const flyout = screen.getByTestId("terminal-flyout");
+      expect(flyout).toHaveStyle({ height: "160px" });
+    });
+
+    it("saves height to localStorage after a drag resize", () => {
+      renderFlyout();
+      const handle = screen.getByRole("separator");
+
+      act(() => {
+        fireEvent.mouseDown(handle, { clientY: 600 });
+        document.dispatchEvent(new MouseEvent("mousemove", { clientY: 400 }));
+        document.dispatchEvent(new MouseEvent("mouseup"));
+      });
+
+      const stored = localStorage.getItem("terminal-flyout-height");
+      expect(stored).not.toBeNull();
+      expect(Number(stored)).toBeGreaterThanOrEqual(160);
+    });
+
+    it("re-clamps height when the window is resized smaller", () => {
+      localStorage.setItem("terminal-flyout-height", "700");
+      // Set a tall viewport so initial render uses 700
+      Object.defineProperty(window, "innerHeight", {
+        writable: true,
+        value: 900,
+      });
+      renderFlyout();
+
+      // Shrink the viewport so 700 exceeds 80%
+      act(() => {
+        Object.defineProperty(window, "innerHeight", {
+          writable: true,
+          value: 400,
+        });
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      const flyout = screen.getByTestId("terminal-flyout");
+      const appliedHeight = parseInt(flyout.style.height, 10);
+      expect(appliedHeight).toBeLessThanOrEqual(Math.floor(400 * 0.8));
+    });
   });
 });

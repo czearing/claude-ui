@@ -22,9 +22,15 @@ export async function handleTaskRoutes(
   res: ServerResponse,
   parsedUrl: ReturnType<typeof parse>,
 ): Promise<boolean> {
+  const query =
+    parsedUrl.query && typeof parsedUrl.query === "object"
+      ? (parsedUrl.query as Record<string, string | string[] | undefined>)
+      : ({} as Record<string, string | string[] | undefined>);
+
   // GET /api/tasks
   if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
-    const repo = parsedUrl.query["repo"] as string | undefined;
+    const repo =
+      typeof query["repo"] === "string" ? query["repo"] : undefined;
     const result = repo ? await readTasksForRepo(repo) : await readAllTasks();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(result));
@@ -60,7 +66,8 @@ export async function handleTaskRoutes(
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length);
     const body = await readBody(req);
-    const repoParam = parsedUrl.query["repo"] as string | undefined;
+    const repoParam =
+      typeof query["repo"] === "string" ? query["repo"] : undefined;
     const taskList = repoParam
       ? await readTasksForRepo(repoParam)
       : await readAllTasks();
@@ -111,7 +118,8 @@ export async function handleTaskRoutes(
     parsedUrl.pathname?.startsWith("/api/tasks/")
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length);
-    const repoParam = parsedUrl.query["repo"] as string | undefined;
+    const repoParam =
+      typeof query["repo"] === "string" ? query["repo"] : undefined;
     const deleteTaskList = repoParam
       ? await readTasksForRepo(repoParam)
       : await readAllTasks();

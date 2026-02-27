@@ -3,7 +3,6 @@
 
 import { useRef, useState } from "react";
 
-import { Sidebar } from "@/components/Layout/Sidebar";
 import { SkillEditor } from "@/components/Skills/SkillEditor";
 import { SkillList } from "@/components/Skills/SkillList";
 import {
@@ -101,33 +100,30 @@ export function SkillsPage({ repo, selectedSkillName }: SkillsPageProps) {
   }
 
   return (
-    <div className={styles.shell}>
-      <Sidebar repo={repo} currentView="Skills" />
-      <div className={styles.page}>
-        <SkillList
-          skills={skills}
-          selectedName={selectedName}
-          onSelect={handleSelect}
-          onNew={handleNew}
-          scope={scope}
-          onScopeChange={handleScopeChange}
-        />
-        <div className={styles.editorPane}>
-          {selectedSkill ? (
-            <SkillEditor
-              name={selectedSkill.name}
-              description={selectedSkill.description}
-              content={selectedSkill.content}
-              onChange={handleChange}
-              onRename={handleRename}
-              onDelete={handleDelete}
-            />
-          ) : (
-            <div className={styles.emptyState}>
-              <p>Select a skill or create a new one.</p>
-            </div>
-          )}
-        </div>
+    <div className={styles.page}>
+      <SkillList
+        skills={skills}
+        selectedName={selectedName}
+        onSelect={handleSelect}
+        onNew={handleNew}
+        scope={scope}
+        onScopeChange={handleScopeChange}
+      />
+      <div className={styles.editorPane}>
+        {selectedSkill ? (
+          <SkillEditor
+            name={selectedSkill.name}
+            description={selectedSkill.description}
+            content={selectedSkill.content}
+            onChange={handleChange}
+            onRename={handleRename}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <div className={styles.emptyState}>
+            <p>Select a skill or create a new one.</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ const NotificationContext = createContext<NotificationContextValue | null>(
 );
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const notifyTransition = (task: Task, from: TaskStatus, to: TaskStatus) => {
+  function notifyTransition(task: Task, from: TaskStatus, to: TaskStatus) {
     const title = truncateTitle(task.title);
 
     if (from === "In Progress" && to === "Review") {
@@ -43,7 +43,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       toast.info(`Agent started "${title}"`);
       return;
     }
-  };
+  }
 
   return (
     <NotificationContext.Provider value={{ notifyTransition }}>

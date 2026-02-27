@@ -30,8 +30,8 @@ describe("broadcastTaskEvent", () => {
       type: "task:updated",
       data: { id: "task-1" },
     });
-    expect((ws1 as { send: jest.Mock }).send).toHaveBeenCalledWith(expected);
-    expect((ws2 as { send: jest.Mock }).send).toHaveBeenCalledWith(expected);
+    expect((ws1 as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(expected);
+    expect((ws2 as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(expected);
   });
 
   it("skips clients that are not OPEN", () => {
@@ -46,10 +46,10 @@ describe("broadcastTaskEvent", () => {
 
     broadcastTaskEvent("task:created", { id: "task-2" });
 
-    expect((wsOpen as { send: jest.Mock }).send).toHaveBeenCalledTimes(1);
-    expect((wsClosing as { send: jest.Mock }).send).not.toHaveBeenCalled();
-    expect((wsClosed as { send: jest.Mock }).send).not.toHaveBeenCalled();
-    expect((wsConnecting as { send: jest.Mock }).send).not.toHaveBeenCalled();
+    expect((wsOpen as unknown as { send: jest.Mock }).send).toHaveBeenCalledTimes(1);
+    expect((wsClosing as unknown as { send: jest.Mock }).send).not.toHaveBeenCalled();
+    expect((wsClosed as unknown as { send: jest.Mock }).send).not.toHaveBeenCalled();
+    expect((wsConnecting as unknown as { send: jest.Mock }).send).not.toHaveBeenCalled();
   });
 
   it("sends correct JSON: { type: event, data }", () => {
@@ -59,7 +59,7 @@ describe("broadcastTaskEvent", () => {
     const data = { id: "repo-42", name: "Test Repo" };
     broadcastTaskEvent("repo:created", data);
 
-    expect((ws as { send: jest.Mock }).send).toHaveBeenCalledWith(
+    expect((ws as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(
       JSON.stringify({ type: "repo:created", data }),
     );
   });
@@ -127,7 +127,7 @@ describe("multiple independent broadcasts", () => {
     broadcastTaskEvent("repo:deleted", { id: "r1" });
     broadcastTaskEvent("task:updated", { id: "t1", status: "done" });
 
-    const sendMock = (ws as { send: jest.Mock }).send;
+    const sendMock = (ws as unknown as { send: jest.Mock }).send;
     expect(sendMock).toHaveBeenCalledTimes(3);
     expect(sendMock).toHaveBeenNthCalledWith(
       1,

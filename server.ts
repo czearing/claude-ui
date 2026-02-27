@@ -72,11 +72,11 @@ async function ensureDefaultRepo(): Promise<void> {
   // Migrate existing tasks that have no repo
   const tasks = await readTasks();
   const needsMigration = tasks.some(
-    (t) => !(t as Record<string, unknown>)["repo"],
+    (t) => !(t as unknown as Record<string, unknown>)["repo"],
   );
   if (needsMigration) {
     const migrated = tasks.map((t) => {
-      const record = t as Record<string, unknown>;
+      const record = t as unknown as Record<string, unknown>;
       if (!record["repo"]) {
         return { ...t, repo: defaultRepo.name };
       }
@@ -223,7 +223,6 @@ async function recoverInProgressTasks(): Promise<void> {
       const updated: Task = {
         ...task,
         status: "Review",
-        updatedAt: new Date().toISOString(),
       };
       await writeTask(updated, prevStatus);
       broadcastTaskEvent("task:updated", updated);

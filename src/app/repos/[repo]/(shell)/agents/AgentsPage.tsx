@@ -5,7 +5,6 @@ import { useRef, useState } from "react";
 import { AgentEditor } from "@/components/Agents/AgentEditor";
 import { AgentList } from "@/components/Agents/AgentList";
 import type { AgentScope } from "@/components/Agents/AgentList";
-import { Sidebar } from "@/components/Layout/Sidebar";
 import {
   useAgent,
   useAgents,
@@ -100,33 +99,30 @@ export function AgentsPage({ repo, selectedAgentName }: AgentsPageProps) {
   }
 
   return (
-    <div className={styles.shell}>
-      <Sidebar repo={repo} currentView="Agents" />
-      <div className={styles.page}>
-        <AgentList
-          agents={agents}
-          selectedName={selectedName}
-          onSelect={handleSelect}
-          onNew={handleNew}
-          scope={scope}
-          onScopeChange={handleScopeChange}
-        />
-        <div className={styles.editorPane}>
-          {selectedAgent ? (
-            <AgentEditor
-              name={selectedAgent.name}
-              description={selectedAgent.description}
-              content={selectedAgent.content}
-              onChange={handleChange}
-              onRename={handleRename}
-              onDelete={handleDelete}
-            />
-          ) : (
-            <div className={styles.emptyState}>
-              <p>Select an agent or create a new one.</p>
-            </div>
-          )}
-        </div>
+    <div className={styles.page}>
+      <AgentList
+        agents={agents}
+        selectedName={selectedName}
+        onSelect={handleSelect}
+        onNew={handleNew}
+        scope={scope}
+        onScopeChange={handleScopeChange}
+      />
+      <div className={styles.editorPane}>
+        {selectedAgent ? (
+          <AgentEditor
+            name={selectedAgent.name}
+            description={selectedAgent.description}
+            content={selectedAgent.content}
+            onChange={handleChange}
+            onRename={handleRename}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <div className={styles.emptyState}>
+            <p>Select an agent or create a new one.</p>
+          </div>
+        )}
       </div>
     </div>
   );

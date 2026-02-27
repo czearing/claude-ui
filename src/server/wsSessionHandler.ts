@@ -110,12 +110,15 @@ export function handleWsConnection(
     // New or resumed session: spawn pty
     const registryEntry = sessionRegistry.get(sessionId);
     const sessionCwd = registryEntry?.cwd ?? process.cwd();
-    // Always spawn a fresh interactive session — do NOT use --continue.
-    // --continue resumes the most recent conversation in the cwd, which may
-    // be the developer's own active session rather than the handover task's
-    // conversation.  The prior -p output is replayed above so the user has
-    // full context without needing the conversation history.
+    // Use --resume <claudeSessionId> when available to continue the exact
+    // handover conversation.  Fall back to a fresh interactive session when
+    // claudeSessionId is absent — never use --continue (it would pick up the
+    // developer's own active session rather than the handover task's one).
     const spawnArgs = ["--dangerously-skip-permissions"];
+    const useResume = Boolean(registryEntry?.claudeSessionId);
+    if (useResume) {
+      spawnArgs.push("--resume", registryEntry!.claudeSessionId!);
+    }
 
     // Unset CLAUDECODE so nested Claude instances are not blocked by the
     // "cannot be launched inside another Claude Code session" guard.
@@ -134,6 +137,7 @@ export function handleWsConnection(
         rows: 24,
         cwd: sessionCwd,
         env: { ...spawnEnv, CLAUDE_CODE_UI_SESSION_ID: sessionId },
+        useConptyDll: process.platform === "win32",
       });
     } catch (err) {
       ws.send(JSON.stringify({ type: "error", message: String(err) }));
@@ -159,8 +163,8 @@ export function handleWsConnection(
         createdAt: new Date().toISOString(),
       });
       void saveSessionRegistry();
-    } else {
-      // Notify the client that --continue was used to resume the conversation
+    } else if (useResume) {
+      // Notify the client that --resume was used to restore the conversation
       ws.send(JSON.stringify({ type: "resumed" }));
     }
 

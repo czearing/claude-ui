@@ -17,16 +17,17 @@ export async function handleAgentRoutes(
   res: ServerResponse,
   parsedUrl: ReturnType<typeof parse>,
 ): Promise<boolean> {
+  const query =
+    parsedUrl.query && typeof parsedUrl.query === "object"
+      ? (parsedUrl.query as Record<string, string | string[] | undefined>)
+      : ({} as Record<string, string | string[] | undefined>);
+
   // GET /api/agents
   if (req.method === "GET" && parsedUrl.pathname === "/api/agents") {
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const agents = await listAgents(dir);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -47,13 +48,9 @@ export async function handleAgentRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const agent = await readAgent(dir, name);
     if (agent === null) {
@@ -79,13 +76,9 @@ export async function handleAgentRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const existing = await readAgent(dir, name);
     if (existing !== null) {
@@ -113,13 +106,9 @@ export async function handleAgentRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const existing = await readAgent(dir, name);
     if (existing === null) {
@@ -154,13 +143,9 @@ export async function handleAgentRoutes(
       return true;
     }
     const scope =
-      typeof parsedUrl.query["scope"] === "string"
-        ? parsedUrl.query["scope"]
-        : "global";
+      typeof query["scope"] === "string" ? query["scope"] : "global";
     const repoId =
-      typeof parsedUrl.query["repoId"] === "string"
-        ? parsedUrl.query["repoId"]
-        : null;
+      typeof query["repoId"] === "string" ? query["repoId"] : null;
     const dir = await resolveAgentsDir(scope, repoId);
     const existing = await readAgent(dir, name);
     if (existing === null) {

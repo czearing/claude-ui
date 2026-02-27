@@ -1,12 +1,3 @@
-/* src/app/repos/[repoId]/skills/SkillsPage.module.css */
-
-.shell {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-  background-color: var(--color-bg);
-}
-
 .page {
   display: flex;
   flex: 1;
