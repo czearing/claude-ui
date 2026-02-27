@@ -9,8 +9,6 @@ import {
   backToInProgress,
   BUFFER_CAP,
   emitStatus,
-  scheduleIdleStatus,
-  SESSION_IDLE_MS,
   sessions,
   type ClaudeStatus,
   type SessionEntry,
@@ -27,12 +25,6 @@ function makeEntry(overrides: Partial<SessionEntry> = {}): SessionEntry {
     activeWs: null,
     currentStatus: "connecting",
     idleTimer: null,
-    handoverPhase: null,
-    handoverSpec: "",
-    specSentAt: 0,
-    hadMeaningfulActivity: false,
-    lastMeaningfulStatus: null,
-    supportsBracketedPaste: false,
     ...overrides,
   };
 }
@@ -125,188 +117,6 @@ describe("emitStatus", () => {
     emitStatus(ws as unknown as WebSocket, "waiting");
 
     expect(ws.send).not.toHaveBeenCalled();
-  });
-});
-
-// ─── scheduleIdleStatus ───────────────────────────────────────────────────────
-
-describe("scheduleIdleStatus", () => {
-  const SESSION_ID = "test-session-idle";
-
-  beforeEach(() => {
-    jest.useFakeTimers();
-    sessions.clear();
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
-    sessions.clear();
-  });
-
-  it("sets idleTimer on the entry", () => {
-    const entry = makeEntry();
-    sessions.set(SESSION_ID, entry);
-
-    scheduleIdleStatus(entry, SESSION_ID);
-
-    expect(entry.idleTimer).not.toBeNull();
-  });
-
-  it("clears an existing timer and resets it when called again", () => {
-    const entry = makeEntry();
-    sessions.set(SESSION_ID, entry);
-
-    scheduleIdleStatus(entry, SESSION_ID);
-    const firstTimer = entry.idleTimer;
-
-    scheduleIdleStatus(entry, SESSION_ID);
-    const secondTimer = entry.idleTimer;
-
-    expect(secondTimer).not.toBeNull();
-    // The timers should be distinct objects (new timer was created)
-    expect(secondTimer).not.toBe(firstTimer);
-  });
-
-  it("sets currentStatus to waiting and emits waiting after SESSION_IDLE_MS silence", () => {
-    const ws = makeMockWs(WebSocket.OPEN);
-    const entry = makeEntry({
-      currentStatus: "thinking",
-      activeWs: ws as unknown as WebSocket,
-    });
-    sessions.set(SESSION_ID, entry);
-
-    scheduleIdleStatus(entry, SESSION_ID);
-    jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-    expect(entry.currentStatus).toBe("waiting");
-    expect(ws.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: "status", value: "waiting" }),
-    );
-  });
-
-  it("does not emit waiting again when currentStatus is already waiting", () => {
-    const ws = makeMockWs(WebSocket.OPEN);
-    const entry = makeEntry({
-      currentStatus: "waiting",
-      activeWs: ws as unknown as WebSocket,
-    });
-    sessions.set(SESSION_ID, entry);
-
-    scheduleIdleStatus(entry, SESSION_ID);
-    jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-    expect(ws.send).not.toHaveBeenCalled();
-  });
-
-  it("does not fire if the session has been removed from the map before the timer fires", () => {
-    const ws = makeMockWs(WebSocket.OPEN);
-    const entry = makeEntry({
-      currentStatus: "thinking",
-      activeWs: ws as unknown as WebSocket,
-    });
-    sessions.set(SESSION_ID, entry);
-
-    scheduleIdleStatus(entry, SESSION_ID);
-    sessions.delete(SESSION_ID); // remove before timer fires
-    jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-    // Should not have changed anything
-    expect(ws.send).not.toHaveBeenCalled();
-  });
-
-  describe("advanceToReview is called after SESSION_IDLE_MS with spec_sent + meaningful activity + typing", () => {
-    beforeEach(() => {
-      global.fetch = jest.fn().mockResolvedValue({ ok: true });
-    });
-
-    afterEach(() => {
-      jest.restoreAllMocks();
-    });
-
-    it("calls advanceToReview when conditions are met", () => {
-      const entry = makeEntry({
-        currentStatus: "typing",
-        handoverPhase: "spec_sent",
-        hadMeaningfulActivity: true,
-        lastMeaningfulStatus: "typing",
-      });
-      sessions.set(SESSION_ID, entry);
-
-      scheduleIdleStatus(entry, SESSION_ID);
-      jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-      expect(entry.handoverPhase).toBe("done");
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
-      expect(fetchUrl).toContain(`/sessions/${SESSION_ID}/advance-to-review`);
-    });
-
-    it("does NOT call advanceToReview when lastMeaningfulStatus is thinking (tool-use gap)", () => {
-      const entry = makeEntry({
-        currentStatus: "thinking",
-        handoverPhase: "spec_sent",
-        hadMeaningfulActivity: true,
-        lastMeaningfulStatus: "thinking",
-      });
-      sessions.set(SESSION_ID, entry);
-
-      scheduleIdleStatus(entry, SESSION_ID);
-      jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-      expect(entry.handoverPhase).toBe("spec_sent");
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
-    it("does NOT call advanceToReview when hadMeaningfulActivity is false and lastMeaningfulStatus is typing", () => {
-      const entry = makeEntry({
-        currentStatus: "typing",
-        handoverPhase: "spec_sent",
-        hadMeaningfulActivity: false,
-        lastMeaningfulStatus: "typing",
-      });
-      sessions.set(SESSION_ID, entry);
-
-      scheduleIdleStatus(entry, SESSION_ID);
-      jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
-
-    it("calls advanceToReview when lastMeaningfulStatus is waiting (spinner fired within echo window)", () => {
-      // Covers the case where Claude processed the spec but the thinking
-      // spinner appeared within SPEC_ECHO_WINDOW_MS so hadMeaningfulActivity
-      // was never set — yet Claude is clearly idle at the ❯ prompt.
-      const entry = makeEntry({
-        currentStatus: "waiting",
-        handoverPhase: "spec_sent",
-        hadMeaningfulActivity: false,
-        lastMeaningfulStatus: "waiting",
-      });
-      sessions.set(SESSION_ID, entry);
-
-      scheduleIdleStatus(entry, SESSION_ID);
-      jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-      expect(entry.handoverPhase).toBe("done");
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
-      expect(fetchUrl).toContain(`/sessions/${SESSION_ID}/advance-to-review`);
-    });
-
-    it("does NOT call advanceToReview when handoverPhase is not spec_sent", () => {
-      const entry = makeEntry({
-        currentStatus: "typing",
-        handoverPhase: null,
-        hadMeaningfulActivity: true,
-        lastMeaningfulStatus: "typing",
-      });
-      sessions.set(SESSION_ID, entry);
-
-      scheduleIdleStatus(entry, SESSION_ID);
-      jest.advanceTimersByTime(SESSION_IDLE_MS);
-
-      expect(global.fetch).not.toHaveBeenCalled();
-    });
   });
 });
 
@@ -447,5 +257,19 @@ describe("exported types", () => {
       "disconnected",
     ];
     expect(statuses).toHaveLength(6);
+  });
+});
+
+// ─── sessions map is exported ─────────────────────────────────────────────────
+
+describe("sessions map", () => {
+  afterEach(() => {
+    sessions.clear();
+  });
+
+  it("can store and retrieve a SessionEntry", () => {
+    const entry = makeEntry({ currentStatus: "thinking" });
+    sessions.set("test-id", entry);
+    expect(sessions.get("test-id")).toBe(entry);
   });
 });

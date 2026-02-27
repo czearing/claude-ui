@@ -4,299 +4,167 @@ import type { Task } from "./tasks.types";
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
 const MINIMAL_TASK: Task = {
-  id: "TASK-001",
-  title: "Do the thing",
+  id: "fix-login-bug",
+  title: "Fix Login Bug",
   status: "Backlog",
-  priority: "Medium",
-  repoId: "repo-abc",
+  repo: "test-repo",
   spec: "",
-  createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-02T00:00:00.000Z",
 };
 
 const FULL_TASK: Task = {
   ...MINIMAL_TASK,
-  id: "TASK-042",
-  title: "Implement feature X",
+  id: "implement-feature-x",
+  title: "Implement Feature X",
   status: "In Progress",
-  priority: "High",
-  sessionId: "sess-xyz",
   spec: "## Goal\n\nBuild the thing.",
-  createdAt: "2026-02-01T10:00:00.000Z",
-  updatedAt: "2026-02-15T12:00:00.000Z",
 };
 
-const ARCHIVED_TASK: Task = {
+const LEGACY_TASK: Task = {
   ...MINIMAL_TASK,
-  status: "Done",
-  archivedAt: "2026-03-01T09:00:00.000Z",
+  id: "TASK-042",
+  title: "TASK-042",
 };
 
 // ── parseTaskFile ─────────────────────────────────────────────────────────────
 
 describe("parseTaskFile", () => {
-  it("parses all required fields from valid frontmatter", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: Do the thing",
-      "status: Backlog",
-      "priority: Medium",
-      "repoId: repo-abc",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-02T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
+  it("derives title from the id slug", () => {
+    const task = parseTaskFile("some content", "test-repo", "fix-login-bug");
 
-    const task = parseTaskFile(content);
-
-    expect(task.id).toBe("TASK-001");
-    expect(task.title).toBe("Do the thing");
-    expect(task.status).toBe("Backlog");
-    expect(task.priority).toBe("Medium");
-    expect(task.repoId).toBe("repo-abc");
-    expect(task.createdAt).toBe("2026-01-01T00:00:00.000Z");
-    expect(task.updatedAt).toBe("2026-01-02T00:00:00.000Z");
+    expect(task.title).toBe("Fix Login Bug");
   });
 
-  it("captures the body as spec (trimmed)", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: T",
-      "status: Backlog",
-      "priority: Low",
-      "repoId: r",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-      "## Goal",
-      "",
-      "Build the thing.",
-    ].join("\n");
+  it("preserves TASK-NNN ids as title verbatim", () => {
+    const task = parseTaskFile("content", "test-repo", "TASK-042");
 
-    const task = parseTaskFile(content);
+    expect(task.title).toBe("TASK-042");
+  });
+
+  it("sets spec to trimmed content", () => {
+    const task = parseTaskFile(
+      "\n  ## Goal\n\nBuild the thing.  \n",
+      "test-repo",
+      "fix-bug",
+    );
+
     expect(task.spec).toBe("## Goal\n\nBuild the thing.");
   });
 
-  it("returns empty string spec when the body is blank", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: T",
-      "status: Backlog",
-      "priority: Low",
-      "repoId: r",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
+  it("returns empty spec for empty content", () => {
+    const task = parseTaskFile("", "test-repo", "fix-bug");
 
-    expect(parseTaskFile(content).spec).toBe("");
+    expect(task.spec).toBe("");
   });
 
-  it("defaults status to Backlog when missing", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: T",
-      "priority: Low",
-      "repoId: r",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
+  it("returns empty spec for whitespace-only content", () => {
+    const task = parseTaskFile("   \n  \n  ", "test-repo", "fix-bug");
 
-    expect(parseTaskFile(content).status).toBe("Backlog");
+    expect(task.spec).toBe("");
   });
 
-  it("defaults priority to Medium when missing", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: T",
-      "status: Not Started",
-      "repoId: r",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
+  it("uses provided status", () => {
+    const task = parseTaskFile("spec", "test-repo", "fix-bug", "In Progress");
 
-    expect(parseTaskFile(content).priority).toBe("Medium");
+    expect(task.status).toBe("In Progress");
   });
 
-  it("includes sessionId when present", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: T",
-      "status: In Progress",
-      "priority: High",
-      "repoId: r",
-      "sessionId: sess-abc",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
+  it("defaults status to Backlog", () => {
+    const task = parseTaskFile("spec", "test-repo", "fix-bug");
 
-    expect(parseTaskFile(content).sessionId).toBe("sess-abc");
+    expect(task.status).toBe("Backlog");
   });
 
-  it("omits sessionId when not in frontmatter", () => {
-    const task = parseTaskFile(serializeTaskFile(MINIMAL_TASK));
+  it("sets repo from parameter", () => {
+    const task = parseTaskFile("spec", "my-repo", "fix-bug");
+
+    expect(task.repo).toBe("my-repo");
+  });
+
+  it("defaults repo to empty string", () => {
+    const task = parseTaskFile("spec");
+
+    expect(task.repo).toBe("");
+  });
+
+  it("defaults id to empty string", () => {
+    const task = parseTaskFile("spec");
+
+    expect(task.id).toBe("");
+  });
+
+  it("does not include sessionId or archivedAt (those come from sidecar)", () => {
+    const task = parseTaskFile("spec", "test-repo", "fix-bug");
+
     expect(task.sessionId).toBeUndefined();
-  });
-
-  it("includes archivedAt when present", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "title: T",
-      "status: Done",
-      "priority: Low",
-      "repoId: r",
-      "archivedAt: 2026-03-01T09:00:00.000Z",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
-
-    expect(parseTaskFile(content).archivedAt).toBe("2026-03-01T09:00:00.000Z");
-  });
-
-  it("omits archivedAt when not in frontmatter", () => {
-    const task = parseTaskFile(serializeTaskFile(MINIMAL_TASK));
     expect(task.archivedAt).toBeUndefined();
-  });
-
-  it("throws when frontmatter delimiters are absent", () => {
-    expect(() => parseTaskFile("no frontmatter here")).toThrow(
-      "Invalid task file: missing frontmatter",
-    );
-  });
-
-  it("ignores frontmatter lines that lack ': ' separator", () => {
-    const content = [
-      "---",
-      "id: TASK-001",
-      "this-line-has-no-colon-space",
-      "title: Valid Title",
-      "status: Backlog",
-      "priority: Low",
-      "repoId: r",
-      "createdAt: 2026-01-01T00:00:00.000Z",
-      "updatedAt: 2026-01-01T00:00:00.000Z",
-      "---",
-      "",
-    ].join("\n");
-
-    // Should not throw, and should still parse valid fields
-    const task = parseTaskFile(content);
-    expect(task.title).toBe("Valid Title");
   });
 });
 
 // ── serializeTaskFile ─────────────────────────────────────────────────────────
 
 describe("serializeTaskFile", () => {
-  it("produces frontmatter with all required fields", () => {
-    const out = serializeTaskFile(MINIMAL_TASK);
-    expect(out).toContain("id: TASK-001");
-    expect(out).toContain("title: Do the thing");
-    expect(out).toContain("status: Backlog");
-    expect(out).toContain("priority: Medium");
-    expect(out).toContain("repoId: repo-abc");
-    expect(out).toContain("createdAt: 2026-01-01T00:00:00.000Z");
-    expect(out).toContain("updatedAt: 2026-01-02T00:00:00.000Z");
-  });
-
-  it("wraps content in --- delimiters", () => {
-    const out = serializeTaskFile(MINIMAL_TASK);
-    expect(out.startsWith("---\n")).toBe(true);
-    expect(out).toContain("\n---\n");
-  });
-
-  it("includes sessionId when present", () => {
-    expect(serializeTaskFile(FULL_TASK)).toContain("sessionId: sess-xyz");
-  });
-
-  it("omits sessionId line when absent", () => {
-    expect(serializeTaskFile(MINIMAL_TASK)).not.toContain("sessionId:");
-  });
-
-  it("includes archivedAt when present", () => {
-    expect(serializeTaskFile(ARCHIVED_TASK)).toContain(
-      "archivedAt: 2026-03-01T09:00:00.000Z",
-    );
-  });
-
-  it("omits archivedAt line when absent", () => {
-    expect(serializeTaskFile(MINIMAL_TASK)).not.toContain("archivedAt:");
-  });
-
-  it("appends the spec body after the closing ---", () => {
+  it("returns spec directly", () => {
     const out = serializeTaskFile(FULL_TASK);
-    expect(out.endsWith("## Goal\n\nBuild the thing.")).toBe(true);
+
+    expect(out).toBe("## Goal\n\nBuild the thing.");
   });
 
-  it("does not append a body section when spec is empty", () => {
+  it("returns empty string for empty spec", () => {
     const out = serializeTaskFile(MINIMAL_TASK);
-    // After the closing ---, there should only be a blank line and nothing else
-    const afterDelimiter = out.split("\n---\n")[1];
-    expect(afterDelimiter?.trim()).toBe("");
+
+    expect(out).toBe("");
+  });
+
+  it("does not include any frontmatter delimiters", () => {
+    const out = serializeTaskFile(FULL_TASK);
+
+    expect(out).not.toContain("---");
+    expect(out).not.toContain("title:");
+  });
+
+  it("does not include sessionId, archivedAt, repo, or status", () => {
+    const task: Task = {
+      ...FULL_TASK,
+      sessionId: "sess-xyz",
+      archivedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const out = serializeTaskFile(task);
+
+    expect(out).not.toContain("sessionId");
+    expect(out).not.toContain("archivedAt");
+    expect(out).not.toContain("repo:");
+    expect(out).not.toContain("status:");
   });
 });
 
-// ── round-trip ────────────────────────────────────────────────────────────────
+// ── round-trip: serialize → parse ────────────────────────────────────────────
 
 describe("round-trip: serialize → parse", () => {
-  it("preserves all fields for a minimal task", () => {
-    const parsed = parseTaskFile(serializeTaskFile(MINIMAL_TASK));
-    expect(parsed).toEqual(MINIMAL_TASK);
+  it("preserves spec for a task with content", () => {
+    const serialized = serializeTaskFile(FULL_TASK);
+    const parsed = parseTaskFile(serialized, FULL_TASK.repo, FULL_TASK.id);
+
+    expect(parsed.spec).toBe(FULL_TASK.spec);
+    expect(parsed.id).toBe(FULL_TASK.id);
+    expect(parsed.title).toBe("Implement Feature X");
   });
 
-  it("preserves all fields for a task with sessionId and spec", () => {
-    const parsed = parseTaskFile(serializeTaskFile(FULL_TASK));
-    expect(parsed).toEqual(FULL_TASK);
+  it("preserves empty spec", () => {
+    const serialized = serializeTaskFile(MINIMAL_TASK);
+    const parsed = parseTaskFile(
+      serialized,
+      MINIMAL_TASK.repo,
+      MINIMAL_TASK.id,
+    );
+
+    expect(parsed.spec).toBe("");
   });
 
-  it("preserves all fields for an archived task", () => {
-    const parsed = parseTaskFile(serializeTaskFile(ARCHIVED_TASK));
-    expect(parsed).toEqual(ARCHIVED_TASK);
-  });
+  it("preserves legacy TASK-NNN id and title", () => {
+    const serialized = serializeTaskFile(LEGACY_TASK);
+    const parsed = parseTaskFile(serialized, LEGACY_TASK.repo, LEGACY_TASK.id);
 
-  it("preserves spec body containing --- on its own line", () => {
-    // The serialized form places the spec after the closing ---.
-    // The frontmatter regex is non-greedy so it terminates at the first
-    // occurrence of \n---\n, which is the frontmatter closing delimiter.
-    // A --- inside the spec body is therefore part of group 2 (the body)
-    // and must survive the round-trip unchanged.
-    const task: Task = {
-      ...MINIMAL_TASK,
-      spec: "Step 1\n---\nStep 2",
-    };
-    const parsed = parseTaskFile(serializeTaskFile(task));
-    expect(parsed.spec).toBe("Step 1\n---\nStep 2");
-  });
-
-  it("preserves title containing colon-space", () => {
-    // The frontmatter parser splits on the first ": " occurrence.
-    // A title like "Fix: handle null" has ": " at index 3, so the key is
-    // "title" and the value is everything after that first ": ", which
-    // correctly includes the rest of the string ("Fix: handle null values
-    // in parser"). The colon-space inside the value must not be lost.
-    const task: Task = {
-      ...MINIMAL_TASK,
-      title: "Fix: handle null values in parser",
-    };
-    const parsed = parseTaskFile(serializeTaskFile(task));
-    expect(parsed.title).toBe("Fix: handle null values in parser");
+    expect(parsed.id).toBe("TASK-042");
+    expect(parsed.title).toBe("TASK-042");
   });
 });

@@ -19,6 +19,7 @@ Replace the current server-side spec status tracking (frontmatter `status:` fiel
 ## Motivation
 
 The current system has produced several real bugs (see: "tasks stuck in In Progress due to spec injection and session recovery bugs"). It requires:
+
 - Idle timeout detection to guess when Claude is done
 - Multi-phase handover state machine (`waiting_for_prompt` -> `spec_sent` -> `done`)
 - Internal API calls from pty-manager back to server to advance task status
@@ -55,6 +56,7 @@ All four status folders must be created when a repo is first set up.
 **Remove** the `status` field from task frontmatter entirely. Status is now implicit from folder location.
 
 **Before:**
+
 ```yaml
 ---
 id: TASK-001
@@ -69,6 +71,7 @@ updatedAt: 2025-01-02T00:00:00Z
 ```
 
 **After:**
+
 ```yaml
 ---
 id: TASK-001
@@ -108,19 +111,23 @@ Migration must be idempotent: if a file is already in a subfolder, skip it.
 ### 3. `src/server/taskStore.ts` - Full Rewrite
 
 **`getStatusFolder(status: TaskStatus): string`** - new helper:
+
 - Maps `TaskStatus` enum -> folder name string
 
 **`getTaskFilePath(repoId, taskId): Promise<string | null>`** - replaces direct path construction:
+
 - Scans all 4 status folders to find the file
 - Returns absolute path or null if not found
 - Cache the location to avoid repeated scans
 
 **`readTask(repoId, taskId)`**:
+
 - Use `getTaskFilePath` to locate file
 - Parse without `status` field; derive status from folder name
 - Inject `status` into returned Task object at read time
 
 **`writeTask(repoId, task)`**:
+
 - Determine current file location via `getTaskFilePath`
 - Determine target folder from `task.status`
 - If folders differ: `fs.rename(currentPath, targetPath)` - this is atomic on same filesystem
@@ -129,18 +136,22 @@ Migration must be idempotent: if a file is already in a subfolder, skip it.
 - Update cache
 
 **`deleteTaskFile(repoId, taskId)`**:
+
 - Use `getTaskFilePath` to locate, then delete
 
 **`readAllTasksForRepo(repoId)`**:
+
 - Scan all 4 status subdirectories
 - For each file found, parse and inject status from folder name
 - Return merged array
 
 **`ensureRepoFolders(repoId)`** - new helper:
+
 - Creates `backlog/`, `in-progress/`, `review/`, `done/` under `specs/{repoId}/`
 - Called on repo creation and on startup
 
 **`createTask(repoId, task)`**:
+
 - Always write new tasks to `backlog/` subfolder
 
 ---
@@ -156,6 +167,7 @@ Migration must be idempotent: if a file is already in a subfolder, skip it.
 ### 5. `src/utils/tasks.types.ts` - No Breaking Changes
 
 Keep `TaskStatus` enum as-is - it is still used at runtime, just no longer serialized to file frontmatter. The enum values map to folder names:
+
 - `"Backlog"` <-> `backlog/`
 - `"In Progress"` <-> `in-progress/`
 - `"Review"` <-> `review/`
@@ -166,12 +178,14 @@ Keep `TaskStatus` enum as-is - it is still used at runtime, just no longer seria
 ### 6. `server.ts` - Simplify Startup Recovery
 
 **`recoverInProgressTasks()`** becomes trivial:
+
 - Scan `specs/*/in-progress/*.md` across all repos
 - For each file, check if the `sessionId` frontmatter field is in the live PTY sessions list
 - If session is dead: `fs.rename` file from `in-progress/` -> `review/`, broadcast `task:updated`
 - No longer needs to load ALL tasks and filter by status field
 
 **`ensureDefaultRepo()`**:
+
 - Call `ensureRepoFolders(repoId)` after creating repo
 - Run migration logic for pre-existing flat spec files
 
@@ -180,23 +194,28 @@ Keep `TaskStatus` enum as-is - it is still used at runtime, just no longer seria
 ### 7. `src/server/routes/tasks.ts` - Status Changes Become File Moves
 
 **`PATCH /api/tasks/:id`**:
+
 - When `status` is in the patch payload: call `writeTask` which handles the rename atomically
 - No special-casing needed; the move IS the status update
 
 **`POST /api/tasks/:id/handover`**:
+
 - Move file: `backlog/TASK-001.md` -> `in-progress/TASK-001.md` (via `writeTask` with status="In Progress")
 - Spawn PTY session with spec content + file movement instructions in prompt
 - Update system prompt to reference file location (see Section 9)
 
 **`POST /api/tasks/:id/recall`**:
+
 - Move file: `in-progress/TASK-001.md` -> `backlog/TASK-001.md` (via `writeTask` with status="Backlog")
 - Kill PTY session as before
 
 **`POST /api/internal/sessions/:id/advance-to-review`**:
+
 - Keep as a fallback for server-side status advance
 - Primary path is Claude moving the file itself (see Section 9)
 
 **`POST /api/tasks` (create)**:
+
 - Writes to `backlog/` subfolder
 
 ---
@@ -209,18 +228,21 @@ Add `chokidar` filesystem watching on the `specs/` directory to detect when Clau
 // In server.ts or a new src/server/specWatcher.ts
 import chokidar from "chokidar";
 
-chokidar.watch("specs/**/*.md", { ignoreInitial: true })
+chokidar
+  .watch("specs/**/*.md", { ignoreInitial: true })
   .on("add", handleSpecFileAdded)
   .on("unlink", handleSpecFileRemoved);
 ```
 
 **`handleSpecFileAdded(filePath)`**:
+
 - Parse the folder path to determine new status
 - Load task from the new path
 - If status changed (file appeared in new folder): broadcast `task:updated`
 - This fires when Claude moves a file INTO a folder
 
 **`handleSpecFileRemoved(filePath)`**:
+
 - Parse the folder path to determine which task was moved OUT of a folder
 - The corresponding `add` event for the destination will handle the update
 - Only act if no corresponding `add` fires within 500ms (file was deleted, not moved)
@@ -234,6 +256,7 @@ This allows the board to update in real time when Claude moves spec files, witho
 Update the prompt sent to Claude on handover to include explicit file movement instructions.
 
 **New handover prompt format:**
+
 ```
 {original spec content}
 
@@ -256,6 +279,7 @@ This replaces the current mechanism where the server infers completion from PTY 
 ### 10. `pty-manager.ts` - Simplify Handover Phase
 
 **Remove:**
+
 - `handoverPhase` tracking entirely (`"waiting_for_prompt"` | `"spec_sent"` | `"done"`)
 - `specSentAt` timestamp
 - `SPEC_ECHO_WINDOW_MS` window (3000ms)
@@ -263,11 +287,13 @@ This replaces the current mechanism where the server infers completion from PTY 
 - The multi-phase detection in `ptyHandlers.ts`
 
 **Keep:**
+
 - `-p` flag spec passing to Claude CLI (simplest, most reliable)
 - Session spawning logic
 - Output buffering for terminal replay
 
 **New approach:**
+
 - Spec content + file movement instructions passed via `-p` flag as before
 - Server watches filesystem for file moves instead of monitoring PTY output for idle signals
 
@@ -275,26 +301,27 @@ This replaces the current mechanism where the server infers completion from PTY 
 
 ### 11. Dead Files / Code to Remove or Gut
 
-| File | Action | Reason |
-|------|--------|--------|
-| `src/server/ptyHandlers.ts` | **Delete** | Entire file is handover phase state machine - replaced by fs watcher |
-| `src/utils/parseClaudeStatus.ts` | **Delete or gut** | Status inference from PTY chars no longer drives task transitions. May keep for UI status indicator but remove from state machine. |
-| `SPEC_ECHO_WINDOW_MS` constant in `ptyStore.ts` | **Remove** | No longer echo-suppressing startup |
-| `handoverPhase` field in `SessionEntry` | **Remove** | No longer tracking phases |
-| `hadMeaningfulActivity` field in `SessionEntry` | **Remove** | No longer used for advance-to-review trigger |
-| `lastMeaningfulStatus` field in `SessionEntry` | **Remove** | No longer used |
-| `specSentAt` field in `SessionEntry` | **Remove** | No longer used |
-| `scheduleIdleStatus()` in `ptyStore.ts` | **Remove** | Idle detection for task advancement eliminated |
-| `advanceToReview()` in `ptyStore.ts` | **Remove or keep as fallback** | Primary path is now fs watcher |
-| `POST /api/internal/sessions/:id/back-to-in-progress` | **Remove** | No longer needed |
-| Status field parsing in `taskFile.ts` | **Remove** | Status derived from path, not frontmatter |
-| `tasks.json.bak` | **Delete file** | Legacy migration file, superseded |
+| File                                                  | Action                         | Reason                                                                                                                             |
+| ----------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/server/ptyHandlers.ts`                           | **Delete**                     | Entire file is handover phase state machine - replaced by fs watcher                                                               |
+| `src/utils/parseClaudeStatus.ts`                      | **Delete or gut**              | Status inference from PTY chars no longer drives task transitions. May keep for UI status indicator but remove from state machine. |
+| `SPEC_ECHO_WINDOW_MS` constant in `ptyStore.ts`       | **Remove**                     | No longer echo-suppressing startup                                                                                                 |
+| `handoverPhase` field in `SessionEntry`               | **Remove**                     | No longer tracking phases                                                                                                          |
+| `hadMeaningfulActivity` field in `SessionEntry`       | **Remove**                     | No longer used for advance-to-review trigger                                                                                       |
+| `lastMeaningfulStatus` field in `SessionEntry`        | **Remove**                     | No longer used                                                                                                                     |
+| `specSentAt` field in `SessionEntry`                  | **Remove**                     | No longer used                                                                                                                     |
+| `scheduleIdleStatus()` in `ptyStore.ts`               | **Remove**                     | Idle detection for task advancement eliminated                                                                                     |
+| `advanceToReview()` in `ptyStore.ts`                  | **Remove or keep as fallback** | Primary path is now fs watcher                                                                                                     |
+| `POST /api/internal/sessions/:id/back-to-in-progress` | **Remove**                     | No longer needed                                                                                                                   |
+| Status field parsing in `taskFile.ts`                 | **Remove**                     | Status derived from path, not frontmatter                                                                                          |
+| `tasks.json.bak`                                      | **Delete file**                | Legacy migration file, superseded                                                                                                  |
 
 ---
 
 ### 12. Unit Tests to Add/Update
 
 #### `taskStore.test.ts`
+
 - `getTaskFilePath` - finds file across all 4 status folders, returns null when not found
 - `readTask` - correctly derives status from folder location, not frontmatter
 - `writeTask` - moves file between status folders when status changes, no-op when status unchanged
@@ -304,11 +331,13 @@ This replaces the current mechanism where the server infers completion from PTY 
 - Migration - moves flat files to correct subdirs, removes status from frontmatter after move
 
 #### `taskFile.test.ts`
+
 - `parseTaskFile` - does not return `status` field (removed from schema)
 - `serializeTaskFile` - does not write `status` field to frontmatter
 - `deriveStatusFromPath` - correctly maps folder names to `TaskStatus` enum values
 
 #### `specWatcher.test.ts` - New file
+
 - File move from `in-progress/` -> `review/` triggers `task:updated` broadcast
 - File move from `backlog/` -> `in-progress/` triggers `task:updated` broadcast
 - File deletion does NOT trigger `task:updated`
@@ -316,6 +345,7 @@ This replaces the current mechanism where the server infers completion from PTY 
 - Multiple rapid moves debounce correctly (no duplicate broadcasts)
 
 #### `routes/tasks.test.ts`
+
 - `PATCH /api/tasks/:id` with status change causes file to be in correct subfolder on disk
 - `POST /api/tasks` creates file in `backlog/` subfolder on disk
 - `POST /api/tasks/:id/handover` moves file to `in-progress/` subfolder, sets sessionId
@@ -323,6 +353,7 @@ This replaces the current mechanism where the server infers completion from PTY 
 - Handover with empty spec skips to `review/` directly (existing behavior preserved)
 
 #### `migration.test.ts` - New file
+
 - Flat `TASK-*.md` files in `specs/{repoId}/` are moved to correct subfolder based on `status` frontmatter
 - Migrated files no longer contain `status` field in frontmatter
 - Migration is idempotent (running twice produces same result)
@@ -330,6 +361,7 @@ This replaces the current mechanism where the server infers completion from PTY 
 - Migration logs counts of files moved per status
 
 #### Delete these test files entirely:
+
 - `ptyHandlers.test.ts` (1111 lines) - module is being deleted
 
 ---
@@ -337,6 +369,7 @@ This replaces the current mechanism where the server infers completion from PTY 
 ### 13. E2E Tests to Add
 
 #### `spec-folder-movement.spec.ts` - New file
+
 **Setup**: Use fixtures that create real spec files on disk in the correct folder structure
 
 - **"task appears in correct board column based on folder location"**: Place a file in `in-progress/`, verify it shows in the In Progress column without any API call
@@ -347,18 +380,22 @@ This replaces the current mechanism where the server infers completion from PTY 
 - **"Claude moving file to review/ updates board in real time"**: Simulate Claude file move via test helper, assert board updates without server restart
 
 #### `spec-migration.spec.ts` - New file
+
 - **"server migrates flat spec files on startup"**: Place flat `TASK-*.md` files with various status values in `specs/{repoId}/`, restart server, verify files are in correct subfolders and frontmatter no longer contains `status` field
 
 #### `board.spec.ts` - Update existing
+
 - Remove any assertions that check frontmatter `status` field directly
 - Add assertions that verify board column assignment matches folder location (not status field)
 
 #### `handover.spec.ts` - Update existing
+
 - Verify spec file is in `in-progress/` folder after handover (not just that status API returns "In Progress")
 - Verify spec file is in `backlog/` folder after recall
 - Verify spec file moves to `review/` when Claude completes (file moved, not server-inferred)
 
 #### `task-lifecycle.spec.ts` - Update existing
+
 - Full lifecycle asserts file location at each step: `backlog/` -> `in-progress/` -> `review/` -> `done/`
 - Verify no `status` field in frontmatter at any point in lifecycle
 

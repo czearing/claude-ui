@@ -3,7 +3,6 @@
 import { FileText, DotsThree, Trash, Sparkle } from "@phosphor-icons/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
-import { formatRelativeDate } from "@/utils/formatRelativeDate";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
 
@@ -40,9 +39,6 @@ export function BacklogRow({
             className={`${styles.rowTitle}${!task.title ? ` ${styles.rowTitleEmpty}` : ""}`}
           >
             {task.title || "New Title"}
-          </span>
-          <span className={styles.rowDate}>
-            {formatRelativeDate(task.createdAt)}
           </span>
         </div>
       </div>

@@ -102,14 +102,14 @@ describe("AddRepoDialog", () => {
     expect(screen.getByText("Path already registered")).toBeInTheDocument();
   });
 
-  it("calls onCreated with the new repo id on success", async () => {
+  it("calls onCreated with the new repo name on success", async () => {
     const onCreated = jest.fn();
     mockMutate.mockImplementation(
       (
         _input: unknown,
-        options: { onSuccess: (repo: { id: string }) => void },
+        options: { onSuccess: (repo: { id: string; name: string }) => void },
       ) => {
-        options.onSuccess({ id: "repo-new" });
+        options.onSuccess({ id: "repo-new-id", name: "New Repo" });
       },
     );
     render(
@@ -118,6 +118,6 @@ describe("AddRepoDialog", () => {
     await userEvent.type(screen.getByLabelText("Name"), "New Repo");
     await userEvent.type(screen.getByLabelText("Path"), "/code/new");
     await userEvent.click(screen.getByRole("button", { name: "Add repo" }));
-    expect(onCreated).toHaveBeenCalledWith("repo-new");
+    expect(onCreated).toHaveBeenCalledWith("New Repo");
   });
 });

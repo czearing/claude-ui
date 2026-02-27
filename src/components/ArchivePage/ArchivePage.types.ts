@@ -1,3 +1,3 @@
 export interface ArchivePageProps {
-  repoId: string;
+  repo: string;
 }

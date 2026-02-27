@@ -51,6 +51,30 @@
   color: var(--color-text);
 }
 
+.badges {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background-color: var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
+
+.badgeActive {
+  background-color: var(--color-agent);
+  color: #fff;
+}
+
 .navSpacer {
   flex: 1;
 }

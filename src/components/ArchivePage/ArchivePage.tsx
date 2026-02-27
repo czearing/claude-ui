@@ -9,23 +9,15 @@ import { TopBar } from "@/components/Layout/TopBar";
 import { useDeleteTask, useTasks, useUpdateTask } from "@/hooks/useTasks";
 import { useTasksSocket } from "@/hooks/useTasksSocket";
 import { formatRelativeDate } from "@/utils/formatRelativeDate";
-import type { Priority } from "@/utils/tasks.types";
 import styles from "./ArchivePage.module.css";
 import type { ArchivePageProps } from "./ArchivePage.types";
 
-const PRIORITY_CLASS: Record<Priority, string> = {
-  Low: styles.priorityLow,
-  Medium: styles.priorityMedium,
-  High: styles.priorityHigh,
-  Urgent: styles.priorityUrgent,
-};
-
-export function ArchivePage({ repoId }: ArchivePageProps) {
+export function ArchivePage({ repo }: ArchivePageProps) {
   useTasksSocket();
 
-  const { data: allTasks = [] } = useTasks(repoId);
-  const { mutate: updateTask } = useUpdateTask(repoId);
-  const { mutate: deleteTask } = useDeleteTask(repoId);
+  const { data: allTasks = [] } = useTasks(repo);
+  const { mutate: updateTask } = useUpdateTask(repo);
+  const { mutate: deleteTask } = useDeleteTask(repo);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const agentActive = allTasks.some((t) => t.status === "In Progress");
@@ -43,14 +35,10 @@ export function ArchivePage({ repoId }: ArchivePageProps) {
 
   return (
     <div className={styles.shell}>
-      <Sidebar
-        repoId={repoId}
-        currentView="Archive"
-        agentActive={agentActive}
-      />
+      <Sidebar repo={repo} currentView="Archive" agentActive={agentActive} />
 
       <main className={styles.main}>
-        <TopBar repoId={repoId} currentView="Archive" />
+        <TopBar repo={repo} currentView="Archive" />
 
         <div className={styles.content}>
           <div className={styles.inner}>
@@ -73,19 +61,13 @@ export function ArchivePage({ repoId }: ArchivePageProps) {
                       >
                         {task.title || "Untitled"}
                       </span>
-                      <div className={styles.rowMeta}>
-                        <span
-                          className={`${styles.priority} ${PRIORITY_CLASS[task.priority]}`}
-                        >
-                          {task.priority}
-                        </span>
-                        <span className={styles.rowDate}>
-                          Archived{" "}
-                          {task.archivedAt
-                            ? formatRelativeDate(task.archivedAt)
-                            : formatRelativeDate(task.updatedAt)}
-                        </span>
-                      </div>
+                      {task.archivedAt && (
+                        <div className={styles.rowMeta}>
+                          <span className={styles.rowDate}>
+                            Archived {formatRelativeDate(task.archivedAt)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -18,17 +18,17 @@ jest.mock("@/hooks/useRepos", () => ({
 
 describe("TopBar", () => {
   it("renders the repo name from useRepos", () => {
-    render(<TopBar repoId="repo-1" currentView="Board" />);
+    render(<TopBar repo="My Repo" currentView="Board" />);
     expect(screen.getByText("My Repo")).toBeInTheDocument();
   });
 
-  it("renders '…' when the repo is not found", () => {
-    render(<TopBar repoId="unknown" currentView="Board" />);
-    expect(screen.getByText("…")).toBeInTheDocument();
+  it("renders the repo name as fallback when not found in list", () => {
+    render(<TopBar repo="unknown" currentView="Board" />);
+    expect(screen.getByText("unknown")).toBeInTheDocument();
   });
 
   it("renders the current view in the breadcrumb", () => {
-    render(<TopBar repoId="repo-1" currentView="Tasks" />);
+    render(<TopBar repo="My Repo" currentView="Tasks" />);
     expect(screen.getByText("Tasks")).toBeInTheDocument();
   });
 });

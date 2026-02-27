@@ -30,7 +30,7 @@ export async function resolveSkillsDir(
 ): Promise<string> {
   if (scope === "repo" && repoId) {
     const repos = await readRepos();
-    const repo = repos.find((r) => r.id === repoId);
+    const repo = repos.find((r) => r.name === repoId);
     if (!repo) {
       throw new Error("Repo not found");
     }

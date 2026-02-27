@@ -7,13 +7,25 @@ import { handleAgentRoutes } from "./src/server/routes/agents";
 import { handleRepoRoutes } from "./src/server/routes/repos";
 import { handleSkillRoutes } from "./src/server/routes/skills";
 import { handleTaskRoutes } from "./src/server/routes/tasks";
-import { readAllTasks, readTask, writeTask } from "./src/server/taskStore";
+import {
+  ensureStatusDirs,
+  FOLDER_STATUS,
+  invalidateRepoCache,
+  migrateFrontmatterTasks,
+  migrateRepoTasks,
+  readAllTasks,
+  readTask,
+  SPECS_DIR,
+  suppressWatchEvents,
+  writeTask,
+} from "./src/server/taskStore";
 import { handleTerminalUpgrade } from "./src/server/wsProxy";
 import { extractTextFromLexical } from "./src/utils/lexical";
 import type { Task } from "./src/utils/tasks.types";
 
 import { randomUUID } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { watch } from "node:fs";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { parse } from "node:url";
@@ -51,19 +63,25 @@ async function ensureDefaultRepo(): Promise<void> {
 
   const defaultRepo = {
     id: randomUUID(),
-    name: "Default",
+    name: "claude-code-ui",
     path: process.cwd(),
     createdAt: new Date().toISOString(),
   };
   await writeRepos([defaultRepo]);
 
-  // Migrate existing tasks that have no repoId
+  // Migrate existing tasks that have no repo
   const tasks = await readTasks();
-  const needsMigration = tasks.some((t) => !t.repoId);
+  const needsMigration = tasks.some(
+    (t) => !(t as Record<string, unknown>)["repo"],
+  );
   if (needsMigration) {
-    const migrated = tasks.map((t) =>
-      t.repoId ? t : { ...t, repoId: defaultRepo.id },
-    );
+    const migrated = tasks.map((t) => {
+      const record = t as Record<string, unknown>;
+      if (!record["repo"]) {
+        return { ...t, repo: defaultRepo.name };
+      }
+      return t;
+    });
     await writeTasks(migrated);
   }
 
@@ -73,7 +91,7 @@ async function ensureDefaultRepo(): Promise<void> {
     const raw = await readFile(tasksFilePath, "utf8");
     const legacyTasks = JSON.parse(raw) as Task[];
     for (const t of legacyTasks) {
-      const existing = await readTask(t.id, t.repoId);
+      const existing = await readTask(t.id, t.repo);
       if (existing) {
         continue; // already migrated
       }
@@ -83,13 +101,88 @@ async function ensureDefaultRepo(): Promise<void> {
       };
       await writeTask(migratedTask);
     }
-    // Rename tasks.json → tasks.json.bak so migration doesn't re-run
-    await rename(tasksFilePath, `${tasksFilePath}.bak`);
+    // Delete tasks.json so migration doesn't re-run
+    await unlink(tasksFilePath);
+    // Clean up any existing .bak file from a previous migration run
+    try {
+      await unlink(`${tasksFilePath}.bak`);
+    } catch {
+      /* already gone */
+    }
     console.error(
       `[tasks] Migrated ${legacyTasks.length} tasks to markdown files`,
     );
   } catch {
     // tasks.json doesn't exist — nothing to migrate
+  }
+}
+
+// ─── Folder-based status migration ───────────────────────────────────────────
+
+async function migrateAllRepos(): Promise<void> {
+  const repos = await readRepos();
+  // Build repoId→name map for migration
+  const repoIdToName = new Map<string, string>();
+  for (const r of repos) {
+    repoIdToName.set(r.id, r.name);
+  }
+
+  // Ensure status dirs for each known repo
+  for (const r of repos) {
+    await ensureStatusDirs(r.name);
+  }
+  // Also ensure default in case it doesn't exist yet
+  await ensureStatusDirs("claude-code-ui");
+
+  await migrateRepoTasks(repoIdToName);
+  await migrateFrontmatterTasks();
+}
+
+// ─── File watcher for external task edits ─────────────────────────────────────
+
+function setupTaskFileWatcher(): void {
+  const watchDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  try {
+    watch(SPECS_DIR, { recursive: true }, (event, filename) => {
+      if (event !== "rename" || !filename) {
+        return;
+      }
+      const normalized = filename.replace(/\\/g, "/");
+      const parts = normalized.split("/");
+      // parts: [repoName, statusFolder, taskFile]
+      if (parts.length < 3) {
+        return;
+      }
+      const [repoName, folder, taskFile] = parts;
+      if (!FOLDER_STATUS[folder]) {
+        return;
+      }
+      if (!taskFile?.endsWith(".md")) {
+        return;
+      }
+      const taskId = taskFile.slice(0, -3);
+      const existing = watchDebounceTimers.get(taskId);
+      if (existing) {
+        clearTimeout(existing);
+      }
+      watchDebounceTimers.set(
+        taskId,
+        setTimeout(async () => {
+          watchDebounceTimers.delete(taskId);
+          if (suppressWatchEvents.has(taskId)) {
+            return;
+          }
+          const task = await readTask(taskId, repoName);
+          if (task) {
+            invalidateRepoCache(task.repo);
+            broadcastTaskEvent("task:updated", task);
+          }
+        }, 100),
+      );
+    });
+  } catch {
+    // SPECS_DIR may not exist yet - watcher will not fire for non-existent dirs
   }
 }
 
@@ -126,12 +219,13 @@ async function recoverInProgressTasks(): Promise<void> {
 
   for (const task of stuckTasks) {
     if (!liveSessions.has(task.sessionId!)) {
+      const prevStatus = task.status;
       const updated: Task = {
         ...task,
         status: "Review",
         updatedAt: new Date().toISOString(),
       };
-      await writeTask(updated);
+      await writeTask(updated, prevStatus);
       broadcastTaskEvent("task:updated", updated);
     }
   }
@@ -143,6 +237,7 @@ app
   .prepare()
   .then(async () => {
     await ensureDefaultRepo();
+    await migrateAllRepos();
 
     // Must be obtained after prepare() so Next.js internals are ready.
     // Handles HMR WebSocket connections (/_next/webpack-hmr) and any other
@@ -203,6 +298,7 @@ app
 
     server.listen(port, () => {
       console.error(`> Ready on http://localhost:${port}`);
+      setupTaskFileWatcher();
       void recoverInProgressTasks();
     });
   })

@@ -32,13 +32,9 @@ function sortTasks(tasks: Task[], sortBy: SortBy): Task[] {
   return [...tasks].sort((a, b) => {
     switch (sortBy) {
       case "newest":
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        return b.id.localeCompare(a.id);
       case "oldest":
-        return (
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
+        return a.id.localeCompare(b.id);
       case "az":
         return a.title.localeCompare(b.title);
       case "za":
@@ -48,21 +44,21 @@ function sortTasks(tasks: Task[], sortBy: SortBy): Task[] {
 }
 
 interface BacklogProps {
-  repoId: string;
+  repo: string;
   onSelectTask: (task: Task) => void;
   onNewTask: () => void;
   selectedTaskId?: string;
 }
 
 export function Backlog({
-  repoId,
+  repo,
   onSelectTask,
   onNewTask,
   selectedTaskId,
 }: BacklogProps) {
-  const { data: backlogTasks = [] } = useTasks(repoId, selectBacklogTasks);
-  const { mutate: deleteTask } = useDeleteTask(repoId);
-  const { mutate: handoverTask } = useHandoverTask(repoId);
+  const { data: backlogTasks = [] } = useTasks(repo, selectBacklogTasks);
+  const { mutate: deleteTask } = useDeleteTask(repo);
+  const { mutate: handoverTask } = useHandoverTask(repo);
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");

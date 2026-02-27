@@ -88,10 +88,9 @@ test.describe("Spec Content Behavior", () => {
     await page.getByText(task.title).click();
 
     // Clicking an In Progress task on the Board navigates to the session page.
-    await expect(page).toHaveURL(
-      new RegExp(`/repos/${repoId}/session/`),
-      { timeout: 10000 },
-    );
+    await expect(page).toHaveURL(new RegExp(`/repos/${repoId}/session/`), {
+      timeout: 10000,
+    });
 
     // The session page mounts useTerminalSocket which opens the WebSocket;
     // poll until the routeWebSocket handler has fired.
@@ -116,11 +115,7 @@ test.describe("Spec Content Behavior", () => {
     // A spec containing only whitespace is treated as empty by the server —
     // there is nothing for Claude to do, so no pty session is spawned and
     // the task jumps straight to "Review".
-    const task = await createTask(
-      request,
-      "Whitespace spec task",
-      "   \n\t  ",
-    );
+    const task = await createTask(request, "Whitespace spec task", "   \n\t  ");
 
     // If this ever fires, it means a terminal was unexpectedly spawned
     // for a blank spec — which would be a regression.

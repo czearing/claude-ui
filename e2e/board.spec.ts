@@ -18,9 +18,7 @@ test("board shows status column headings", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "In Progress" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Review" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
 });
 
 // /backlog redirects to /tasks which shows the Backlog component (Backlog-only
@@ -42,7 +40,5 @@ test("in-progress task card shows agent processing badge", async ({ page }) => {
 test("new task button is present on the tasks page", async ({ page }) => {
   await page.goto("/repos/repo-1/tasks");
 
-  await expect(
-    page.getByRole("button", { name: /new task/i }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /new task/i })).toBeVisible();
 });

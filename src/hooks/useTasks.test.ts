@@ -45,26 +45,23 @@ const mockTask: Task = {
   id: "task-1",
   title: "Test Task",
   status: "Not Started",
-  priority: "Medium",
   spec: "",
-  repoId: REPO_ID,
-  createdAt: "2024-01-01T00:00:00.000Z",
-  updatedAt: "2024-01-01T00:00:00.000Z",
+  repo: REPO_ID,
 };
 
 describe("useTasks", () => {
-  it("fetches tasks for a repoId", async () => {
+  it("fetches tasks for a repo", async () => {
     mockFetch.mockResolvedValue(okJson([mockTask]));
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useTasks(REPO_ID), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([mockTask]);
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/tasks?repoId=${encodeURIComponent(REPO_ID)}`,
+      `/api/tasks?repo=${encodeURIComponent(REPO_ID)}`,
     );
   });
 
-  it("does not fetch when repoId is empty", () => {
+  it("does not fetch when repo is empty", () => {
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useTasks(""), { wrapper });
     expect(result.current.fetchStatus).toBe("idle");
@@ -91,7 +88,7 @@ describe("useTasks", () => {
 });
 
 describe("useCreateTask", () => {
-  it("POSTs to /api/tasks with repoId merged in", async () => {
+  it("POSTs to /api/tasks with repo merged in", async () => {
     mockFetch.mockResolvedValue(okJson(mockTask));
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useCreateTask(REPO_ID), { wrapper });
@@ -104,7 +101,7 @@ describe("useCreateTask", () => {
     expect(opts.method).toBe("POST");
     expect(JSON.parse(opts.body as string)).toMatchObject({
       title: "Test Task",
-      repoId: REPO_ID,
+      repo: REPO_ID,
     });
   });
 });

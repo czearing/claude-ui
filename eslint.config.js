@@ -27,6 +27,8 @@ export default config(
       "*.log",
       "logs/",
       ".storybook/",
+      "scripts/debug-*.mjs",
+      "scripts/test-*.mjs",
     ],
   },
 

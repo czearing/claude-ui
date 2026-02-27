@@ -50,14 +50,11 @@ const mockBroadcastTaskEvent = broadcastTaskEvent as jest.MockedFunction<
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
-    id: "TASK-001",
+    id: "test-task",
     title: "Test Task",
     status: "Review",
-    priority: "Medium",
     spec: "some spec",
-    repoId: "repo-abc",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-02T00:00:00.000Z",
+    repo: "test-repo",
     ...overrides,
   };
 }

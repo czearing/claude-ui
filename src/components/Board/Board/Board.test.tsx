@@ -64,31 +64,22 @@ const tasks: Task[] = [
     id: "1",
     title: "In-progress task",
     status: "In Progress",
-    priority: "High",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
+    repo: "repo1",
   },
   {
     id: "2",
     title: "Review task",
     status: "Review",
-    priority: "Medium",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
+    repo: "repo1",
   },
   {
     id: "3",
     title: "Done task",
     status: "Done",
-    priority: "Low",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
+    repo: "repo1",
   },
 ];
 
@@ -101,7 +92,7 @@ beforeEach(() => {
 
 describe("Board", () => {
   it("renders all three board columns", () => {
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
     expect(
       screen.getByRole("heading", { name: "In Progress" }),
     ).toBeInTheDocument();
@@ -110,39 +101,36 @@ describe("Board", () => {
   });
 
   it("shows In Progress tasks on the board", () => {
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
     expect(screen.getByText("In-progress task")).toBeInTheDocument();
   });
 
   it("shows Review tasks on the board", () => {
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
     expect(screen.getByText("Review task")).toBeInTheDocument();
   });
 
   it("Done column is always empty — Done tasks are never rendered on the board", () => {
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
     expect(screen.queryByText("Done task")).not.toBeInTheDocument();
   });
 
   it("renders a new In Progress card when tasks prop gains a task:created entry", () => {
     const { rerender } = render(
-      <Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />,
+      <Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />,
     );
 
     const createdTask: Task = {
       id: "4",
       title: "Newly Created Task",
       status: "In Progress",
-      priority: "High",
       spec: "",
-      repoId: "repo1",
-      createdAt: "2024-01-02T00:00:00Z",
-      updatedAt: "2024-01-02T00:00:00Z",
+      repo: "repo1",
     };
 
     rerender(
       <Board
-        repoId="repo1"
+        repo="repo1"
         tasks={[...tasks, createdTask]}
         onSelectTask={jest.fn()}
       />,
@@ -151,23 +139,42 @@ describe("Board", () => {
     expect(screen.getByText("Newly Created Task")).toBeInTheDocument();
   });
 
-  it("calls updateTask with new status when drag ends on a different column", () => {
+  it("calls updateTask with new status when drag ends on a valid column (Review to Done)", () => {
     const updateMutate = jest.fn();
     (useUpdateTask as jest.Mock).mockReturnValue({ mutate: updateMutate });
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+
+    // Task "2" is in Review status. Review → Done is the only valid cross-column
+    // move for a Review task (it can be archived but cannot go back to In Progress).
+    capturedDragEnd?.({
+      active: { id: "2" } as DragEndEvent["active"],
+      over: { id: "Done" } as DragEndEvent["over"],
+    } as DragEndEvent);
+
+    expect(updateMutate).toHaveBeenCalledWith({ id: "2", status: "Done" });
+  });
+
+  it("does not allow dragging In Progress tasks to Review", () => {
+    // The "Review" status is set exclusively by the agent when it finishes work.
+    // Allowing a user to drag an In Progress card into Review would bypass the
+    // agent handoff and put the task into a misleading state where it appears
+    // ready for human review but the agent may still be running.
+    const updateMutate = jest.fn();
+    (useUpdateTask as jest.Mock).mockReturnValue({ mutate: updateMutate });
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
 
     capturedDragEnd?.({
       active: { id: "1" } as DragEndEvent["active"],
       over: { id: "Review" } as DragEndEvent["over"],
     } as DragEndEvent);
 
-    expect(updateMutate).toHaveBeenCalledWith({ id: "1", status: "Review" });
+    expect(updateMutate).not.toHaveBeenCalled();
   });
 
   it("does not call updateTask when drag is cancelled (no over target)", () => {
     const updateMutate = jest.fn();
     (useUpdateTask as jest.Mock).mockReturnValue({ mutate: updateMutate });
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
 
     capturedDragEnd?.({
       active: { id: "1" } as DragEndEvent["active"],
@@ -180,7 +187,7 @@ describe("Board", () => {
   it("does not call updateTask when dragging a task to its current position", () => {
     const updateMutate = jest.fn();
     (useUpdateTask as jest.Mock).mockReturnValue({ mutate: updateMutate });
-    render(<Board repoId="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
+    render(<Board repo="repo1" tasks={tasks} onSelectTask={jest.fn()} />);
 
     // active.id === over.id means dropped on itself
     capturedDragEnd?.({

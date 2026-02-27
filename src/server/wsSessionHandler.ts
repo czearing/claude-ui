@@ -6,20 +6,42 @@
  */
 
 import * as pty from "node-pty";
-import type { WebSocket } from "ws";
+import { WebSocket } from "ws";
 
-import { attachTerminalHandlers } from "./ptyHandlers";
 import {
-  advanceToReview,
+  appendToBuffer,
   backToInProgress,
   completedSessions,
   emitStatus,
   sessions,
 } from "./ptyStore";
+import {
+  createHookSettingsFile,
+  cleanupHookSettingsDir,
+} from "../utils/claudeHookSettings";
 import type { SessionRegistryEntry } from "../utils/sessionRegistry";
 
 import type { IncomingMessage } from "node:http";
 import { parse } from "node:url";
+
+/**
+ * Returns true only when the user has pressed Enter (CR) — i.e. they have
+ * actually submitted a prompt to Claude.
+ *
+ * We deliberately do NOT fire backToInProgress on every keypress.  Typing
+ * individual characters (or xterm.js automatically responding to PTY queries
+ * like cursor-position reports \x1b[24;80R) should not pull a task out of
+ * Review; only an explicit submission should.
+ *
+ * Strip CSI sequences first so that sequences ending in a letter (e.g. mode
+ * reports) are not confused with user-typed carriage returns.
+ */
+function isUserSubmit(s: string): boolean {
+  // Strip all CSI sequences: ESC [ <parameter/intermediate bytes> <final byte>
+  // eslint-disable-next-line no-control-regex
+  const stripped = s.replace(/\x1b\[[\x20-\x3f]*[\x40-\x7e]/g, "");
+  return stripped.includes("\r");
+}
 
 /**
  * Handle an incoming WebSocket connection on the pty-manager server.
@@ -58,44 +80,42 @@ export function handleWsConnection(
       );
     }
     emitStatus(ws, entry.currentStatus);
-
-    // Recover stale handover sessions: the spec was sent but the idle timer
-    // may have fired before meaningful activity was detected (e.g. spinner
-    // within the echo window), leaving the task "In Progress" forever with
-    // Claude idle at the ❯ prompt.  Advance to Review now that the user has
-    // reconnected and we can confirm Claude is waiting.
-    if (
-      entry.handoverPhase === "spec_sent" &&
-      entry.currentStatus === "waiting"
-    ) {
-      entry.handoverPhase = "done";
-      advanceToReview(sessionId);
-    }
-  } else if (completedSessions.has(sessionId)) {
-    // The handover session already exited — replay its output so the client
-    // has context before seeing "Session ended.", then close.
-    // Do NOT spawn --continue, which would resume the caller's own Claude
-    // Code session instead of showing the completed task's output.
-    const finalOutput = completedSessions.get(sessionId)!;
-    if (finalOutput.length > 0) {
-      ws.send(
-        JSON.stringify({
-          type: "replay",
-          data: finalOutput.toString("base64"),
-        }),
-      );
-    }
-    ws.send(JSON.stringify({ type: "status", value: "exited" }));
-    ws.send(JSON.stringify({ type: "exit", code: 0 }));
-    ws.close();
-    return;
   } else {
+    // Check for a completed handover session whose output should be replayed
+    // before spawning --continue for the interactive follow-up session.
+    let priorOutput: Buffer | null = null;
+    if (completedSessions.has(sessionId)) {
+      const finalOutput = completedSessions.get(sessionId)!;
+      const reg = sessionRegistry.get(sessionId);
+      if (!reg) {
+        // Truly ended — no registry entry, replay output and close.
+        if (finalOutput.length > 0) {
+          ws.send(
+            JSON.stringify({
+              type: "replay",
+              data: finalOutput.toString("base64"),
+            }),
+          );
+        }
+        ws.send(JSON.stringify({ type: "status", value: "exited" }));
+        ws.send(JSON.stringify({ type: "exit", code: 0 }));
+        ws.close();
+        return;
+      }
+      // Registry entry exists — replay prior output then spawn --continue.
+      priorOutput = finalOutput;
+      completedSessions.delete(sessionId);
+    }
+
     // New or resumed session: spawn pty
     const registryEntry = sessionRegistry.get(sessionId);
     const sessionCwd = registryEntry?.cwd ?? process.cwd();
-    const spawnArgs = registryEntry
-      ? ["--dangerously-skip-permissions", "--continue"]
-      : ["--dangerously-skip-permissions"];
+    // Always spawn a fresh interactive session — do NOT use --continue.
+    // --continue resumes the most recent conversation in the cwd, which may
+    // be the developer's own active session rather than the handover task's
+    // conversation.  The prior -p output is replayed above so the user has
+    // full context without needing the conversation history.
+    const spawnArgs = ["--dangerously-skip-permissions"];
 
     // Unset CLAUDECODE so nested Claude instances are not blocked by the
     // "cannot be launched inside another Claude Code session" guard.
@@ -103,6 +123,9 @@ export function handleWsConnection(
       string,
       string
     >;
+    const SERVER_PORT = process.env.SERVER_PORT ?? "3000";
+    const settingsFile = createHookSettingsFile(sessionId, SERVER_PORT);
+    spawnArgs.push("--settings", settingsFile);
     let ptyProcess: pty.IPty;
     try {
       ptyProcess = pty.spawn(command, spawnArgs, {
@@ -110,12 +133,22 @@ export function handleWsConnection(
         cols: 80,
         rows: 24,
         cwd: sessionCwd,
-        env: spawnEnv,
+        env: { ...spawnEnv, CLAUDE_CODE_UI_SESSION_ID: sessionId },
       });
     } catch (err) {
       ws.send(JSON.stringify({ type: "error", message: String(err) }));
       ws.close();
       return;
+    }
+
+    // Replay prior handover output so user has full context before --continue
+    if (priorOutput && priorOutput.length > 0) {
+      ws.send(
+        JSON.stringify({
+          type: "replay",
+          data: priorOutput.toString("base64"),
+        }),
+      );
     }
 
     // Track in registry so the session survives future server restarts
@@ -138,30 +171,38 @@ export function handleWsConnection(
       activeWs: ws,
       currentStatus: "connecting",
       idleTimer: null,
-      handoverPhase: null,
-      handoverSpec: "",
-      specSentAt: 0,
-      hadMeaningfulActivity: false,
-      lastMeaningfulStatus: null,
-      supportsBracketedPaste: false,
     };
     sessions.set(sessionId, entry);
     emitStatus(ws, "connecting");
 
-    attachTerminalHandlers(ptyProcess, sessionId);
-
-    // Recovery: if this is a resumed session whose registry entry is older
-    // than 5 minutes, the pty-manager likely restarted while the task was
-    // "In Progress".  Advance to Review now — advanceToReview checks
-    // task.status === "In Progress" before mutating, so it is safe to call
-    // even if the task is already in a different state.
-    if (registryEntry) {
-      const ageMs = Date.now() - new Date(registryEntry.createdAt).getTime();
-      const FIVE_MINUTES_MS = 5 * 60 * 1000;
-      if (ageMs > FIVE_MINUTES_MS) {
-        advanceToReview(sessionId);
+    // Simple PTY handlers
+    ptyProcess.onData((data) => {
+      const chunk = Buffer.from(data);
+      const e = sessions.get(sessionId);
+      if (!e) {return;}
+      appendToBuffer(e, chunk);
+      if (e.activeWs?.readyState === WebSocket.OPEN) {
+        e.activeWs.send(chunk);
       }
-    }
+    });
+    ptyProcess.onExit(({ exitCode }) => {
+      const e = sessions.get(sessionId);
+      if (e) {
+        if (e.idleTimer !== null) {clearTimeout(e.idleTimer);}
+        e.currentStatus = "exited";
+        if (e.activeWs?.readyState === WebSocket.OPEN) {
+          e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
+          e.activeWs.close();
+        }
+        // Store final output for replay if user reconnects
+        completedSessions.set(sessionId, Buffer.concat(e.outputBuffer));
+      }
+      sessions.delete(sessionId);
+      cleanupHookSettingsDir(sessionId);
+      // Keep registry entry so --continue can always be spawned as a fallback
+      // if the interactive session dies.  Registry entries are only cleared by
+      // explicit killSession calls (user marks task Done or uses Recall).
+    });
   }
 
   ws.on("message", (data, isBinary) => {
@@ -170,13 +211,9 @@ export function handleWsConnection(
       return;
     }
     if (isBinary) {
-      // User sent input — if Claude had already done meaningful work, the task
-      // may be sitting in "Review".  Reset state and move it back to "In Progress".
-      if (e.hadMeaningfulActivity) {
-        e.hadMeaningfulActivity = false;
-        backToInProgress(sessionId);
-      }
-      e.pty.write(Buffer.from(data as ArrayBuffer).toString());
+      const str = Buffer.from(data as ArrayBuffer).toString();
+      if (isUserSubmit(str)) {backToInProgress(sessionId);}
+      e.pty.write(str);
     } else {
       const text = (data as Buffer).toString("utf8");
       try {
@@ -192,12 +229,7 @@ export function handleWsConnection(
       } catch {
         // not JSON — write raw to PTY
       }
-      // User sent input — if Claude had already done meaningful work, the task
-      // may be sitting in "Review".  Reset state and move it back to "In Progress".
-      if (e.hadMeaningfulActivity) {
-        e.hadMeaningfulActivity = false;
-        backToInProgress(sessionId);
-      }
+      if (isUserSubmit(text)) {backToInProgress(sessionId);}
       e.pty.write(text);
     }
   });

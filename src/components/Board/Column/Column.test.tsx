@@ -32,21 +32,15 @@ const tasks: Task[] = [
     id: "1",
     title: "Task Alpha",
     status: "Review",
-    priority: "High",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
+    repo: "repo1",
   },
   {
     id: "2",
     title: "Task Beta",
     status: "Review",
-    priority: "Medium",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
+    repo: "repo1",
   },
 ];
 

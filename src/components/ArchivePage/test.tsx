@@ -11,22 +11,16 @@ const mockUseTasks = jest.fn().mockReturnValue({
       id: "TASK-001",
       title: "Finished feature",
       status: "Done",
-      priority: "High",
       spec: "",
-      repoId: "repo-1",
-      createdAt: "2026-02-20T10:00:00.000Z",
-      updatedAt: "2026-02-25T10:00:00.000Z",
+      repo: "repo-1",
       archivedAt: "2026-02-25T10:00:00.000Z",
     },
     {
       id: "TASK-002",
       title: "In progress task",
       status: "In Progress",
-      priority: "Medium",
       spec: "",
-      repoId: "repo-1",
-      createdAt: "2026-02-21T10:00:00.000Z",
-      updatedAt: "2026-02-25T10:00:00.000Z",
+      repo: "repo-1",
     },
   ],
 });
@@ -64,40 +58,34 @@ describe("ArchivePage", () => {
           id: "TASK-001",
           title: "Finished feature",
           status: "Done",
-          priority: "High",
           spec: "",
-          repoId: "repo-1",
-          createdAt: "2026-02-20T10:00:00.000Z",
-          updatedAt: "2026-02-25T10:00:00.000Z",
+          repo: "repo-1",
           archivedAt: "2026-02-25T10:00:00.000Z",
         },
         {
           id: "TASK-002",
           title: "In progress task",
           status: "In Progress",
-          priority: "Medium",
           spec: "",
-          repoId: "repo-1",
-          createdAt: "2026-02-21T10:00:00.000Z",
-          updatedAt: "2026-02-25T10:00:00.000Z",
+          repo: "repo-1",
         },
       ],
     });
   });
 
   it("shows only Done tasks, not In Progress tasks", () => {
-    render(<ArchivePage repoId="repo-1" />);
+    render(<ArchivePage repo="repo-1" />);
     expect(screen.getByText("Finished feature")).toBeInTheDocument();
     expect(screen.queryByText("In progress task")).not.toBeInTheDocument();
   });
 
   it("shows archived count in subheading", () => {
-    render(<ArchivePage repoId="repo-1" />);
+    render(<ArchivePage repo="repo-1" />);
     expect(screen.getByText(/Completed tasks \(1\)/)).toBeInTheDocument();
   });
 
   it("calls updateTask with status Backlog when Restore is clicked", () => {
-    render(<ArchivePage repoId="repo-1" />);
+    render(<ArchivePage repo="repo-1" />);
     fireEvent.click(screen.getByText("Restore"));
     expect(mockUpdateTask).toHaveBeenCalledWith({
       id: "TASK-001",
@@ -107,7 +95,7 @@ describe("ArchivePage", () => {
 
   it("shows empty state when no Done tasks exist", () => {
     mockUseTasks.mockReturnValueOnce({ data: [] });
-    render(<ArchivePage repoId="repo-1" />);
+    render(<ArchivePage repo="repo-1" />);
     expect(screen.getByText(/No archived tasks yet/)).toBeInTheDocument();
   });
 
@@ -118,22 +106,19 @@ describe("ArchivePage", () => {
           id: "TASK-003",
           title: "No archived date task",
           status: "Done",
-          priority: "Low",
           spec: "",
-          repoId: "repo-1",
-          createdAt: "2026-02-20T10:00:00.000Z",
-          updatedAt: "2026-02-25T10:00:00.000Z",
+          repo: "repo-1",
           // intentionally no archivedAt field
         },
       ],
     });
-    render(<ArchivePage repoId="repo-1" />);
+    render(<ArchivePage repo="repo-1" />);
     expect(screen.getByText("No archived date task")).toBeInTheDocument();
   });
 
   it("calls deleteTask with task id when Delete is selected from dropdown", async () => {
     const user = userEvent.setup();
-    render(<ArchivePage repoId="repo-1" />);
+    render(<ArchivePage repo="repo-1" />);
 
     const trigger = screen.getByRole("button", {
       name: "More actions for Finished feature",

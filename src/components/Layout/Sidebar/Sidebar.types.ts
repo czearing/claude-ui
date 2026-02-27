@@ -8,7 +8,6 @@ export type View =
   | "Settings";
 
 export interface SidebarProps {
-  repoId?: string;
+  repo?: string;
   currentView: View;
-  agentActive?: boolean;
 }

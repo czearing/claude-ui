@@ -25,7 +25,7 @@ export function AddRepoDialog({
         onSuccess: (repo) => {
           setName("");
           setPath("");
-          onCreated(repo.id);
+          onCreated(repo.name);
         },
       },
     );

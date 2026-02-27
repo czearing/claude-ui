@@ -24,16 +24,16 @@ const BOARD_COLUMNS: TaskStatus[] = ["In Progress", "Review", "Done"];
 const EMPTY: Task[] = [];
 
 interface BoardProps {
-  repoId: string;
+  repo: string;
   tasks: Task[];
   onSelectTask: (task: Task) => void;
   onHandover?: (taskId: string) => void;
 }
 
-export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
-  const { mutate: updateTask } = useUpdateTask(repoId);
-  const { mutate: deleteTask } = useDeleteTask(repoId);
-  const { mutate: recallTask } = useRecallTask(repoId);
+export function Board({ repo, tasks, onSelectTask, onHandover }: BoardProps) {
+  const { mutate: updateTask } = useUpdateTask(repo);
+  const { mutate: deleteTask } = useDeleteTask(repo);
+  const { mutate: recallTask } = useRecallTask(repo);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
@@ -63,11 +63,15 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
     }
 
     const sourceStatus = tasks.find((t) => t.id === active.id)?.status;
-    // Only Review can move to Done; Review cannot move back to In Progress
+    // Only Review can move to Done; Review cannot move back to In Progress;
+    // In Progress cannot be manually moved to Review (the agent sets Review status)
     if (targetStatus === "Done" && sourceStatus !== "Review") {
       return;
     }
     if (sourceStatus === "Review" && targetStatus === "In Progress") {
+      return;
+    }
+    if (sourceStatus === "In Progress" && targetStatus === "Review") {
       return;
     }
 
@@ -86,7 +90,8 @@ export function Board({ repoId, tasks, onSelectTask, onHandover }: BoardProps) {
           {BOARD_COLUMNS.map((status) => {
             const isDropDisabled =
               (status === "Done" && activeTask?.status !== "Review") ||
-              (status === "In Progress" && activeTask?.status === "Review");
+              (status === "In Progress" && activeTask?.status === "Review") ||
+              (status === "Review" && activeTask?.status === "In Progress");
             return (
               <Column
                 key={status}

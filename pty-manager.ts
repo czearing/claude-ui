@@ -19,12 +19,20 @@
  */
 
 import * as pty from "node-pty";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 
-import { attachHandoverHandlers } from "./src/server/ptyHandlers";
-import { sessions, killSession } from "./src/server/ptyStore";
+import {
+  appendToBuffer,
+  completedSessions,
+  sessions,
+  killSession,
+} from "./src/server/ptyStore";
 import type { SessionEntry } from "./src/server/ptyStore";
 import { handleWsConnection } from "./src/server/wsSessionHandler";
+import {
+  createHookSettingsFile,
+  cleanupHookSettingsDir,
+} from "./src/utils/claudeHookSettings";
 import { readBody } from "./src/utils/readBody";
 import {
   loadRegistry,
@@ -90,23 +98,35 @@ async function handleRequest(
 
       let ptyProcess: pty.IPty;
       try {
-        // Pass the spec directly via -p so Claude receives it on startup
-        // without needing PTY write injection (which is unreliable on Windows).
+        // Spawn Claude in print mode (-p) with the spec as the prompt.
+        // This avoids the need to inject text into an interactive PTY — which
+        // is unreliable on Windows ConPTY — while still streaming output to
+        // the terminal view.  When Claude finishes, the Stop hook fires to
+        // advance the task to Review, the process exits, and the WS client
+        // reconnects to trigger a fresh interactive session for follow-up.
         // Unset CLAUDECODE so nested Claude instances are not blocked by the
         // "cannot be launched inside another Claude Code session" guard.
         const { CLAUDECODE: _cc, ...spawnEnv } = process.env as Record<
           string,
           string
         >;
+        const SERVER_PORT = process.env.SERVER_PORT ?? "3000";
+        const settingsFile = createHookSettingsFile(sessionId, SERVER_PORT);
         ptyProcess = pty.spawn(
           command,
-          ["--dangerously-skip-permissions", "-p", spec],
+          [
+            "--dangerously-skip-permissions",
+            "--settings",
+            settingsFile,
+            "-p",
+            spec,
+          ],
           {
             name: "xterm-color",
             cols: 80,
             rows: 24,
             cwd,
-            env: spawnEnv,
+            env: { ...spawnEnv, CLAUDE_CODE_UI_SESSION_ID: sessionId },
           },
         );
       } catch (err) {
@@ -122,13 +142,6 @@ async function handleRequest(
         activeWs: null,
         currentStatus: "connecting",
         idleTimer: null,
-        // spec already passed via -p; no injection needed
-        handoverPhase: "spec_sent",
-        handoverSpec: spec,
-        specSentAt: Date.now(),
-        hadMeaningfulActivity: false,
-        lastMeaningfulStatus: null,
-        supportsBracketedPaste: false,
       };
       sessions.set(sessionId, entry);
       sessionRegistry.set(sessionId, {
@@ -138,13 +151,35 @@ async function handleRequest(
       });
       void saveSessionRegistry();
 
-      attachHandoverHandlers(ptyProcess, sessionId);
-      // Remove from registry when the handover session exits so that if the
-      // pty-manager restarts, wsSessionHandler won't find a stale registry
-      // entry and spawn --continue (which would resume the wrong session).
-      ptyProcess.onExit(() => {
-        sessionRegistry.delete(sessionId);
-        void saveSessionRegistry();
+      ptyProcess.onData((data) => {
+        const chunk = Buffer.from(data);
+        const e = sessions.get(sessionId);
+        if (!e) {return;}
+
+        appendToBuffer(e, chunk);
+        if (e.activeWs?.readyState === WebSocket.OPEN) {
+          e.activeWs.send(chunk);
+        }
+      });
+      ptyProcess.onExit(({ exitCode: _exitCode }) => {
+        const e = sessions.get(sessionId);
+        if (e) {
+          if (e.idleTimer !== null) {clearTimeout(e.idleTimer);}
+          e.currentStatus = "exited";
+          if (e.activeWs?.readyState === WebSocket.OPEN) {
+            // Close WS without sending an "exit" message so the client
+            // reconnects and wsSessionHandler can spawn a fresh interactive
+            // session for follow-up.
+            e.activeWs.close();
+          }
+        }
+        const finalBuffer = e ? Buffer.concat(e.outputBuffer) : Buffer.alloc(0);
+        sessions.delete(sessionId);
+        completedSessions.set(sessionId, finalBuffer);
+        cleanupHookSettingsDir(sessionId);
+        // Keep registry entry so wsSessionHandler knows the cwd when the client reconnects.
+        // The file watcher in server.ts handles task status updates when Claude
+        // moves files between folders — no advanceToReview call needed here.
       });
 
       res.writeHead(201, { "Content-Type": "application/json" });

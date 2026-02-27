@@ -5,6 +5,11 @@ import { renderHook, act } from "@testing-library/react";
 import type { Task } from "@/utils/tasks.types";
 import { useTasksSocket } from "./useTasksSocket";
 
+const mockNotifyTransition = jest.fn();
+jest.mock("@/context/NotificationContext", () => ({
+  useNotifications: () => ({ notifyTransition: mockNotifyTransition }),
+}));
+
 // ─── WebSocket mock ──────────────────────────────────────────────────────────
 
 class MockWebSocket {
@@ -53,11 +58,8 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: "TASK-001",
     title: "Test Task",
     status: "Backlog",
-    priority: "Medium",
     spec: "",
-    repoId: "repo-1",
-    createdAt: "2024-01-01T00:00:00.000Z",
-    updatedAt: "2024-01-01T00:00:00.000Z",
+    repo: "repo-1",
     ...overrides,
   };
 }
@@ -83,6 +85,7 @@ describe("useTasksSocket", () => {
   beforeEach(() => {
     MockWebSocket.reset();
     jest.clearAllMocks();
+    mockNotifyTransition.mockClear();
   });
 
   it("connects to the board WS endpoint", () => {
@@ -250,12 +253,12 @@ describe("useTasksSocket", () => {
     const { queryClient, Wrapper } = createWrapper();
     const taskRepo1 = makeTask({
       id: "TASK-001",
-      repoId: "repo-1",
+      repo: "repo-1",
       status: "Backlog",
     });
     const taskRepo2 = makeTask({
       id: "TASK-001",
-      repoId: "repo-2",
+      repo: "repo-2",
       status: "Backlog",
     });
     queryClient.setQueryData(["tasks", "repo-1"], [taskRepo1]);
@@ -342,7 +345,7 @@ describe("useTasksSocket", () => {
 
   // ─── task:deleted ────────────────────────────────────────────────────────
 
-  it("removes the task from the cache on task:deleted with repoId", () => {
+  it("removes the task from the cache on task:deleted with repo", () => {
     const { queryClient, Wrapper } = createWrapper();
     const task1 = makeTask({ id: "TASK-001" });
     const task2 = makeTask({ id: "TASK-002" });
@@ -353,7 +356,7 @@ describe("useTasksSocket", () => {
     act(() => {
       sendMessage({
         type: "task:deleted",
-        data: { id: "TASK-001", repoId: "repo-1" },
+        data: { id: "TASK-001", repo: "repo-1" },
       });
     });
 
@@ -362,7 +365,7 @@ describe("useTasksSocket", () => {
     expect(tasks?.[0].id).toBe("TASK-002");
   });
 
-  it("invalidates all tasks on task:deleted without repoId", () => {
+  it("invalidates all tasks on task:deleted without repo", () => {
     const { queryClient, Wrapper } = createWrapper();
     queryClient.setQueryData(["tasks", "repo-1"], [makeTask()]);
 
@@ -390,7 +393,7 @@ describe("useTasksSocket", () => {
       act(() => {
         sendMessage({
           type: "task:deleted",
-          data: { id: "TASK-999", repoId: "repo-1" },
+          data: { id: "TASK-999", repo: "repo-1" },
         });
       });
     }).not.toThrow();
@@ -677,5 +680,59 @@ describe("useTasksSocket", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["tasks"] });
 
     jest.useRealTimers();
+  });
+
+  // --- notifications ---
+
+  it("calls notifyTransition when task status changes from In Progress to Review", () => {
+    const { queryClient, Wrapper } = createWrapper();
+    const original = makeTask({ id: "TASK-001", status: "In Progress" });
+    queryClient.setQueryData(["tasks", "repo-1"], [original]);
+
+    renderHook(() => useTasksSocket(), { wrapper: Wrapper });
+
+    const updated = { ...original, status: "Review" } as Task;
+
+    act(() => {
+      sendMessage({ type: "task:updated", data: updated });
+    });
+
+    expect(mockNotifyTransition).toHaveBeenCalledTimes(1);
+    expect(mockNotifyTransition).toHaveBeenCalledWith(
+      updated,
+      "In Progress",
+      "Review",
+    );
+  });
+
+  it("does not call notifyTransition when status is unchanged", () => {
+    const { queryClient, Wrapper } = createWrapper();
+    const original = makeTask({ id: "TASK-001", status: "Review" });
+    queryClient.setQueryData(["tasks", "repo-1"], [original]);
+
+    renderHook(() => useTasksSocket(), { wrapper: Wrapper });
+
+    act(() => {
+      sendMessage({
+        type: "task:updated",
+        data: { ...original, status: "Review" },
+      });
+    });
+
+    expect(mockNotifyTransition).not.toHaveBeenCalled();
+  });
+
+  it("does not call notifyTransition when task is not in cache", () => {
+    const { Wrapper } = createWrapper();
+    renderHook(() => useTasksSocket(), { wrapper: Wrapper });
+
+    act(() => {
+      sendMessage({
+        type: "task:updated",
+        data: makeTask({ id: "TASK-001", status: "Done" }),
+      });
+    });
+
+    expect(mockNotifyTransition).not.toHaveBeenCalled();
   });
 });

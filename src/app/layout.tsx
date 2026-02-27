@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import "@/app/global.css";
+import { Toaster } from "@/components/Toast";
 import { Providers } from "./Providers";
 
 const inter = Inter({
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <Toaster />
       </body>
     </html>
   );

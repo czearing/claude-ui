@@ -9,11 +9,11 @@ import styles from "./SpecEditor.module.css";
 import type { SpecEditorProps } from "./SpecEditor.types";
 import { LexicalEditor } from "../LexicalEditor";
 
-export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
+export function SpecEditor({ repo, task, onClose, inline }: SpecEditorProps) {
   const { mutate: updateTask, mutateAsync: updateTaskAsync } =
-    useUpdateTask(repoId);
+    useUpdateTask(repo);
   const { mutate: handoverTask, isPending: isHandingOver } =
-    useHandoverTask(repoId);
+    useHandoverTask(repo);
 
   const [spec, setSpec] = useState(task?.spec ?? "");
   const [title, setTitle] = useState(task?.title ?? "");
@@ -122,7 +122,7 @@ export function SpecEditor({ repoId, task, onClose, inline }: SpecEditorProps) {
           </p>
           {task.sessionId && (
             <a
-              href={`/repos/${repoId}/session/${task.sessionId}`}
+              href={`/repos/${repo}/session/${task.sessionId}`}
               className={styles.viewDiffButton}
               style={{ textDecoration: "none", display: "inline-block" }}
             >

@@ -2,7 +2,7 @@ import { broadcastTaskEvent } from "../boardBroadcast";
 import { readRepos } from "../repoStore";
 import {
   deleteTaskFile,
-  getNextTaskId,
+  getUniqueTaskId,
   readAllTasks,
   readTasksForRepo,
   writeTask,
@@ -10,7 +10,7 @@ import {
 
 import { extractTextFromLexical } from "../../utils/lexical";
 import { readBody } from "../../utils/readBody";
-import type { Priority, Task, TaskStatus } from "../../utils/tasks.types";
+import type { Task } from "../../utils/tasks.types";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { parse } from "node:url";
@@ -24,10 +24,8 @@ export async function handleTaskRoutes(
 ): Promise<boolean> {
   // GET /api/tasks
   if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
-    const repoId = parsedUrl.query["repoId"] as string | undefined;
-    const result = repoId
-      ? await readTasksForRepo(repoId)
-      : await readAllTasks();
+    const repo = parsedUrl.query["repo"] as string | undefined;
+    const result = repo ? await readTasksForRepo(repo) : await readAllTasks();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(result));
     return true;
@@ -36,16 +34,16 @@ export async function handleTaskRoutes(
   // POST /api/tasks
   if (req.method === "POST" && parsedUrl.pathname === "/api/tasks") {
     const body = await readBody(req);
-    const now = new Date().toISOString();
+    const title = typeof body["title"] === "string" ? body["title"] : "";
+    const repo =
+      typeof body["repo"] === "string" ? body["repo"] : "claude-code-ui";
+    const id = await getUniqueTaskId(title, repo);
     const task: Task = {
-      id: await getNextTaskId(),
-      title: typeof body["title"] === "string" ? body["title"] : "",
-      status: (body["status"] as TaskStatus) ?? "Backlog",
-      priority: (body["priority"] as Priority) ?? "Medium",
+      id,
+      title,
+      status: "Backlog",
       spec: typeof body["spec"] === "string" ? body["spec"] : "",
-      repoId: typeof body["repoId"] === "string" ? body["repoId"] : "default",
-      createdAt: now,
-      updatedAt: now,
+      repo,
     };
     await writeTask(task);
     broadcastTaskEvent("task:created", task);
@@ -62,9 +60,11 @@ export async function handleTaskRoutes(
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length);
     const body = await readBody(req);
-    const existing = await readAllTasks().then((ts) =>
-      ts.find((t) => t.id === id),
-    );
+    const repoParam = parsedUrl.query["repo"] as string | undefined;
+    const taskList = repoParam
+      ? await readTasksForRepo(repoParam)
+      : await readAllTasks();
+    const existing = taskList.find((t) => t.id === id);
     if (!existing) {
       res.writeHead(404);
       res.end();
@@ -77,12 +77,12 @@ export async function handleTaskRoutes(
       body.status !== "Done" &&
       existing.status === "Done";
 
+    const prevStatus = existing.status;
     const updated: Task = {
       ...existing,
       ...body,
       id,
-      repoId: existing.repoId,
-      updatedAt: now,
+      repo: existing.repo,
       archivedAt: becomingDone
         ? (existing.archivedAt ?? now) // stamp once; don't overwrite if already set
         : leavingDone
@@ -92,7 +92,7 @@ export async function handleTaskRoutes(
     if (becomingDone || leavingDone) {
       delete updated.sessionId;
     }
-    await writeTask(updated);
+    await writeTask(updated, prevStatus);
     broadcastTaskEvent("task:updated", updated);
     if (becomingDone && existing.sessionId) {
       await fetch(
@@ -111,15 +111,17 @@ export async function handleTaskRoutes(
     parsedUrl.pathname?.startsWith("/api/tasks/")
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length);
-    const taskToDelete = await readAllTasks().then((ts) =>
-      ts.find((t) => t.id === id),
-    );
+    const repoParam = parsedUrl.query["repo"] as string | undefined;
+    const deleteTaskList = repoParam
+      ? await readTasksForRepo(repoParam)
+      : await readAllTasks();
+    const taskToDelete = deleteTaskList.find((t) => t.id === id);
     if (taskToDelete) {
-      await deleteTaskFile(id, taskToDelete.repoId);
+      await deleteTaskFile(id, taskToDelete.repo, taskToDelete.status);
     }
     broadcastTaskEvent("task:deleted", {
       id,
-      repoId: taskToDelete?.repoId,
+      repo: taskToDelete?.repo,
     });
     res.writeHead(204);
     res.end();
@@ -145,13 +147,13 @@ export async function handleTaskRoutes(
       return true;
     }
     const oldSessionId = existing.sessionId;
+    const prevStatus = existing.status;
     const updatedTask: Task = {
       ...existing,
       status: "Backlog",
-      updatedAt: new Date().toISOString(),
     };
     delete updatedTask.sessionId;
-    await writeTask(updatedTask);
+    await writeTask(updatedTask, prevStatus);
     broadcastTaskEvent("task:updated", updatedTask);
     if (oldSessionId) {
       await fetch(
@@ -178,18 +180,18 @@ export async function handleTaskRoutes(
     }
     const sessionId = randomUUID();
     // Build the prompt: spec body only (extracted from Lexical JSON
-    // or passed through as plain text).
+    // or passed through as plain text), then append file management instructions.
     const plainSpec = extractTextFromLexical(task.spec);
     const specText = plainSpec.trim();
 
     // Empty spec — nothing for Claude to do; advance straight to Review.
     if (!specText) {
+      const prevStatus = task.status;
       const reviewTask: Task = {
         ...task,
         status: "Review",
-        updatedAt: new Date().toISOString(),
       };
-      await writeTask(reviewTask);
+      await writeTask(reviewTask, prevStatus);
       broadcastTaskEvent("task:updated", reviewTask);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(reviewTask));
@@ -198,11 +200,13 @@ export async function handleTaskRoutes(
 
     // Look up the repo path for this task
     const repos = await readRepos();
-    const repo = repos.find((r) => r.id === task.repoId);
+    const repo = repos.find((r) => r.name === task.repo);
     const cwd = repo?.path ?? process.cwd();
 
     // Delegate PTY spawning to the long-lived pty-manager process so the
     // Claude session survives future hot-reloads of this server.
+    // The Stop hook (configured by pty-manager via claudeHookSettings) signals
+    // task completion — no file-move instructions needed in the spec.
     let ptymgrRes: Response;
     try {
       ptymgrRes = await fetch(`http://localhost:${PTY_MANAGER_PORT}/sessions`, {
@@ -226,13 +230,13 @@ export async function handleTaskRoutes(
       return true;
     }
 
+    const prevStatus = task.status;
     const inProgressTask: Task = {
       ...task,
       sessionId,
       status: "In Progress",
-      updatedAt: new Date().toISOString(),
     };
-    await writeTask(inProgressTask);
+    await writeTask(inProgressTask, prevStatus);
     broadcastTaskEvent("task:updated", inProgressTask);
 
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -268,12 +272,12 @@ export async function handleTaskRoutes(
     const current = await readAllTasks();
     const task = current.find((t) => t.sessionId === id);
     if (task?.status === "In Progress") {
+      const prevStatus = task.status;
       const updated: Task = {
         ...task,
         status: "Review",
-        updatedAt: new Date().toISOString(),
       };
-      await writeTask(updated);
+      await writeTask(updated, prevStatus);
       broadcastTaskEvent("task:updated", updated);
     }
     res.writeHead(204);
@@ -296,12 +300,12 @@ export async function handleTaskRoutes(
     const current = await readAllTasks();
     const task = current.find((t) => t.sessionId === id);
     if (task?.status === "Review") {
+      const prevStatus = task.status;
       const updated: Task = {
         ...task,
         status: "In Progress",
-        updatedAt: new Date().toISOString(),
       };
-      await writeTask(updated);
+      await writeTask(updated, prevStatus);
       broadcastTaskEvent("task:updated", updated);
     }
     res.writeHead(204);

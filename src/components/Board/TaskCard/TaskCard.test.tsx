@@ -27,11 +27,8 @@ const notStartedTask: Task = {
   id: "task-1",
   title: "Fix the bug",
   status: "Not Started",
-  priority: "Medium",
   spec: "",
-  repoId: "repo-1",
-  createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z",
+  repo: "repo-1",
 };
 
 const inProgressTask: Task = {

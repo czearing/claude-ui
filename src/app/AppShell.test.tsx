@@ -4,12 +4,6 @@ import { act, render, screen } from "@testing-library/react";
 import type { Task } from "@/utils/tasks.types";
 import { AppShell } from "./AppShell";
 
-const mockPush = jest.fn();
-
-jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
-
 jest.mock("next/dynamic", () => ({
   __esModule: true,
   default: () => () => <div data-testid="spec-editor" />,
@@ -29,7 +23,7 @@ jest.mock("@/hooks/useTasksSocket", () => ({
   useTasksSocket: jest.fn(),
 }));
 
-// Capture Board's onSelectTask so tests can trigger it
+// Capture Board's callbacks so tests can trigger them
 let capturedBoardOnSelect: ((t: Task) => void) | undefined;
 let capturedBoardOnHandover: ((id: string) => void) | undefined;
 let capturedBacklogOnSelect: ((t: Task) => void) | undefined;
@@ -68,15 +62,37 @@ jest.mock("@/components/Layout/TopBar", () => ({
   TopBar: () => <div data-testid="topbar" />,
 }));
 
+jest.mock("@/components/Terminal/TerminalFlyout", () => ({
+  TerminalFlyout: (props: {
+    sessions: { sessionId: string }[];
+    activeSessionId: string;
+    onCloseTab: (id: string) => void;
+    onClose: () => void;
+  }) => (
+    <div
+      data-testid="terminal-flyout"
+      data-active-session={props.activeSessionId}
+    >
+      {props.sessions.map((s) => (
+        <button
+          key={s.sessionId}
+          data-testid={`close-tab-${s.sessionId}`}
+          onClick={() => props.onCloseTab(s.sessionId)}
+        >
+          close tab
+        </button>
+      ))}
+      <button onClick={props.onClose}>close all</button>
+    </div>
+  ),
+}));
+
 const backlogTask: Task = {
   id: "t-1",
   title: "Fix bug",
   status: "Backlog",
-  priority: "Medium",
   spec: "",
-  repoId: "repo-1",
-  createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z",
+  repo: "repo-1",
 };
 
 const inProgressTask: Task = {
@@ -86,7 +102,6 @@ const inProgressTask: Task = {
 };
 
 beforeEach(() => {
-  mockPush.mockClear();
   mockHandoverMutate.mockClear();
   mockCreateMutate.mockClear();
   capturedBoardOnSelect = undefined;
@@ -98,20 +113,20 @@ beforeEach(() => {
 
 describe("AppShell", () => {
   it("renders the Board when view is Board", () => {
-    render(<AppShell repoId="repo-1" view="Board" />);
+    render(<AppShell repo="repo-1" view="Board" />);
     expect(screen.getByTestId("board")).toBeInTheDocument();
     expect(screen.queryByTestId("backlog")).not.toBeInTheDocument();
   });
 
   it("renders the Backlog when view is Tasks", () => {
-    render(<AppShell repoId="repo-1" view="Tasks" />);
+    render(<AppShell repo="repo-1" view="Tasks" />);
     expect(screen.getByTestId("backlog")).toBeInTheDocument();
     expect(screen.queryByTestId("board")).not.toBeInTheDocument();
   });
 
   it("passes agentActive=false to Sidebar when no task is In Progress", () => {
     mockUseTasks.mockReturnValue({ data: [backlogTask] });
-    render(<AppShell repoId="repo-1" view="Board" />);
+    render(<AppShell repo="repo-1" view="Board" />);
     expect(screen.getByTestId("sidebar")).toHaveAttribute(
       "data-agent-active",
       "false",
@@ -120,7 +135,7 @@ describe("AppShell", () => {
 
   it("passes agentActive=true to Sidebar when a task is In Progress", () => {
     mockUseTasks.mockReturnValue({ data: [inProgressTask] });
-    render(<AppShell repoId="repo-1" view="Board" />);
+    render(<AppShell repo="repo-1" view="Board" />);
     expect(screen.getByTestId("sidebar")).toHaveAttribute(
       "data-agent-active",
       "true",
@@ -128,21 +143,13 @@ describe("AppShell", () => {
   });
 
   it("filters Backlog tasks out of the Board task list", () => {
-    // Board receives only non-Backlog tasks from AppShell
-    const reviewTask: Task = {
-      ...backlogTask,
-      id: "t-3",
-      status: "Review",
-    };
+    const reviewTask: Task = { ...backlogTask, id: "t-3", status: "Review" };
     mockUseTasks.mockReturnValue({ data: [backlogTask, reviewTask] });
-    render(<AppShell repoId="repo-1" view="Board" />);
-    // Board is rendered — only reviewTask is passed (not backlogTask)
-    // Verified by the mock capturing onSelectTask; the filtering is an internal
-    // concern tested by confirming the Board receives props and renders.
+    render(<AppShell repo="repo-1" view="Board" />);
     expect(screen.getByTestId("board")).toBeInTheDocument();
   });
 
-  it("navigates to session when Board task with a sessionId is selected", () => {
+  it("opens terminal flyout when Board task with a sessionId is selected", () => {
     const sessionTask: Task = {
       ...backlogTask,
       id: "t-4",
@@ -150,31 +157,168 @@ describe("AppShell", () => {
       sessionId: "ses-abc",
     };
     mockUseTasks.mockReturnValue({ data: [sessionTask] });
-    render(<AppShell repoId="repo-1" view="Board" />);
+    render(<AppShell repo="repo-1" view="Board" />);
 
     act(() => capturedBoardOnSelect?.(sessionTask));
-    expect(mockPush).toHaveBeenCalledWith("/repos/repo-1/session/ses-abc");
+
+    expect(screen.getByTestId("terminal-flyout")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-flyout")).toHaveAttribute(
+      "data-active-session",
+      "ses-abc",
+    );
   });
 
   it("shows spec editor when a task is selected in Tasks view", () => {
-    render(<AppShell repoId="repo-1" view="Tasks" />);
+    render(<AppShell repo="repo-1" view="Tasks" />);
     act(() => capturedBacklogOnSelect?.(backlogTask));
     expect(screen.getByTestId("spec-editor")).toBeInTheDocument();
   });
 
-  it("navigates to session after a successful handover from the Board", () => {
+  it("opens terminal flyout after a successful handover from the Board", () => {
+    const handoverResult: Task = {
+      ...backlogTask,
+      id: "t-4",
+      status: "In Progress",
+      sessionId: "ses-xyz",
+    };
     mockHandoverMutate.mockImplementation(
       (_id: string, opts?: { onSuccess?: (t: Task) => void }) => {
-        opts?.onSuccess?.({ ...backlogTask, sessionId: "ses-xyz" });
+        opts?.onSuccess?.(handoverResult);
       },
     );
-    render(<AppShell repoId="repo-1" view="Board" />);
+    mockUseTasks.mockReturnValue({ data: [handoverResult] });
+    render(<AppShell repo="repo-1" view="Board" />);
     act(() => capturedBoardOnHandover?.("t-1"));
-    expect(mockPush).toHaveBeenCalledWith("/repos/repo-1/session/ses-xyz");
+
+    expect(screen.getByTestId("terminal-flyout")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-flyout")).toHaveAttribute(
+      "data-active-session",
+      "ses-xyz",
+    );
+  });
+
+  it("opens flyout for Review task with sessionId selected on Board", () => {
+    const reviewTask: Task = {
+      ...backlogTask,
+      id: "t-5",
+      status: "Review",
+      sessionId: "ses-review",
+    };
+    mockUseTasks.mockReturnValue({ data: [reviewTask] });
+    render(<AppShell repo="repo-1" view="Board" />);
+
+    act(() => capturedBoardOnSelect?.(reviewTask));
+
+    expect(screen.getByTestId("terminal-flyout")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-flyout")).toHaveAttribute(
+      "data-active-session",
+      "ses-review",
+    );
+  });
+
+  it("closing a tab removes it; flyout hides when last tab closed", () => {
+    const sessionTask: Task = {
+      ...backlogTask,
+      id: "t-4",
+      status: "In Progress",
+      sessionId: "ses-abc",
+    };
+    mockUseTasks.mockReturnValue({ data: [sessionTask] });
+    render(<AppShell repo="repo-1" view="Board" />);
+
+    act(() => capturedBoardOnSelect?.(sessionTask));
+    expect(screen.getByTestId("terminal-flyout")).toBeInTheDocument();
+
+    act(() => {
+      screen.getByTestId("close-tab-ses-abc").click();
+    });
+    expect(screen.queryByTestId("terminal-flyout")).not.toBeInTheDocument();
+  });
+
+  it("switching tabs updates the active session", () => {
+    const taskA: Task = {
+      ...backlogTask,
+      id: "t-a",
+      status: "In Progress",
+      sessionId: "ses-a",
+    };
+    const taskB: Task = {
+      ...backlogTask,
+      id: "t-b",
+      status: "Review",
+      sessionId: "ses-b",
+    };
+    mockUseTasks.mockReturnValue({ data: [taskA, taskB] });
+    render(<AppShell repo="repo-1" view="Board" />);
+
+    act(() => capturedBoardOnSelect?.(taskA));
+    act(() => capturedBoardOnSelect?.(taskB));
+
+    // Both tabs open; ses-b is active (last opened)
+    expect(screen.getByTestId("terminal-flyout")).toHaveAttribute(
+      "data-active-session",
+      "ses-b",
+    );
+  });
+
+  it("closes flyout tab automatically when a session's task loses its sessionId", () => {
+    const sessionTask: Task = {
+      ...backlogTask,
+      id: "t-4",
+      status: "In Progress",
+      sessionId: "ses-abc",
+    };
+    mockUseTasks.mockReturnValue({ data: [sessionTask] });
+    const { rerender } = render(<AppShell repo="repo-1" view="Board" />);
+
+    act(() => capturedBoardOnSelect?.(sessionTask));
+    expect(screen.getByTestId("terminal-flyout")).toBeInTheDocument();
+
+    // Simulate task moving to Done (sessionId cleared by server broadcast)
+    const doneTask: Task = {
+      ...sessionTask,
+      status: "Done",
+      sessionId: undefined,
+    };
+    mockUseTasks.mockReturnValue({ data: [doneTask] });
+    rerender(<AppShell repo="repo-1" view="Board" />);
+
+    expect(screen.queryByTestId("terminal-flyout")).not.toBeInTheDocument();
+  });
+
+  it("switches active tab to neighbour when the active session is terminated", () => {
+    const taskA: Task = {
+      ...backlogTask,
+      id: "t-a",
+      status: "In Progress",
+      sessionId: "ses-a",
+    };
+    const taskB: Task = {
+      ...backlogTask,
+      id: "t-b",
+      status: "In Progress",
+      sessionId: "ses-b",
+    };
+    mockUseTasks.mockReturnValue({ data: [taskA, taskB] });
+    const { rerender } = render(<AppShell repo="repo-1" view="Board" />);
+
+    act(() => capturedBoardOnSelect?.(taskA));
+    act(() => capturedBoardOnSelect?.(taskB));
+
+    // ses-b is active; terminate ses-b
+    const doneB: Task = { ...taskB, status: "Done", sessionId: undefined };
+    mockUseTasks.mockReturnValue({ data: [taskA, doneB] });
+    rerender(<AppShell repo="repo-1" view="Board" />);
+
+    // Falls back to ses-a
+    expect(screen.getByTestId("terminal-flyout")).toHaveAttribute(
+      "data-active-session",
+      "ses-a",
+    );
   });
 
   it("closes spec editor when Escape is pressed", () => {
-    render(<AppShell repoId="repo-1" view="Tasks" />);
+    render(<AppShell repo="repo-1" view="Tasks" />);
     act(() => capturedBacklogOnSelect?.(backlogTask));
     expect(screen.getByTestId("spec-editor")).toBeInTheDocument();
 
@@ -190,26 +334,25 @@ describe("AppShell", () => {
         opts?.onSuccess?.({ ...backlogTask, id: "t-new" });
       },
     );
-    render(<AppShell repoId="repo-1" view="Tasks" />);
+    render(<AppShell repo="repo-1" view="Tasks" />);
     act(() => capturedBacklogOnNewTask?.());
     expect(screen.getByTestId("spec-editor")).toBeInTheDocument();
   });
 
-  it("calls createTask with empty title and Medium priority on new task", () => {
-    render(<AppShell repoId="repo-1" view="Tasks" />);
+  it("calls createTask with empty title on new task", () => {
+    render(<AppShell repo="repo-1" view="Tasks" />);
     act(() => capturedBacklogOnNewTask?.());
     expect(mockCreateMutate).toHaveBeenCalledWith(
-      { title: "", priority: "Medium", status: "Backlog" },
+      { title: "", status: "Backlog" },
       expect.any(Object),
     );
   });
 
   it("does not open spec editor when createTask has no onSuccess callback fired", () => {
-    // createTask called but onSuccess never invoked (e.g., optimistic pending state)
     mockCreateMutate.mockImplementation(() => {
       /* onSuccess not called */
     });
-    render(<AppShell repoId="repo-1" view="Tasks" />);
+    render(<AppShell repo="repo-1" view="Tasks" />);
     act(() => capturedBacklogOnNewTask?.());
     expect(screen.queryByTestId("spec-editor")).not.toBeInTheDocument();
   });

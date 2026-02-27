@@ -51,6 +51,7 @@ export function TaskCard({
         styles.card,
         isDragging && styles.cardDragging,
         isAgentActive && styles.cardAgentActive,
+        isReview && styles.cardReview,
         isDone && styles.cardDone,
         selected && styles.cardSelected,
       )}
@@ -63,7 +64,6 @@ export function TaskCard({
           </span>
         </div>
         <div className={styles.headerRight}>
-          {isReview && <span className={styles.reviewBadge}>Review</span>}
           {(onRemove ?? onRecall) && (
             <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenu.Trigger asChild>
@@ -134,6 +134,11 @@ export function TaskCard({
           <div className={styles.shimmer} />
           <Kanban size={12} />
           <span>Agent Processing...</span>
+        </div>
+      )}
+      {isReview && (
+        <div className={styles.reviewBadge}>
+          <span>Review</span>
         </div>
       )}
     </div>

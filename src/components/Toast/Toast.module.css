@@ -1,0 +1,32 @@
+/* Scoped class applied to the Sonner toaster root element */
+.toaster {
+  font-family: var(--font-sans);
+}
+
+/* Override Sonner's dark-theme defaults with the app design tokens */
+:global([data-sonner-toaster][data-theme="dark"]) {
+  --normal-bg: var(--color-surface);
+  --normal-border: var(--color-border);
+  --normal-text: var(--color-text);
+  --border-radius: var(--radius-md);
+  --font-size: var(--text-sm);
+  --width: 360px;
+}
+
+/* Description text uses muted color */
+:global([data-sonner-toast] [data-description]) {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+/* Close button blends with the surface */
+:global([data-sonner-toast] [data-close-button]) {
+  border-color: var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+:global([data-sonner-toast] [data-close-button]:hover) {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}

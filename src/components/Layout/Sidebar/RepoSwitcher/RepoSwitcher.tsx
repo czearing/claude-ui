@@ -11,14 +11,16 @@ import { AddRepoDialog } from "./AddRepoDialog";
 import styles from "./RepoSwitcher.module.css";
 import type { RepoSwitcherProps } from "./RepoSwitcher.types";
 
-export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
+export function RepoSwitcher({ activeRepoName }: RepoSwitcherProps) {
   const { data: repos = [] } = useRepos();
   const router = useRouter();
   const pathname = usePathname();
   const [addOpen, setAddOpen] = useState(false);
 
-  const activeRepo = repos.find((r) => r.id === activeRepoId);
-  const viewSegment = pathname.endsWith("/backlog") ? "backlog" : "board";
+  const activeRepo = repos.find((r) => r.name === activeRepoName);
+  const knownSegments = ["board", "tasks", "archive", "agents", "skills"];
+  const viewSegment =
+    knownSegments.find((s) => pathname.includes(`/${s}`)) ?? "board";
 
   return (
     <>
@@ -55,10 +57,14 @@ export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
               <DropdownMenu.Item
                 key={repo.id}
                 className={styles.item}
-                onSelect={() => router.push(`/repos/${repo.id}/${viewSegment}`)}
+                onSelect={() =>
+                  router.push(
+                    `/repos/${encodeURIComponent(repo.name)}/${viewSegment}`,
+                  )
+                }
               >
                 <span className={styles.itemName}>{repo.name}</span>
-                {repo.id === activeRepoId && (
+                {repo.name === activeRepoName && (
                   <Check size={12} className={styles.checkIcon} />
                 )}
               </DropdownMenu.Item>
@@ -82,9 +88,9 @@ export function RepoSwitcher({ activeRepoId }: RepoSwitcherProps) {
       <AddRepoDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onCreated={(repoId) => {
+        onCreated={(repoName) => {
           setAddOpen(false);
-          router.push(`/repos/${repoId}/board`);
+          router.push(`/repos/${encodeURIComponent(repoName)}/board`);
         }}
       />
     </>

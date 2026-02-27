@@ -7,12 +7,12 @@ import type {
   UpdateTaskInput,
 } from "@/utils/tasks.types";
 
-function tasksKey(repoId: string) {
-  return ["tasks", repoId] as const;
+function tasksKey(repo: string) {
+  return ["tasks", repo] as const;
 }
 
-async function fetchTasks(repoId: string): Promise<Task[]> {
-  const res = await fetch(`/api/tasks?repoId=${encodeURIComponent(repoId)}`);
+async function fetchTasks(repo: string): Promise<Task[]> {
+  const res = await fetch(`/api/tasks?repo=${encodeURIComponent(repo)}`);
   if (!res.ok) {
     throw new Error("Failed to fetch tasks");
   }
@@ -20,26 +20,26 @@ async function fetchTasks(repoId: string): Promise<Task[]> {
 }
 
 export function useTasks<T = Task[]>(
-  repoId: string,
+  repo: string,
   select?: (data: Task[]) => T,
 ) {
   return useQuery({
-    queryKey: tasksKey(repoId),
-    queryFn: () => fetchTasks(repoId),
-    enabled: Boolean(repoId),
+    queryKey: tasksKey(repo),
+    queryFn: () => fetchTasks(repo),
+    enabled: Boolean(repo),
     staleTime: Infinity, // WebSocket keeps tasks fresh via setQueryData
     select,
   });
 }
 
-export function useCreateTask(repoId: string) {
+export function useCreateTask(repo: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Omit<CreateTaskInput, "repoId">) =>
+    mutationFn: (input: Omit<CreateTaskInput, "repo">) =>
       fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...input, repoId }),
+        body: JSON.stringify({ ...input, repo }),
       }).then(async (r) => {
         if (!r.ok) {
           throw new Error("Failed to create task");
@@ -47,15 +47,15 @@ export function useCreateTask(repoId: string) {
         return r.json() as Promise<Task>;
       }),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+      queryClient.invalidateQueries({ queryKey: tasksKey(repo) }),
   });
 }
 
-export function useUpdateTask(repoId: string) {
+export function useUpdateTask(repo: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateTaskInput & { id: string }) =>
-      fetch(`/api/tasks/${id}`, {
+      fetch(`/api/tasks/${id}?repo=${encodeURIComponent(repo)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -66,55 +66,54 @@ export function useUpdateTask(repoId: string) {
         return r.json() as Promise<Task>;
       }),
     onMutate: async ({ id, ...input }) => {
-      await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
-      const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
-      queryClient.setQueryData<Task[]>(tasksKey(repoId), (old) =>
-        (old ?? []).map((t) =>
-          t.id === id
-            ? { ...t, ...input, updatedAt: new Date().toISOString() }
-            : t,
-        ),
+      await queryClient.cancelQueries({ queryKey: tasksKey(repo) });
+      const previous = queryClient.getQueryData<Task[]>(tasksKey(repo));
+      queryClient.setQueryData<Task[]>(tasksKey(repo), (old) =>
+        (old ?? []).map((t) => (t.id === id ? { ...t, ...input } : t)),
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(tasksKey(repoId), context.previous);
+        queryClient.setQueryData(tasksKey(repo), context.previous);
       }
     },
     onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+      queryClient.invalidateQueries({ queryKey: tasksKey(repo) }),
   });
 }
 
-export function useDeleteTask(repoId: string) {
+export function useDeleteTask(repo: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      const r = await fetch(
+        `/api/tasks/${id}?repo=${encodeURIComponent(repo)}`,
+        { method: "DELETE" },
+      );
       if (!r.ok && r.status !== 404) {
         throw new Error("Failed to delete task");
       }
     },
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
-      const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
-      queryClient.setQueryData<Task[]>(tasksKey(repoId), (old) =>
+      await queryClient.cancelQueries({ queryKey: tasksKey(repo) });
+      const previous = queryClient.getQueryData<Task[]>(tasksKey(repo));
+      queryClient.setQueryData<Task[]>(tasksKey(repo), (old) =>
         (old ?? []).filter((t) => t.id !== id),
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(tasksKey(repoId), context.previous);
+        queryClient.setQueryData(tasksKey(repo), context.previous);
       }
     },
     onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+      queryClient.invalidateQueries({ queryKey: tasksKey(repo) }),
   });
 }
 
-export function useHandoverTask(repoId: string) {
+export function useHandoverTask(repo: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
@@ -125,11 +124,11 @@ export function useHandoverTask(repoId: string) {
         return r.json() as Promise<Task>;
       }),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+      queryClient.invalidateQueries({ queryKey: tasksKey(repo) }),
   });
 }
 
-export function useRecallTask(repoId: string) {
+export function useRecallTask(repo: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
@@ -140,16 +139,15 @@ export function useRecallTask(repoId: string) {
         return r.json() as Promise<Task>;
       }),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: tasksKey(repoId) });
-      const previous = queryClient.getQueryData<Task[]>(tasksKey(repoId));
-      queryClient.setQueryData<Task[]>(tasksKey(repoId), (old) =>
+      await queryClient.cancelQueries({ queryKey: tasksKey(repo) });
+      const previous = queryClient.getQueryData<Task[]>(tasksKey(repo));
+      queryClient.setQueryData<Task[]>(tasksKey(repo), (old) =>
         (old ?? []).map((t) =>
           t.id === id
             ? {
                 ...t,
                 status: "Backlog" as const,
                 sessionId: undefined,
-                updatedAt: new Date().toISOString(),
               }
             : t,
         ),
@@ -158,10 +156,10 @@ export function useRecallTask(repoId: string) {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(tasksKey(repoId), context.previous);
+        queryClient.setQueryData(tasksKey(repo), context.previous);
       }
     },
     onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: tasksKey(repoId) }),
+      queryClient.invalidateQueries({ queryKey: tasksKey(repo) }),
   });
 }

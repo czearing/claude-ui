@@ -23,31 +23,22 @@ const mockTasks = [
     id: "1",
     title: "Fix login bug",
     status: "Backlog",
-    priority: "High",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
+    repo: "repo1",
   },
   {
     id: "2",
     title: "Add dark mode",
     status: "Backlog",
-    priority: "Medium",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-02T00:00:00Z",
-    updatedAt: "2024-01-02T00:00:00Z",
+    repo: "repo1",
   },
   {
     id: "3",
     title: "In Progress task",
     status: "In Progress",
-    priority: "Medium",
     spec: "",
-    repoId: "repo1",
-    createdAt: "2024-01-03T00:00:00Z",
-    updatedAt: "2024-01-03T00:00:00Z",
+    repo: "repo1",
   },
 ];
 
@@ -60,21 +51,21 @@ beforeEach(() => {
 describe("Backlog", () => {
   it("renders the heading", () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     expect(screen.getByRole("heading", { name: "Tasks" })).toBeInTheDocument();
   });
 
   it("renders a sort combobox defaulting to Newest", () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     expect(screen.getByRole("combobox", { name: /sort/i })).toBeInTheDocument();
   });
 
   it("sorts tasks A-Z by title when selected", async () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     await userEvent.click(screen.getByRole("combobox", { name: /sort/i }));
     await userEvent.click(await screen.findByRole("option", { name: "A → Z" }));
@@ -85,7 +76,7 @@ describe("Backlog", () => {
 
   it("sorts tasks oldest-first when selected", async () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     await userEvent.click(screen.getByRole("combobox", { name: /sort/i }));
     await userEvent.click(
@@ -99,7 +90,7 @@ describe("Backlog", () => {
   it("calls onNewTask when New Task button is clicked", async () => {
     const onNewTask = jest.fn();
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={onNewTask} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={onNewTask} />,
     );
     await userEvent.click(screen.getByRole("button", { name: /new task/i }));
     expect(onNewTask).toHaveBeenCalledTimes(1);
@@ -107,7 +98,7 @@ describe("Backlog", () => {
 
   it("filters tasks by search query", async () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     await userEvent.type(
       screen.getByPlaceholderText("Search issues..."),
@@ -119,7 +110,7 @@ describe("Backlog", () => {
 
   it("shows empty state message when no tasks match search", async () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     await userEvent.type(
       screen.getByPlaceholderText("Search issues..."),
@@ -134,7 +125,7 @@ describe("Backlog", () => {
     const deleteMutate = jest.fn();
     (useDeleteTask as jest.Mock).mockReturnValue({ mutate: deleteMutate });
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     const trigger = screen.getByRole("button", {
       name: /more actions for fix login bug/i,
@@ -148,7 +139,7 @@ describe("Backlog", () => {
     const handoverMutate = jest.fn();
     (useHandoverTask as jest.Mock).mockReturnValue({ mutate: handoverMutate });
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     await userEvent.click(
       screen.getByRole("button", { name: "Send Fix login bug to agent" }),
@@ -160,7 +151,7 @@ describe("Backlog", () => {
     const onSelectTask = jest.fn();
     render(
       <Backlog
-        repoId="repo1"
+        repo="repo1"
         onSelectTask={onSelectTask}
         onNewTask={jest.fn()}
       />,
@@ -175,7 +166,7 @@ describe("Backlog", () => {
     const deleteMutate = jest.fn();
     (useDeleteTask as jest.Mock).mockReturnValue({ mutate: deleteMutate });
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     await userEvent.click(
       screen.getByRole("button", { name: /more actions for fix login bug/i }),
@@ -189,14 +180,14 @@ describe("Backlog", () => {
   it("shows different empty state when backlog has no tasks at all", () => {
     (useTasks as jest.Mock).mockReturnValue({ data: [] });
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     expect(screen.getByText(/no issues in the backlog/i)).toBeInTheDocument();
   });
 
   it("search and sort work together", async () => {
     render(
-      <Backlog repoId="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
     );
     // Filter to only "Add dark mode" by searching
     await userEvent.type(

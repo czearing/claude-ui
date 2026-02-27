@@ -52,12 +52,9 @@ jest.mock("./ptyStore", () => {
     emitStatus: jest.fn(),
     advanceToReview: jest.fn(),
     backToInProgress: jest.fn(),
+    appendToBuffer: jest.fn(),
   };
 });
-
-jest.mock("./ptyHandlers", () => ({
-  attachTerminalHandlers: jest.fn(),
-}));
 
 jest.mock("node:url", () => ({
   // NOTE: parsedQueryBag is declared above this jest.mock call in the source,
@@ -82,12 +79,6 @@ const {
   emitStatus: jest.Mock;
   advanceToReview: jest.Mock;
   backToInProgress: jest.Mock;
-};
-
-const { attachTerminalHandlers } = jest.requireMock(
-  "./ptyHandlers",
-) as unknown as {
-  attachTerminalHandlers: jest.Mock;
 };
 
 const { spawn: mockSpawn, _mockPty: mockPtyProcess } = jest.requireMock(
@@ -202,11 +193,6 @@ describe("handleWsConnection", () => {
         activeWs: null as MockWs | null,
         currentStatus: "thinking",
         idleTimer: null,
-        handoverPhase: null,
-        handoverSpec: "",
-        specSentAt: 0,
-        hadMeaningfulActivity: false,
-        lastMeaningfulStatus: null,
       };
       sessionsMap.set(SESSION_ID, existingEntry);
 
@@ -244,11 +230,6 @@ describe("handleWsConnection", () => {
         activeWs: null,
         currentStatus: "waiting",
         idleTimer: null,
-        handoverPhase: null,
-        handoverSpec: "",
-        specSentAt: 0,
-        hadMeaningfulActivity: false,
-        lastMeaningfulStatus: null,
       };
       sessionsMap.set(SESSION_ID, existingEntry);
 
@@ -266,121 +247,6 @@ describe("handleWsConnection", () => {
       // emitStatus still fires.
       expect(emitStatus).toHaveBeenCalledWith(ws, "waiting");
     });
-
-    it("calls advanceToReview when reconnecting to a spec_sent session idle at the ❯ prompt", () => {
-      setSessionId(SESSION_ID);
-
-      const stuckEntry = {
-        pty: mockPtyProcess,
-        outputBuffer: [],
-        bufferSize: 0,
-        activeWs: null,
-        currentStatus: "waiting",
-        idleTimer: null,
-        handoverPhase: "spec_sent",
-        handoverSpec: "Build the feature",
-        specSentAt: Date.now() - 60_000,
-        hadMeaningfulActivity: false,
-        lastMeaningfulStatus: "waiting",
-      };
-      sessionsMap.set(SESSION_ID, stuckEntry);
-
-      const ws = new MockWs();
-      handleWsConnection(
-        ws as never,
-        makeReq(),
-        new Map(),
-        makeSave(),
-        "claude",
-      );
-
-      expect(advanceToReview).toHaveBeenCalledWith(SESSION_ID);
-      expect(stuckEntry.handoverPhase).toBe("done");
-    });
-
-    it("reconnect to spec_sent + thinking session: replays buffer, emits status, does not spawn new PTY", () => {
-      setSessionId(SESSION_ID);
-
-      const activeEntry = {
-        pty: mockPtyProcess,
-        outputBuffer: [Buffer.from("work in progress")],
-        bufferSize: 16,
-        activeWs: null as MockWs | null,
-        currentStatus: "thinking",
-        idleTimer: null,
-        handoverPhase: "spec_sent",
-        handoverSpec: "Build the feature",
-        specSentAt: Date.now() - 10_000,
-        hadMeaningfulActivity: true,
-        lastMeaningfulStatus: "thinking",
-      };
-      sessionsMap.set(SESSION_ID, activeEntry);
-
-      const ws = new MockWs();
-      handleWsConnection(
-        ws as never,
-        makeReq(),
-        new Map(),
-        makeSave(),
-        "claude",
-      );
-
-      // No new PTY spawned -- this is a reconnect to existing session
-      expect(mockSpawn).not.toHaveBeenCalled();
-
-      // Buffer replayed to new socket
-      expect(ws.send).toHaveBeenCalledTimes(1);
-      const sentMsg = JSON.parse(ws.send.mock.calls[0][0] as string) as {
-        type: string;
-        data: string;
-      };
-      expect(sentMsg.type).toBe("replay");
-      const decoded = Buffer.from(sentMsg.data, "base64").toString();
-      expect(decoded).toBe("work in progress");
-
-      // Status emitted with current status (thinking)
-      expect(emitStatus).toHaveBeenCalledWith(ws, "thinking");
-
-      // advanceToReview NOT called (session still thinking)
-      expect(advanceToReview).not.toHaveBeenCalled();
-
-      // handoverPhase unchanged
-      expect(activeEntry.handoverPhase).toBe("spec_sent");
-
-      // activeWs updated to new socket
-      expect(activeEntry.activeWs).toBe(ws);
-    });
-
-    it("does NOT call advanceToReview when reconnecting to a spec_sent session still thinking", () => {
-      setSessionId(SESSION_ID);
-
-      const activeEntry = {
-        pty: mockPtyProcess,
-        outputBuffer: [],
-        bufferSize: 0,
-        activeWs: null,
-        currentStatus: "thinking",
-        idleTimer: null,
-        handoverPhase: "spec_sent",
-        handoverSpec: "Build the feature",
-        specSentAt: Date.now() - 10_000,
-        hadMeaningfulActivity: true,
-        lastMeaningfulStatus: "thinking",
-      };
-      sessionsMap.set(SESSION_ID, activeEntry);
-
-      const ws = new MockWs();
-      handleWsConnection(
-        ws as never,
-        makeReq(),
-        new Map(),
-        makeSave(),
-        "claude",
-      );
-
-      expect(advanceToReview).not.toHaveBeenCalled();
-      expect(activeEntry.handoverPhase).toBe("spec_sent");
-    });
   });
 
   // ── completed session (in completedSessions map) ───────────────────────────
@@ -388,82 +254,199 @@ describe("handleWsConnection", () => {
   describe("completed session (in completedSessions map)", () => {
     const SESSION_ID = "completed-session-1";
 
-    it("replays stored output, sends exit status, then closes — no PTY spawned", () => {
-      setSessionId(SESSION_ID);
-      const storedOutput = Buffer.from("Claude finished the task successfully");
-      completedSessionsMap.set(SESSION_ID, storedOutput);
+    describe("without registry entry (truly ended)", () => {
+      it("replays stored output, sends exit status, then closes — no PTY spawned", () => {
+        setSessionId(SESSION_ID);
+        const storedOutput = Buffer.from(
+          "Claude finished the task successfully",
+        );
+        completedSessionsMap.set(SESSION_ID, storedOutput);
 
-      const ws = new MockWs();
-      handleWsConnection(
-        ws as never,
-        makeReq(),
-        new Map(),
-        makeSave(),
-        "claude",
-      );
+        const ws = new MockWs();
+        handleWsConnection(
+          ws as never,
+          makeReq(),
+          new Map(),
+          makeSave(),
+          "claude",
+        );
 
-      expect(mockSpawn).not.toHaveBeenCalled();
+        expect(mockSpawn).not.toHaveBeenCalled();
 
-      // Three sends: replay, status, exit (in that order)
-      expect(ws.send).toHaveBeenCalledTimes(3);
+        // Three sends: replay, status, exit (in that order)
+        expect(ws.send).toHaveBeenCalledTimes(3);
 
-      const [replayCall, statusCall, exitCall] = ws.send.mock.calls as [
-        [string],
-        [string],
-        [string],
-      ];
+        const [replayCall, statusCall, exitCall] = ws.send.mock.calls as [
+          [string],
+          [string],
+          [string],
+        ];
 
-      const replayMsg = JSON.parse(replayCall[0]) as {
-        type: string;
-        data: string;
-      };
-      expect(replayMsg.type).toBe("replay");
-      const decoded = Buffer.from(replayMsg.data, "base64").toString();
-      expect(decoded).toBe("Claude finished the task successfully");
+        const replayMsg = JSON.parse(replayCall[0]) as {
+          type: string;
+          data: string;
+        };
+        expect(replayMsg.type).toBe("replay");
+        const decoded = Buffer.from(replayMsg.data, "base64").toString();
+        expect(decoded).toBe("Claude finished the task successfully");
 
-      const statusMsg = JSON.parse(statusCall[0]) as {
-        type: string;
-        value: string;
-      };
-      expect(statusMsg.type).toBe("status");
-      expect(statusMsg.value).toBe("exited");
+        const statusMsg = JSON.parse(statusCall[0]) as {
+          type: string;
+          value: string;
+        };
+        expect(statusMsg.type).toBe("status");
+        expect(statusMsg.value).toBe("exited");
 
-      const exitMsg = JSON.parse(exitCall[0]) as { type: string; code: number };
-      expect(exitMsg.type).toBe("exit");
-      expect(exitMsg.code).toBe(0);
+        const exitMsg = JSON.parse(exitCall[0]) as {
+          type: string;
+          code: number;
+        };
+        expect(exitMsg.type).toBe("exit");
+        expect(exitMsg.code).toBe(0);
 
-      expect(ws.close).toHaveBeenCalledTimes(1);
+        expect(ws.close).toHaveBeenCalledTimes(1);
+      });
+
+      it("sends status and exit without replay when stored buffer is empty", () => {
+        setSessionId(SESSION_ID);
+        completedSessionsMap.set(SESSION_ID, Buffer.alloc(0));
+
+        const ws = new MockWs();
+        handleWsConnection(
+          ws as never,
+          makeReq(),
+          new Map(),
+          makeSave(),
+          "claude",
+        );
+
+        // Two sends only: status + exit (no replay when buffer is empty)
+        expect(ws.send).toHaveBeenCalledTimes(2);
+
+        const [statusCall, exitCall] = ws.send.mock.calls as [
+          [string],
+          [string],
+        ];
+        const statusMsg = JSON.parse(statusCall[0]) as {
+          type: string;
+          value: string;
+        };
+        expect(statusMsg.type).toBe("status");
+        expect(statusMsg.value).toBe("exited");
+
+        const exitMsg = JSON.parse(exitCall[0]) as { type: string };
+        expect(exitMsg.type).toBe("exit");
+
+        expect(ws.close).toHaveBeenCalledTimes(1);
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
     });
 
-    it("sends status and exit without replay when stored buffer is empty", () => {
-      setSessionId(SESSION_ID);
-      completedSessionsMap.set(SESSION_ID, Buffer.alloc(0));
+    describe("with registry entry (spawn fresh interactive session)", () => {
+      it("replays prior output, spawns fresh PTY, sends resumed", () => {
+        setSessionId(SESSION_ID);
+        const priorOutput = Buffer.from("Task completed successfully");
+        completedSessionsMap.set(SESSION_ID, priorOutput);
 
-      const ws = new MockWs();
-      handleWsConnection(
-        ws as never,
-        makeReq(),
-        new Map(),
-        makeSave(),
-        "claude",
-      );
+        const registry = new Map<
+          string,
+          { id: string; cwd: string; createdAt: string }
+        >();
+        registry.set(SESSION_ID, {
+          id: SESSION_ID,
+          cwd: "/home/user/project",
+          createdAt: new Date().toISOString(),
+        });
+        const save = makeSave();
+        const ws = new MockWs();
 
-      // Two sends only: status + exit (no replay when buffer is empty)
-      expect(ws.send).toHaveBeenCalledTimes(2);
+        handleWsConnection(
+          ws as never,
+          makeReq(),
+          registry as never,
+          save,
+          "claude",
+        );
 
-      const [statusCall, exitCall] = ws.send.mock.calls as [[string], [string]];
-      const statusMsg = JSON.parse(statusCall[0]) as {
-        type: string;
-        value: string;
-      };
-      expect(statusMsg.type).toBe("status");
-      expect(statusMsg.value).toBe("exited");
+        // PTY spawned without --continue using registry cwd
+        expect(mockSpawn).toHaveBeenCalledTimes(1);
+        const [cmd, args, opts] = mockSpawn.mock.calls[0] as [
+          string,
+          string[],
+          { cwd: string },
+        ];
+        expect(cmd).toBe("claude");
+        expect(args).not.toContain("--continue");
+        expect(opts.cwd).toBe("/home/user/project");
 
-      const exitMsg = JSON.parse(exitCall[0]) as { type: string };
-      expect(exitMsg.type).toBe("exit");
+        // completedSessions entry consumed
+        expect(completedSessionsMap.has(SESSION_ID)).toBe(false);
 
-      expect(ws.close).toHaveBeenCalledTimes(1);
-      expect(mockSpawn).not.toHaveBeenCalled();
+        // Two sends: replay (prior output) + resumed
+        expect(ws.send).toHaveBeenCalledTimes(2);
+
+        const [replayCall, resumedCall] = ws.send.mock.calls as [
+          [string],
+          [string],
+        ];
+
+        const replayMsg = JSON.parse(replayCall[0]) as {
+          type: string;
+          data: string;
+        };
+        expect(replayMsg.type).toBe("replay");
+        const decoded = Buffer.from(replayMsg.data, "base64").toString();
+        expect(decoded).toBe("Task completed successfully");
+
+        const resumedMsg = JSON.parse(resumedCall[0]) as { type: string };
+        expect(resumedMsg.type).toBe("resumed");
+
+        // WS not closed
+        expect(ws.close).not.toHaveBeenCalled();
+
+        // saveSessionRegistry NOT called (entry already exists)
+        expect(save).not.toHaveBeenCalled();
+
+        // emitStatus with "connecting"
+        expect(emitStatus).toHaveBeenCalledWith(ws, "connecting");
+
+        // Session registered in sessions map
+        expect(sessionsMap.has(SESSION_ID)).toBe(true);
+      });
+
+      it("spawns fresh PTY without replay when prior output is empty", () => {
+        setSessionId(SESSION_ID);
+        completedSessionsMap.set(SESSION_ID, Buffer.alloc(0));
+
+        const registry = new Map<
+          string,
+          { id: string; cwd: string; createdAt: string }
+        >();
+        registry.set(SESSION_ID, {
+          id: SESSION_ID,
+          cwd: "/home/user/project",
+          createdAt: new Date().toISOString(),
+        });
+        const ws = new MockWs();
+
+        handleWsConnection(
+          ws as never,
+          makeReq(),
+          registry as never,
+          makeSave(),
+          "claude",
+        );
+
+        // Only one send: resumed (no replay when buffer is empty)
+        expect(ws.send).toHaveBeenCalledTimes(1);
+        const msg = JSON.parse(ws.send.mock.calls[0][0] as string) as {
+          type: string;
+        };
+        expect(msg.type).toBe("resumed");
+
+        expect(mockSpawn).toHaveBeenCalledTimes(1);
+        expect(ws.close).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -472,7 +455,7 @@ describe("handleWsConnection", () => {
   describe("new session (not in registry)", () => {
     const SESSION_ID = "new-session-1";
 
-    it("spawns a fresh PTY, registers the session, and wires handlers", () => {
+    it("spawns a fresh PTY, registers the session, and wires onData/onExit handlers", () => {
       setSessionId(SESSION_ID);
       const registry = new Map<
         string,
@@ -506,11 +489,9 @@ describe("handleWsConnection", () => {
       // Session in sessions map.
       expect(sessionsMap.has(SESSION_ID)).toBe(true);
 
-      // Terminal handlers attached.
-      expect(attachTerminalHandlers).toHaveBeenCalledWith(
-        mockPtyProcess,
-        SESSION_ID,
-      );
+      // PTY handlers attached via onData and onExit.
+      expect(mockPtyProcess.onData).toHaveBeenCalledTimes(1);
+      expect(mockPtyProcess.onExit).toHaveBeenCalledTimes(1);
 
       // emitStatus with "connecting".
       expect(emitStatus).toHaveBeenCalledWith(ws, "connecting");
@@ -525,7 +506,7 @@ describe("handleWsConnection", () => {
   describe("resumed session (in registry, not in sessions map)", () => {
     const SESSION_ID = "resumed-session-1";
 
-    it("spawns PTY with --continue, uses registry cwd, sends 'resumed'", () => {
+    it("spawns fresh PTY, uses registry cwd, sends 'resumed'", () => {
       setSessionId(SESSION_ID);
       const registry = new Map<
         string,
@@ -547,7 +528,7 @@ describe("handleWsConnection", () => {
         "claude",
       );
 
-      // PTY spawned with --continue.
+      // PTY spawned without --continue.
       expect(mockSpawn).toHaveBeenCalledTimes(1);
       const [cmd, args, opts] = mockSpawn.mock.calls[0] as [
         string,
@@ -555,7 +536,7 @@ describe("handleWsConnection", () => {
         { cwd: string },
       ];
       expect(cmd).toBe("claude");
-      expect(args).toContain("--continue");
+      expect(args).not.toContain("--continue");
       expect(opts.cwd).toBe("/home/user/project");
 
       // "resumed" message sent.
@@ -571,24 +552,21 @@ describe("handleWsConnection", () => {
       // emitStatus with "connecting".
       expect(emitStatus).toHaveBeenCalledWith(ws, "connecting");
 
-      // Recent session (just now): advanceToReview NOT called.
+      // advanceToReview NOT called.
       expect(advanceToReview).not.toHaveBeenCalled();
     });
+  });
 
-    it("calls advanceToReview immediately when resumed session is older than 5 minutes (pty-manager restart recovery)", () => {
+  // ── ptyProcess.onExit — cleanup (completedSessions + registry) ───────────────
+
+  describe("ptyProcess.onExit — cleanup", () => {
+    const SESSION_ID = "exit-session-1";
+
+    function setupAndGetExitHandler(
+      registry: Map<string, { id: string; cwd: string; createdAt: string }>,
+      save: jest.Mock,
+    ): { ws: MockWs; onExitCallback: (arg: { exitCode: number }) => void } {
       setSessionId(SESSION_ID);
-      const registry = new Map<
-        string,
-        { id: string; cwd: string; createdAt: string }
-      >();
-      // Registry entry created 6 minutes ago — older than the 5-minute threshold.
-      const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000).toISOString();
-      registry.set(SESSION_ID, {
-        id: SESSION_ID,
-        cwd: "/home/user/project",
-        createdAt: sixMinutesAgo,
-      });
-      const save = makeSave();
       const ws = new MockWs();
 
       handleWsConnection(
@@ -599,34 +577,76 @@ describe("handleWsConnection", () => {
         "claude",
       );
 
-      // Recovery: advanceToReview should be called for the old in-progress session.
-      expect(advanceToReview).toHaveBeenCalledWith(SESSION_ID);
-    });
+      // The onExit callback is the first argument passed to mockPtyProcess.onExit
+      const onExitCallback = mockPtyProcess.onExit.mock.calls[0][0] as (arg: {
+        exitCode: number;
+      }) => void;
+      return { ws, onExitCallback };
+    }
 
-    it("does NOT call advanceToReview when resumed session is less than 5 minutes old", () => {
-      setSessionId(SESSION_ID);
+    it("stores final output in completedSessions on exit", () => {
       const registry = new Map<
         string,
         { id: string; cwd: string; createdAt: string }
       >();
-      // Registry entry created 2 minutes ago — within threshold.
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       registry.set(SESSION_ID, {
         id: SESSION_ID,
-        cwd: "/home/user/project",
-        createdAt: twoMinutesAgo,
+        cwd: "/project",
+        createdAt: new Date().toISOString(),
       });
-      const ws = new MockWs();
+      const save = makeSave();
+      const { onExitCallback } = setupAndGetExitHandler(registry, save);
 
-      handleWsConnection(
-        ws as never,
-        makeReq(),
-        registry as never,
-        makeSave(),
-        "claude",
-      );
+      // Simulate session having output buffer
+      const sessionEntry = sessionsMap.get(SESSION_ID) as {
+        outputBuffer: Buffer[];
+        bufferSize: number;
+        currentStatus: string;
+        activeWs: null;
+        idleTimer: null;
+      };
+      if (sessionEntry) {
+        sessionEntry.outputBuffer = [Buffer.from("some output")];
+        sessionEntry.bufferSize = 11;
+      }
 
-      expect(advanceToReview).not.toHaveBeenCalled();
+      jest.clearAllMocks();
+      onExitCallback({ exitCode: 0 });
+
+      // Final output stored in completedSessions
+      expect(completedSessionsMap.has(SESSION_ID)).toBe(true);
+
+      // Session removed from sessions map
+      expect(sessionsMap.has(SESSION_ID)).toBe(false);
+
+      // Registry entry must NOT be deleted — it must persist so --continue can
+      // be spawned as a fallback if the interactive session dies.  Entries are
+      // only cleared by explicit killSession calls.
+      expect(registry.has(SESSION_ID)).toBe(true);
+
+      // saveSessionRegistry must NOT be called (registry was not mutated)
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("sends exit message and closes WS when activeWs is open", () => {
+      const registry = new Map<
+        string,
+        { id: string; cwd: string; createdAt: string }
+      >();
+      const save = makeSave();
+      const { ws, onExitCallback } = setupAndGetExitHandler(registry, save);
+
+      jest.clearAllMocks();
+      onExitCallback({ exitCode: 1 });
+
+      expect(ws.send).toHaveBeenCalledTimes(1);
+      const msg = JSON.parse(ws.send.mock.calls[0][0] as string) as {
+        type: string;
+        code: number;
+      };
+      expect(msg.type).toBe("exit");
+      expect(msg.code).toBe(1);
+      expect(ws.close).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -730,107 +750,60 @@ describe("handleWsConnection", () => {
       expect(mockPtyProcess.write).not.toHaveBeenCalled();
     });
 
-    it("calls backToInProgress and resets hadMeaningfulActivity when text input arrives after meaningful activity", () => {
-      const ws = setupConnected();
-      const entry = sessionsMap.get(SESSION_ID) as {
-        hadMeaningfulActivity: boolean;
-      };
-      entry.hadMeaningfulActivity = true;
+    describe("backToInProgress — only fires on Enter (submit), not on typing", () => {
+      it("calls backToInProgress when Enter is pressed (text frame)", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        ws.emit("message", Buffer.from("hello\r"), false);
+        expect(backToInProgress).toHaveBeenCalledWith(SESSION_ID);
+      });
 
-      ws.emit("message", Buffer.from("Keep going\r"), false);
+      it("calls backToInProgress when Enter is pressed (binary frame)", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        ws.emit("message", Buffer.from("hello\r"), true);
+        expect(backToInProgress).toHaveBeenCalledWith(SESSION_ID);
+      });
 
-      expect(backToInProgress).toHaveBeenCalledWith(SESSION_ID);
-      expect(entry.hadMeaningfulActivity).toBe(false);
-      expect(mockPtyProcess.write).toHaveBeenCalledWith("Keep going\r");
-    });
+      it("does NOT call backToInProgress for typing without Enter", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        ws.emit("message", Buffer.from("hello"), false);
+        expect(backToInProgress).not.toHaveBeenCalled();
+        // Still forwarded to PTY
+        expect(mockPtyProcess.write).toHaveBeenCalledWith("hello");
+      });
 
-    it("calls backToInProgress and resets hadMeaningfulActivity when binary input arrives after meaningful activity", () => {
-      const ws = setupConnected();
-      const entry = sessionsMap.get(SESSION_ID) as {
-        hadMeaningfulActivity: boolean;
-      };
-      entry.hadMeaningfulActivity = true;
+      it("does NOT call backToInProgress for a single keypress without Enter (binary)", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        ws.emit("message", Buffer.from("a"), true);
+        expect(backToInProgress).not.toHaveBeenCalled();
+      });
 
-      const binaryData = Buffer.from([0x41]);
-      ws.emit("message", binaryData, true);
+      it("does NOT call backToInProgress for a CSI cursor-position report (\\x1b[24;80R)", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        // xterm.js sends this in response to a \x1b[6n query from the PTY
+        ws.emit("message", Buffer.from("\x1b[24;80R"), false);
+        expect(backToInProgress).not.toHaveBeenCalled();
+        // Still forwarded to PTY
+        expect(mockPtyProcess.write).toHaveBeenCalledWith("\x1b[24;80R");
+      });
 
-      expect(backToInProgress).toHaveBeenCalledWith(SESSION_ID);
-      expect(entry.hadMeaningfulActivity).toBe(false);
-    });
+      it("does NOT call backToInProgress for a CSI device-attribute response (\\x1b[?1;2c)", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        ws.emit("message", Buffer.from("\x1b[?1;2c"), false);
+        expect(backToInProgress).not.toHaveBeenCalled();
+      });
 
-    it("does NOT call backToInProgress when hadMeaningfulActivity is false", () => {
-      const ws = setupConnected();
-      const entry = sessionsMap.get(SESSION_ID) as {
-        hadMeaningfulActivity: boolean;
-      };
-      entry.hadMeaningfulActivity = false;
-
-      ws.emit("message", Buffer.from("hello\r"), false);
-
-      expect(backToInProgress).not.toHaveBeenCalled();
-    });
-
-    it("does NOT call backToInProgress for resize messages even when hadMeaningfulActivity is true", () => {
-      const ws = setupConnected();
-      const entry = sessionsMap.get(SESSION_ID) as {
-        hadMeaningfulActivity: boolean;
-      };
-      entry.hadMeaningfulActivity = true;
-
-      const resizeMsg = JSON.stringify({ type: "resize", cols: 120, rows: 40 });
-      ws.emit("message", Buffer.from(resizeMsg), false);
-
-      expect(backToInProgress).not.toHaveBeenCalled();
-      // hadMeaningfulActivity should remain true since no real input was sent
-      expect(entry.hadMeaningfulActivity).toBe(true);
-    });
-
-    it("calls backToInProgress only on the first message of a burst — subsequent messages with flag already false do nothing", () => {
-      // Simulates the user pressing several keys rapidly after Claude finished.
-      // The first key resets hadMeaningfulActivity, so each subsequent key
-      // arrives with the flag already false and must not trigger extra calls.
-      const ws = setupConnected();
-      const entry = sessionsMap.get(SESSION_ID) as {
-        hadMeaningfulActivity: boolean;
-      };
-      entry.hadMeaningfulActivity = true;
-
-      ws.emit("message", Buffer.from("K"), false); // first keystroke — triggers reset
-      expect(backToInProgress).toHaveBeenCalledTimes(1);
-      expect(entry.hadMeaningfulActivity).toBe(false);
-
-      ws.emit("message", Buffer.from("e"), false); // second
-      ws.emit("message", Buffer.from("e"), false); // third
-      ws.emit("message", Buffer.from("p"), false); // fourth
-
-      // Still exactly one call total
-      expect(backToInProgress).toHaveBeenCalledTimes(1);
-      // All four characters were written to the PTY
-      expect(mockPtyProcess.write).toHaveBeenCalledTimes(4);
-    });
-
-    it("resize followed by real input: resize does not consume the flag, real input still triggers reset", () => {
-      // A resize arriving between Claude finishing and the user typing must not
-      // interfere with backToInProgress firing on the real keypress.
-      const ws = setupConnected();
-      const entry = sessionsMap.get(SESSION_ID) as {
-        hadMeaningfulActivity: boolean;
-      };
-      entry.hadMeaningfulActivity = true;
-
-      // Terminal resize event
-      ws.emit(
-        "message",
-        Buffer.from(JSON.stringify({ type: "resize", cols: 200, rows: 50 })),
-        false,
-      );
-      expect(backToInProgress).not.toHaveBeenCalled();
-      expect(entry.hadMeaningfulActivity).toBe(true); // flag unchanged
-
-      // User types
-      ws.emit("message", Buffer.from("continue\r"), false);
-      expect(backToInProgress).toHaveBeenCalledTimes(1);
-      expect(entry.hadMeaningfulActivity).toBe(false);
+      it("does NOT call backToInProgress for binary-framed CSI sequence", () => {
+        const ws = setupConnected();
+        jest.clearAllMocks();
+        ws.emit("message", Buffer.from("\x1b[24;80R"), true);
+        expect(backToInProgress).not.toHaveBeenCalled();
+      });
     });
   });
 

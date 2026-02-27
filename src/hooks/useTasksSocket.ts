@@ -1,15 +1,16 @@
 // src/hooks/useTasksSocket.ts
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { useNotifications } from "@/context/NotificationContext";
 import type { Task } from "@/utils/tasks.types";
 
 type TaskEvent =
   | { type: "task:created"; data: Task }
   | { type: "task:updated"; data: Task }
-  | { type: "task:deleted"; data: { id: string; repoId?: string } }
+  | { type: "task:deleted"; data: { id: string; repo?: string } }
   | { type: "repo:created" | "repo:deleted"; data: unknown };
 
 const BASE_BACKOFF_MS = 1_000;
@@ -17,6 +18,10 @@ const MAX_BACKOFF_MS = 30_000;
 
 export function useTasksSocket() {
   const queryClient = useQueryClient();
+
+  const { notifyTransition } = useNotifications();
+  const notifyRef = useRef(notifyTransition);
+  notifyRef.current = notifyTransition;
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -29,10 +34,11 @@ export function useTasksSocket() {
       ws = new WebSocket(`${protocol}//${window.location.host}/ws/board`);
 
       ws.onopen = () => {
-        const isReconnect = attempt > 0;
+        const wasReconnect = attempt > 0;
         attempt = 0; // reset backoff on successful connection
-        // Catch up on any events missed while disconnected (skip on initial connect)
-        if (isReconnect) {
+        // Only catch up on missed events when this is a reconnect, not the
+        // initial connection (which would discard any optimistic cache updates).
+        if (wasReconnect) {
           void queryClient.invalidateQueries({ queryKey: ["tasks"] });
         }
       };
@@ -42,8 +48,18 @@ export function useTasksSocket() {
           const msg = JSON.parse(event.data as string) as TaskEvent;
 
           if (msg.type === "task:updated") {
+            // Detect status change before updating cache
+            const cached = queryClient.getQueryData<Task[]>([
+              "tasks",
+              msg.data.repo,
+            ]);
+            const prevTask = cached?.find((t) => t.id === msg.data.id);
+            if (prevTask && prevTask.status !== msg.data.status) {
+              notifyRef.current(msg.data, prevTask.status, msg.data.status);
+            }
+
             queryClient.setQueryData<Task[]>(
-              ["tasks", msg.data.repoId],
+              ["tasks", msg.data.repo],
               (prev) => {
                 if (!prev) {
                   return prev;
@@ -53,7 +69,7 @@ export function useTasksSocket() {
             );
           } else if (msg.type === "task:created") {
             queryClient.setQueryData<Task[]>(
-              ["tasks", msg.data.repoId],
+              ["tasks", msg.data.repo],
               (prev) => {
                 if (!prev) {
                   return prev;
@@ -62,9 +78,9 @@ export function useTasksSocket() {
               },
             );
           } else if (msg.type === "task:deleted") {
-            if (msg.data.repoId) {
+            if (msg.data.repo) {
               queryClient.setQueryData<Task[]>(
-                ["tasks", msg.data.repoId],
+                ["tasks", msg.data.repo],
                 (prev) => {
                   if (!prev) {
                     return prev;
