@@ -8,8 +8,10 @@ import type { Task, TaskStatus } from "@/utils/tasks.types";
 const TITLE_MAX_LENGTH = 40;
 
 function truncateTitle(title: string): string {
-  if (title.length <= TITLE_MAX_LENGTH) {return title;}
-  return `${title.slice(0, TITLE_MAX_LENGTH)  }...`;
+  if (title.length <= TITLE_MAX_LENGTH) {
+    return title;
+  }
+  return `${title.slice(0, TITLE_MAX_LENGTH)}...`;
 }
 
 interface NotificationContextValue {

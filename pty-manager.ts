@@ -154,7 +154,9 @@ async function handleRequest(
       ptyProcess.onData((data) => {
         const chunk = Buffer.from(data);
         const e = sessions.get(sessionId);
-        if (!e) {return;}
+        if (!e) {
+          return;
+        }
 
         appendToBuffer(e, chunk);
         if (e.activeWs?.readyState === WebSocket.OPEN) {
@@ -164,7 +166,9 @@ async function handleRequest(
       ptyProcess.onExit(({ exitCode: _exitCode }) => {
         const e = sessions.get(sessionId);
         if (e) {
-          if (e.idleTimer !== null) {clearTimeout(e.idleTimer);}
+          if (e.idleTimer !== null) {
+            clearTimeout(e.idleTimer);
+          }
           e.currentStatus = "exited";
           if (e.activeWs?.readyState === WebSocket.OPEN) {
             // Close WS without sending an "exit" message so the client

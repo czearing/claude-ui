@@ -91,13 +91,17 @@ export async function migrateRepoTasks(
   try {
     topDirs = await readdir(SPECS_DIR);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {return;}
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
     throw err;
   }
 
   const oldStatusFolders = ["backlog", "in-progress", "review", "done"];
   for (const folder of oldStatusFolders) {
-    if (!topDirs.includes(folder)) {continue;}
+    if (!topDirs.includes(folder)) {
+      continue;
+    }
     const dir = join(SPECS_DIR, folder);
     let isDir: boolean;
     try {
@@ -106,7 +110,9 @@ export async function migrateRepoTasks(
     } catch {
       continue;
     }
-    if (!isDir) {continue;}
+    if (!isDir) {
+      continue;
+    }
 
     let files: string[];
     try {
@@ -150,9 +156,12 @@ export async function migrateRepoTasks(
   }
 
   for (const entry of topDirs) {
-    if (oldStatusFolders.includes(entry)) {continue;}
-    if (STATUS_FOLDERS.includes(entry as (typeof STATUS_FOLDERS)[number]))
-      {continue;}
+    if (oldStatusFolders.includes(entry)) {
+      continue;
+    }
+    if (STATUS_FOLDERS.includes(entry as (typeof STATUS_FOLDERS)[number])) {
+      continue;
+    }
 
     const repoDir = join(SPECS_DIR, entry);
     let isDir: boolean;
@@ -162,7 +171,9 @@ export async function migrateRepoTasks(
     } catch {
       continue;
     }
-    if (!isDir) {continue;}
+    if (!isDir) {
+      continue;
+    }
 
     const repoName = repoIdToName.get(entry) ?? entry;
 
@@ -245,7 +256,9 @@ export async function migrateFrontmatterTasks(): Promise<void> {
   try {
     repoDirs = await readdir(SPECS_DIR);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {return;}
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
     throw err;
   }
 
@@ -258,7 +271,9 @@ export async function migrateFrontmatterTasks(): Promise<void> {
     } catch {
       continue;
     }
-    if (!isDir) {continue;}
+    if (!isDir) {
+      continue;
+    }
 
     for (const folder of STATUS_FOLDERS) {
       const dir = join(repoDir, folder);
@@ -270,7 +285,9 @@ export async function migrateFrontmatterTasks(): Promise<void> {
       }
 
       for (const filename of files) {
-        if (!filename.endsWith(".md")) {continue;}
+        if (!filename.endsWith(".md")) {
+          continue;
+        }
         const filePath = join(dir, filename);
         let raw: string;
         try {
@@ -279,11 +296,15 @@ export async function migrateFrontmatterTasks(): Promise<void> {
           continue;
         }
 
-        if (!raw.startsWith("---\n")) {continue;}
+        if (!raw.startsWith("---\n")) {
+          continue;
+        }
 
         // Parse old frontmatter
         const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(raw);
-        if (!match) {continue;}
+        if (!match) {
+          continue;
+        }
 
         const frontmatter = match[1];
         const body = match[2].trim();
@@ -291,10 +312,14 @@ export async function migrateFrontmatterTasks(): Promise<void> {
         const meta: Record<string, string> = {};
         for (const line of frontmatter.split("\n")) {
           const idx = line.indexOf(": ");
-          if (idx === -1) {continue;}
+          if (idx === -1) {
+            continue;
+          }
           const key = line.slice(0, idx).trim();
           const value = line.slice(idx + 2).trim();
-          if (key) {meta[key] = value;}
+          if (key) {
+            meta[key] = value;
+          }
         }
 
         const oldId = filename.slice(0, -3);
@@ -304,8 +329,12 @@ export async function migrateFrontmatterTasks(): Promise<void> {
 
         // Save sessionId/archivedAt to sidecar
         const stateEntry: { sessionId?: string; archivedAt?: string } = {};
-        if (meta["sessionId"]) {stateEntry.sessionId = meta["sessionId"];}
-        if (meta["archivedAt"]) {stateEntry.archivedAt = meta["archivedAt"];}
+        if (meta["sessionId"]) {
+          stateEntry.sessionId = meta["sessionId"];
+        }
+        if (meta["archivedAt"]) {
+          stateEntry.archivedAt = meta["archivedAt"];
+        }
         if (Object.keys(stateEntry).length > 0) {
           await setTaskState(repoName, targetId, stateEntry);
         }
@@ -333,11 +362,20 @@ export async function readTask(id: string, repo: string): Promise<Task | null> {
       const folderStatus = FOLDER_STATUS[folder];
       const task = parseTaskFile(raw, repo, id, folderStatus);
       const state = await getTaskState(repo, id);
-      if (state.sessionId) {task.sessionId = state.sessionId;}
-      if (state.archivedAt) {task.archivedAt = state.archivedAt;}
+      if (state.sessionId) {
+        task.sessionId = state.sessionId;
+      }
+      if (state.archivedAt) {
+        task.archivedAt = state.archivedAt;
+      }
+      if (state.title) {
+        task.title = state.title;
+      }
       return task;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {continue;}
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
       throw err;
     }
   }
@@ -354,14 +392,17 @@ async function unlinkWithRetry(filePath: string): Promise<void> {
     await unlink(filePath);
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {return;}
+    if (code === "ENOENT") {
+      return;
+    }
     if (code === "EPERM" && process.platform === "win32") {
       await new Promise((r) => setTimeout(r, 150));
       try {
         await unlink(filePath);
       } catch (retryErr) {
-        if ((retryErr as NodeJS.ErrnoException).code !== "ENOENT")
-          {throw retryErr;}
+        if ((retryErr as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw retryErr;
+        }
       }
       return;
     }
@@ -390,7 +431,9 @@ export async function writeTask(
   } else {
     // No prevStatus: clean up from any other status folder
     for (const folder of STATUS_FOLDERS) {
-      if (folder === targetFolder) {continue;}
+      if (folder === targetFolder) {
+        continue;
+      }
       const oldPath = join(SPECS_DIR, task.repo, folder, `${task.id}.md`);
       await unlinkWithRetry(oldPath);
     }
@@ -398,10 +441,11 @@ export async function writeTask(
 
   await writeFile(targetPath, serializeTaskFile(task), "utf8");
 
-  // Persist sessionId/archivedAt to sidecar
+  // Persist sessionId/archivedAt/title to sidecar
   await setTaskState(task.repo, task.id, {
     sessionId: task.sessionId,
     archivedAt: task.archivedAt,
+    title: task.title,
   });
 
   const cached = repoCache.get(task.repo);
@@ -426,7 +470,9 @@ export async function deleteTaskFile(
   try {
     await unlink(filePath);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {throw err;}
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw err;
+    }
     return;
   }
 
@@ -443,7 +489,9 @@ export async function deleteTaskFile(
 
 export async function readTasksForRepo(repo: string): Promise<Task[]> {
   const cached = repoCache.get(repo);
-  if (cached) {return cached;}
+  if (cached) {
+    return cached;
+  }
 
   const tasks: Task[] = [];
   const states = await getAllTaskStates(repo);
@@ -454,7 +502,9 @@ export async function readTasksForRepo(repo: string): Promise<Task[]> {
     try {
       files = await readdir(dir);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {continue;}
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
       throw err;
     }
     const folderStatus = FOLDER_STATUS[folder];
@@ -468,17 +518,28 @@ export async function readTasksForRepo(repo: string): Promise<Task[]> {
             const raw = await readFile(filePath, "utf8");
             const task = parseTaskFile(raw, repo, fileId, folderStatus);
             const state = states[fileId];
-            if (state?.sessionId) {task.sessionId = state.sessionId;}
-            if (state?.archivedAt) {task.archivedAt = state.archivedAt;}
+            if (state?.sessionId) {
+              task.sessionId = state.sessionId;
+            }
+            if (state?.archivedAt) {
+              task.archivedAt = state.archivedAt;
+            }
+            if (state?.title) {
+              task.title = state.title;
+            }
             return task;
           } catch (err) {
-            if ((err as NodeJS.ErrnoException).code === "ENOENT") {return null;}
+            if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+              return null;
+            }
             throw err;
           }
         }),
     );
     for (const t of folderTasks) {
-      if (t !== null) {tasks.push(t);}
+      if (t !== null) {
+        tasks.push(t);
+      }
     }
   }
 
@@ -493,7 +554,9 @@ export async function readAllTasks(): Promise<Task[]> {
   try {
     repoDirs = await readdir(SPECS_DIR);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {return [];}
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
     throw err;
   }
 
@@ -506,7 +569,9 @@ export async function readAllTasks(): Promise<Task[]> {
     } catch {
       continue;
     }
-    if (!isDir) {continue;}
+    if (!isDir) {
+      continue;
+    }
 
     const repoTasks = await readTasksForRepo(repoName);
     allTasks.push(...repoTasks);
@@ -540,7 +605,9 @@ export async function getUniqueTaskId(
     }
   }
 
-  if (!existing.has(base)) {return base;}
+  if (!existing.has(base)) {
+    return base;
+  }
   let counter = 2;
   while (existing.has(`${base}-${counter}`)) {
     counter++;

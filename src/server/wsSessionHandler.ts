@@ -179,7 +179,9 @@ export function handleWsConnection(
     ptyProcess.onData((data) => {
       const chunk = Buffer.from(data);
       const e = sessions.get(sessionId);
-      if (!e) {return;}
+      if (!e) {
+        return;
+      }
       appendToBuffer(e, chunk);
       if (e.activeWs?.readyState === WebSocket.OPEN) {
         e.activeWs.send(chunk);
@@ -188,7 +190,9 @@ export function handleWsConnection(
     ptyProcess.onExit(({ exitCode }) => {
       const e = sessions.get(sessionId);
       if (e) {
-        if (e.idleTimer !== null) {clearTimeout(e.idleTimer);}
+        if (e.idleTimer !== null) {
+          clearTimeout(e.idleTimer);
+        }
         e.currentStatus = "exited";
         if (e.activeWs?.readyState === WebSocket.OPEN) {
           e.activeWs.send(JSON.stringify({ type: "exit", code: exitCode }));
@@ -212,7 +216,9 @@ export function handleWsConnection(
     }
     if (isBinary) {
       const str = Buffer.from(data as ArrayBuffer).toString();
-      if (isUserSubmit(str)) {backToInProgress(sessionId);}
+      if (isUserSubmit(str)) {
+        backToInProgress(sessionId);
+      }
       e.pty.write(str);
     } else {
       const text = (data as Buffer).toString("utf8");
@@ -229,7 +235,9 @@ export function handleWsConnection(
       } catch {
         // not JSON — write raw to PTY
       }
-      if (isUserSubmit(text)) {backToInProgress(sessionId);}
+      if (isUserSubmit(text)) {
+        backToInProgress(sessionId);
+      }
       e.pty.write(text);
     }
   });

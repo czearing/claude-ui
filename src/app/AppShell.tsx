@@ -136,14 +136,18 @@ export function AppShell({
   function handleHandover(taskId: string) {
     handoverTask.mutate(taskId, {
       onSuccess: (task) => {
-        if (task.sessionId) {openSession(task.sessionId);}
+        if (task.sessionId) {
+          openSession(task.sessionId);
+        }
       },
     });
   }
 
   function handleSelectTask(task: Task) {
     if (currentView === "Board") {
-      if (task.sessionId) {openSession(task.sessionId);}
+      if (task.sessionId) {
+        openSession(task.sessionId);
+      }
       return;
     }
     openPane();

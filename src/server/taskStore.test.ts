@@ -356,6 +356,7 @@ describe("writeTask", () => {
       {
         sessionId: "sess-1",
         archivedAt: "2026-01-01T00:00:00.000Z",
+        title: "Fix Login Bug",
       },
     );
   });

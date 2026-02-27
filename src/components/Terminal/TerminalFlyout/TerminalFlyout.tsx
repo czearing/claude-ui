@@ -36,7 +36,9 @@ export function TerminalFlyout({
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
-      if (!dragging.current) {return;}
+      if (!dragging.current) {
+        return;
+      }
       const delta = startY.current - e.clientY;
       const next = Math.min(
         MAX_HEIGHT,
@@ -57,7 +59,9 @@ export function TerminalFlyout({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {onClose();}
+      if (e.key === "Escape") {
+        onClose();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
