@@ -6,8 +6,8 @@ import dynamic from "next/dynamic";
 import styles from "./TerminalFlyout.module.css";
 import type { TerminalFlyoutProps } from "./TerminalFlyout.types";
 
-const TerminalPage = dynamic(
-  () => import("@/app/TerminalPage").then((m) => m.TerminalPage),
+const ChatPage = dynamic(
+  () => import("@/app/ChatPage").then((m) => m.ChatPage),
   { ssr: false },
 );
 
@@ -165,7 +165,16 @@ export function TerminalFlyout({
         </button>
       </div>
       <div className={styles.terminal} role="tabpanel">
-        <TerminalPage key={activeSessionId} sessionId={activeSessionId} />
+        {sessions.map((s) => {
+          const active = s.sessionId === activeSessionId;
+          return active ? (
+            <ChatPage
+              key={s.sessionId}
+              taskId={s.taskId}
+              sessionId={s.sessionId}
+            />
+          ) : null;
+        })}
       </div>
     </div>
   );
