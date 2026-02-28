@@ -1,3 +1,4 @@
+import { handleGetHistory, handleChat } from "./taskChat";
 import { handleHandover, handleRecall, activePtys } from "./taskHandover";
 import { broadcastTaskEvent } from "../boardBroadcast";
 import {
@@ -7,25 +8,24 @@ import {
   readTasksForRepo,
   writeTask,
 } from "../taskStore";
+import { parseStringBody } from "../utils/routeUtils";
 
 import { readBody } from "../../utils/readBody";
 import type { Task } from "../../utils/tasks.types";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { parse } from "node:url";
+
+const DEFAULT_REPO = "claude-code-ui";
 
 export async function handleTaskRoutes(
   req: IncomingMessage,
   res: ServerResponse,
-  parsedUrl: ReturnType<typeof parse>,
+  parsedUrl: URL,
 ): Promise<boolean> {
-  const query =
-    parsedUrl.query && typeof parsedUrl.query === "object"
-      ? (parsedUrl.query as Record<string, string | string[] | undefined>)
-      : ({} as Record<string, string | string[] | undefined>);
+  const query = parsedUrl.searchParams;
 
   // GET /api/tasks
   if (req.method === "GET" && parsedUrl.pathname === "/api/tasks") {
-    const repo = typeof query["repo"] === "string" ? query["repo"] : undefined;
+    const repo = query.get("repo") ?? undefined;
     const result = repo ? await readTasksForRepo(repo) : await readAllTasks();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(result));
@@ -35,15 +35,14 @@ export async function handleTaskRoutes(
   // POST /api/tasks
   if (req.method === "POST" && parsedUrl.pathname === "/api/tasks") {
     const body = await readBody(req);
-    const title = typeof body["title"] === "string" ? body["title"] : "";
-    const repo =
-      typeof body["repo"] === "string" ? body["repo"] : "claude-code-ui";
+    const title = parseStringBody(body, "title");
+    const repo = parseStringBody(body, "repo", { fallback: DEFAULT_REPO });
     const id = await getUniqueTaskId(title, repo);
     const task: Task = {
       id,
       title,
       status: "Backlog",
-      spec: typeof body["spec"] === "string" ? body["spec"] : "",
+      spec: parseStringBody(body, "spec"),
       repo,
     };
     await writeTask(task);
@@ -81,6 +80,31 @@ export async function handleTaskRoutes(
     return true;
   }
 
+  // GET /api/tasks/:id/history
+  if (
+    req.method === "GET" &&
+    parsedUrl.pathname?.startsWith("/api/tasks/") &&
+    parsedUrl.pathname.endsWith("/history")
+  ) {
+    const id = parsedUrl.pathname.slice(
+      "/api/tasks/".length,
+      -"/history".length,
+    );
+    await handleGetHistory(req, res, id);
+    return true;
+  }
+
+  // POST /api/tasks/:id/chat
+  if (
+    req.method === "POST" &&
+    parsedUrl.pathname?.startsWith("/api/tasks/") &&
+    parsedUrl.pathname.endsWith("/chat")
+  ) {
+    const id = parsedUrl.pathname.slice("/api/tasks/".length, -"/chat".length);
+    await handleChat(req, res, id);
+    return true;
+  }
+
   // DELETE /api/sessions/:id — kill active PTY if running
   if (
     req.method === "DELETE" &&
@@ -110,8 +134,7 @@ export async function handleTaskRoutes(
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length);
     const body = await readBody(req);
-    const repoParam =
-      typeof query["repo"] === "string" ? query["repo"] : undefined;
+    const repoParam = query.get("repo") ?? undefined;
     const taskList = repoParam
       ? await readTasksForRepo(repoParam)
       : await readAllTasks();
@@ -156,8 +179,7 @@ export async function handleTaskRoutes(
     parsedUrl.pathname?.startsWith("/api/tasks/")
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length);
-    const repoParam =
-      typeof query["repo"] === "string" ? query["repo"] : undefined;
+    const repoParam = query.get("repo") ?? undefined;
     const deleteTaskList = repoParam
       ? await readTasksForRepo(repoParam)
       : await readAllTasks();

@@ -1,13 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
+import { useDeleteTask, useTasks } from "@/hooks/useTasks";
 import { Backlog } from "./Backlog";
 
 jest.mock("@/hooks/useTasks", () => ({
   useTasks: jest.fn(),
   useDeleteTask: jest.fn(),
-  useHandoverTask: jest.fn(),
 }));
 
 jest.mock("@/hooks/useTasksSocket", () => ({
@@ -45,7 +44,6 @@ const mockTasks = [
 beforeEach(() => {
   (useTasks as jest.Mock).mockReturnValue({ data: mockTasks });
   (useDeleteTask as jest.Mock).mockReturnValue({ mutate: jest.fn() });
-  (useHandoverTask as jest.Mock).mockReturnValue({ mutate: jest.fn() });
 });
 
 describe("Backlog", () => {
@@ -135,16 +133,20 @@ describe("Backlog", () => {
     expect(deleteMutate).not.toHaveBeenCalled();
   });
 
-  it("calls handoverTask when Send to Agent is clicked", async () => {
-    const handoverMutate = jest.fn();
-    (useHandoverTask as jest.Mock).mockReturnValue({ mutate: handoverMutate });
+  it("calls onHandover when Send to Agent is clicked", async () => {
+    const onHandover = jest.fn();
     render(
-      <Backlog repo="repo1" onSelectTask={jest.fn()} onNewTask={jest.fn()} />,
+      <Backlog
+        repo="repo1"
+        onSelectTask={jest.fn()}
+        onNewTask={jest.fn()}
+        onHandover={onHandover}
+      />,
     );
     await userEvent.click(
       screen.getByRole("button", { name: "Send Fix login bug to agent" }),
     );
-    expect(handoverMutate).toHaveBeenCalledWith("1");
+    expect(onHandover).toHaveBeenCalledWith("1");
   });
 
   it("calls onSelectTask when a task row is clicked", async () => {

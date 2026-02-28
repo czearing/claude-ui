@@ -8,7 +8,6 @@ import { readRepos, writeRepos } from "../repoStore";
 import { readBody } from "../../utils/readBody";
 import { existsSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
-import { parse } from "node:url";
 
 jest.mock("../repoStore");
 jest.mock("../boardBroadcast");
@@ -61,7 +60,7 @@ describe("GET /api/repos", () => {
 
     const req = makeReq("GET");
     const res = makeRes();
-    const parsed = parse("/api/repos");
+    const parsed = new URL("/api/repos", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -85,7 +84,7 @@ describe("POST /api/repos", () => {
 
     const req = makeReq("POST");
     const res = makeRes();
-    const parsed = parse("/api/repos");
+    const parsed = new URL("/api/repos", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -103,7 +102,7 @@ describe("POST /api/repos", () => {
 
     const req = makeReq("POST");
     const res = makeRes();
-    const parsed = parse("/api/repos");
+    const parsed = new URL("/api/repos", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -125,7 +124,7 @@ describe("POST /api/repos", () => {
 
     const req = makeReq("POST");
     const res = makeRes();
-    const parsed = parse("/api/repos");
+    const parsed = new URL("/api/repos", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -157,7 +156,7 @@ describe("POST /api/repos", () => {
 
     const req = makeReq("POST");
     const res = makeRes();
-    const parsed = parse("/api/repos");
+    const parsed = new URL("/api/repos", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -197,7 +196,7 @@ describe("PATCH /api/repos/:id", () => {
 
     const req = makeReq("PATCH");
     const res = makeRes();
-    const parsed = parse("/api/repos/unknown-id");
+    const parsed = new URL("/api/repos/unknown-id", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -221,7 +220,7 @@ describe("PATCH /api/repos/:id", () => {
 
     const req = makeReq("PATCH");
     const res = makeRes();
-    const parsed = parse("/api/repos/repo-1");
+    const parsed = new URL("/api/repos/repo-1", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -250,7 +249,7 @@ describe("PATCH /api/repos/:id", () => {
 
     const req = makeReq("PATCH");
     const res = makeRes();
-    const parsed = parse("/api/repos/repo-1");
+    const parsed = new URL("/api/repos/repo-1", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -296,7 +295,7 @@ describe("DELETE /api/repos/:id", () => {
 
     const req = makeReq("DELETE");
     const res = makeRes();
-    const parsed = parse("/api/repos/repo-1");
+    const parsed = new URL("/api/repos/repo-1", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -320,7 +319,7 @@ describe("non-matching routes", () => {
   it("returns false for a completely unrelated route", async () => {
     const req = makeReq("GET");
     const res = makeRes();
-    const parsed = parse("/api/tasks");
+    const parsed = new URL("/api/tasks", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 
@@ -332,7 +331,7 @@ describe("non-matching routes", () => {
   it("returns false for an unknown HTTP method on /api/repos", async () => {
     const req = makeReq("PUT");
     const res = makeRes();
-    const parsed = parse("/api/repos");
+    const parsed = new URL("/api/repos", "http://localhost");
 
     const handled = await handleRepoRoutes(req, res as never, parsed);
 

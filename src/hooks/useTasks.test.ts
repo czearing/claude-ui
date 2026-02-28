@@ -7,7 +7,6 @@ import type { Task } from "@/utils/tasks.types";
 import {
   useCreateTask,
   useDeleteTask,
-  useHandoverTask,
   useRecallTask,
   useTasks,
   useUpdateTask,
@@ -185,7 +184,11 @@ describe("useDeleteTask", () => {
       return cached?.length === 0;
     });
 
-    resolveFetch({ ok: true, status: 200 });
+    resolveFetch({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(undefined),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 
@@ -225,25 +228,6 @@ describe("useDeleteTask", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.isError).toBe(false);
-  });
-});
-
-describe("useHandoverTask", () => {
-  it("POSTs to /api/tasks/:id/handover", async () => {
-    const handedOverTask: Task = { ...mockTask, status: "In Progress" };
-    mockFetch.mockResolvedValue(okJson(handedOverTask));
-    const { wrapper } = makeWrapper();
-    const { result } = renderHook(() => useHandoverTask(REPO_ID), { wrapper });
-
-    act(() => {
-      result.current.mutate("task-1");
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/tasks/task-1/handover");
-    expect(opts.method).toBe("POST");
   });
 });
 

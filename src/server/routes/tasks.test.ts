@@ -16,7 +16,6 @@ import {
 import { readBody } from "../../utils/readBody";
 import type { Task } from "../../utils/tasks.types";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { parse } from "node:url";
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -84,8 +83,8 @@ function makeRes() {
   };
 }
 
-function parsedUrl(url: string): ReturnType<typeof parse> {
-  return parse(url, true);
+function parsedUrl(url: string): URL {
+  return new URL(url, "http://localhost");
 }
 
 beforeEach(() => {

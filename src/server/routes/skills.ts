@@ -7,26 +7,22 @@ import {
   writeSkill,
 } from "../skillStore";
 import type { Skill } from "../skillStore";
+import { parseStringBody } from "../utils/routeUtils";
 
 import { readBody } from "../../utils/readBody";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { parse } from "node:url";
 
 export async function handleSkillRoutes(
   req: IncomingMessage,
   res: ServerResponse,
-  parsedUrl: ReturnType<typeof parse>,
+  parsedUrl: URL,
 ): Promise<boolean> {
-  const query =
-    parsedUrl.query && typeof parsedUrl.query === "object"
-      ? (parsedUrl.query as Record<string, string | string[] | undefined>)
-      : ({} as Record<string, string | string[] | undefined>);
+  const query = parsedUrl.searchParams;
 
   // GET /api/skills
   if (req.method === "GET" && parsedUrl.pathname === "/api/skills") {
-    const scope =
-      typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const scope = query.get("scope") ?? "global";
+    const repoId = query.get("repoId");
     const dir = await resolveSkillsDir(scope, repoId);
     const skills = await listSkills(dir);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -46,9 +42,8 @@ export async function handleSkillRoutes(
       res.end(JSON.stringify({ error: "Invalid skill name" }));
       return true;
     }
-    const scope =
-      typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const scope = query.get("scope") ?? "global";
+    const repoId = query.get("repoId");
     const dir = await resolveSkillsDir(scope, repoId);
     const skill = await readSkill(dir, name);
     if (skill === null) {
@@ -64,18 +59,16 @@ export async function handleSkillRoutes(
   // POST /api/skills
   if (req.method === "POST" && parsedUrl.pathname === "/api/skills") {
     const body = await readBody(req);
-    const name = typeof body["name"] === "string" ? body["name"].trim() : "";
-    const description =
-      typeof body["description"] === "string" ? body["description"] : "";
-    const content = typeof body["content"] === "string" ? body["content"] : "";
+    const name = parseStringBody(body, "name", { trim: true });
+    const description = parseStringBody(body, "description");
+    const content = parseStringBody(body, "content");
     if (!SKILL_NAME_RE.test(name)) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Invalid skill name" }));
       return true;
     }
-    const scope =
-      typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const scope = query.get("scope") ?? "global";
+    const repoId = query.get("repoId");
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing !== null) {
@@ -102,9 +95,8 @@ export async function handleSkillRoutes(
       res.end(JSON.stringify({ error: "Invalid skill name" }));
       return true;
     }
-    const scope =
-      typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const scope = query.get("scope") ?? "global";
+    const repoId = query.get("repoId");
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing === null) {
@@ -143,9 +135,8 @@ export async function handleSkillRoutes(
       res.end(JSON.stringify({ error: "Invalid skill name" }));
       return true;
     }
-    const scope =
-      typeof query["scope"] === "string" ? query["scope"] : "global";
-    const repoId = typeof query["repoId"] === "string" ? query["repoId"] : null;
+    const scope = query.get("scope") ?? "global";
+    const repoId = query.get("repoId");
     const dir = await resolveSkillsDir(scope, repoId);
     const existing = await readSkill(dir, name);
     if (existing === null) {

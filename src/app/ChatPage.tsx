@@ -9,7 +9,6 @@ import styles from "./ChatPage.module.css";
 
 type ChatPageProps = {
   taskId: string;
-  sessionId: string;
   onStatus?: (status: ClaudeStatus) => void;
 };
 

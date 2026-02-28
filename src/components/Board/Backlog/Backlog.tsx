@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/Select";
-import { useDeleteTask, useHandoverTask, useTasks } from "@/hooks/useTasks";
+import { useDeleteTask, useTasks } from "@/hooks/useTasks";
 import type { Task } from "@/utils/tasks.types";
 import styles from "./Backlog.module.css";
 import { BacklogRow } from "./BacklogRow";
@@ -47,6 +47,7 @@ interface BacklogProps {
   repo: string;
   onSelectTask: (task: Task) => void;
   onNewTask: () => void;
+  onHandover?: (taskId: string) => void;
   selectedTaskId?: string;
 }
 
@@ -54,11 +55,11 @@ export function Backlog({
   repo,
   onSelectTask,
   onNewTask,
+  onHandover,
   selectedTaskId,
 }: BacklogProps) {
   const { data: backlogTasks = [] } = useTasks(repo, selectBacklogTasks);
   const { mutate: deleteTask } = useDeleteTask(repo);
-  const { mutate: handoverTask } = useHandoverTask(repo);
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
@@ -127,7 +128,7 @@ export function Backlog({
               isMenuOpen={openMenuId === task.id}
               onSelect={() => onSelectTask(task)}
               onSetMenuOpen={(open) => setOpenMenuId(open ? task.id : null)}
-              onHandover={() => handoverTask(task.id)}
+              onHandover={() => onHandover?.(task.id)}
               onDelete={() => deleteTask(task.id)}
             />
           ))}

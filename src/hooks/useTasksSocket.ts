@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useNotifications } from "@/context/NotificationContext";
+import { tasksKey } from "@/hooks/useTasks";
 import type { Task } from "@/utils/tasks.types";
 
 type TaskEvent =
@@ -49,17 +50,16 @@ export function useTasksSocket() {
 
           if (msg.type === "task:updated") {
             // Detect status change before updating cache
-            const cached = queryClient.getQueryData<Task[]>([
-              "tasks",
-              msg.data.repo,
-            ]);
+            const cached = queryClient.getQueryData<Task[]>(
+              tasksKey(msg.data.repo),
+            );
             const prevTask = cached?.find((t) => t.id === msg.data.id);
             if (prevTask && prevTask.status !== msg.data.status) {
               notifyRef.current(msg.data, prevTask.status, msg.data.status);
             }
 
             queryClient.setQueryData<Task[]>(
-              ["tasks", msg.data.repo],
+              tasksKey(msg.data.repo),
               (prev) => {
                 if (!prev) {
                   return prev;
@@ -69,7 +69,7 @@ export function useTasksSocket() {
             );
           } else if (msg.type === "task:created") {
             queryClient.setQueryData<Task[]>(
-              ["tasks", msg.data.repo],
+              tasksKey(msg.data.repo),
               (prev) => {
                 if (!prev) {
                   return prev;
@@ -80,7 +80,7 @@ export function useTasksSocket() {
           } else if (msg.type === "task:deleted") {
             if (msg.data.repo) {
               queryClient.setQueryData<Task[]>(
-                ["tasks", msg.data.repo],
+                tasksKey(msg.data.repo),
                 (prev) => {
                   if (!prev) {
                     return prev;

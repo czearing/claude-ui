@@ -1,0 +1,66 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ── Item row ────────────────────────────────────────────────────────────── */
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Radio button ────────────────────────────────────────────────────────── */
+
+.radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border-color 150ms;
+  outline: none;
+}
+
+.radio:hover {
+  border-color: var(--color-border-hover);
+}
+
+.radio:focus-visible {
+  border-color: var(--color-agent);
+  box-shadow: 0 0 0 2px var(--color-agent-light);
+}
+
+.radio[data-state="checked"] {
+  border-color: var(--color-agent);
+}
+
+.radio[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Indicator dot ───────────────────────────────────────────────────────── */
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-agent);
+}
+
+/* ── Label ───────────────────────────────────────────────────────────────── */
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}

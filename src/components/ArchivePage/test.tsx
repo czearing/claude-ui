@@ -29,7 +29,6 @@ jest.mock("@/hooks/useTasks", () => ({
   useTasks: (...args: unknown[]) => mockUseTasks(...args),
   useUpdateTask: () => ({ mutate: mockUpdateTask }),
   useDeleteTask: () => ({ mutate: mockDeleteTask }),
-  useHandoverTask: () => ({ mutate: jest.fn() }),
 }));
 
 jest.mock("@/hooks/useTasksSocket", () => ({

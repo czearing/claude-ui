@@ -35,11 +35,7 @@ export const SessionPage = ({ params }: SessionPageProps) => {
         <StatusIndicator status={status} />
       </header>
       <div className={styles.terminal}>
-        <ChatPage
-          taskId={sessionId}
-          sessionId={sessionId}
-          onStatus={handleStatus}
-        />
+        <ChatPage taskId={sessionId} onStatus={handleStatus} />
       </div>
     </div>
   );

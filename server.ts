@@ -3,7 +3,6 @@ import { WebSocketServer } from "ws";
 
 import { boardClients, broadcastTaskEvent } from "./src/server/boardBroadcast";
 import { handleAgentRoutes } from "./src/server/routes/agents";
-import { handlePrototypeChatRoutes } from "./src/server/routes/prototypeChat";
 import { handleRepoRoutes } from "./src/server/routes/repos";
 import { handleSkillRoutes } from "./src/server/routes/skills";
 import { handleTaskRoutes } from "./src/server/routes/tasks";
@@ -24,7 +23,6 @@ import type { Task } from "./src/utils/tasks.types";
 
 import { watch } from "node:fs";
 import { createServer } from "node:http";
-import { parse } from "node:url";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -104,7 +102,7 @@ app
 
     const server = createServer(async (req, res) => {
       try {
-        const parsedUrl = parse(req.url!, true);
+        const parsedUrl = new URL(req.url!, "http://localhost");
         if (await handleTaskRoutes(req, res, parsedUrl)) {
           return;
         }
@@ -117,10 +115,7 @@ app
         if (await handleRepoRoutes(req, res, parsedUrl)) {
           return;
         }
-        if (await handlePrototypeChatRoutes(req, res, parsedUrl)) {
-          return;
-        }
-        void handle(req, res, parsedUrl);
+        void handle(req, res);
       } catch (err) {
         console.error("Request error:", err);
         res.writeHead(500);
@@ -131,7 +126,7 @@ app
     const boardWss = new WebSocketServer({ noServer: true });
 
     server.on("upgrade", (req, socket, head) => {
-      const url = parse(req.url ?? "", true);
+      const url = new URL(req.url ?? "/", "http://localhost");
       if (url.pathname === "/ws/board") {
         boardWss.handleUpgrade(req, socket, head, (ws) =>
           boardWss.emit("connection", ws, req),

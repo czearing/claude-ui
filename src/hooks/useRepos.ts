@@ -1,6 +1,8 @@
 // src/hooks/useRepos.ts
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { apiFetch } from "@/utils/apiFetch";
+
 export interface Repo {
   id: string;
   name: string;
@@ -16,11 +18,7 @@ export interface CreateRepoInput {
 const REPOS_KEY = ["repos"] as const;
 
 async function fetchRepos(): Promise<Repo[]> {
-  const res = await fetch("/api/repos");
-  if (!res.ok) {
-    throw new Error("Failed to fetch repos");
-  }
-  return res.json() as Promise<Repo[]>;
+  return apiFetch<Repo[]>("/api/repos");
 }
 
 export function useRepos() {
@@ -35,16 +33,10 @@ export function useCreateRepo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateRepoInput) =>
-      fetch("/api/repos", {
+      apiFetch<Repo>("/api/repos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      }).then(async (r) => {
-        if (!r.ok) {
-          const err = (await r.json()) as { error: string };
-          throw new Error(err.error);
-        }
-        return r.json() as Promise<Repo>;
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: REPOS_KEY }),
   });
@@ -53,12 +45,8 @@ export function useCreateRepo() {
 export function useDeleteRepo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const r = await fetch(`/api/repos/${id}`, { method: "DELETE" });
-      if (!r.ok && r.status !== 404) {
-        throw new Error("Failed to delete repo");
-      }
-    },
+    mutationFn: (id: string) =>
+      apiFetch(`/api/repos/${id}`, { method: "DELETE", allow404: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: REPOS_KEY }),
   });
 }

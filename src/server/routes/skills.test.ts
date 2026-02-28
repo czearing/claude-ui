@@ -12,7 +12,6 @@ import {
 
 import { readBody } from "../../utils/readBody";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { parse } from "node:url";
 
 jest.mock("../skillStore", () => ({
   SKILL_NAME_RE: /^[a-z0-9-]{1,64}$/,
@@ -52,8 +51,8 @@ function makeRes(): MockRes & ServerResponse {
   } as unknown as MockRes & ServerResponse;
 }
 
-function parsedUrl(url: string) {
-  return parse(url, true);
+function parsedUrl(url: string): URL {
+  return new URL(url, "http://localhost");
 }
 
 const FAKE_DIR = "/home/user/.claude/skills";

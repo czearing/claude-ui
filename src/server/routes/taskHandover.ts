@@ -1,15 +1,19 @@
 import { activePtys, buildArgs, spawnClaude, stripAnsi } from "./taskSpawn";
 import { broadcastTaskEvent } from "../boardBroadcast";
 import { readRepos } from "../repoStore";
+import { appendClaudeSessionId, appendMessages } from "../taskStateStore";
+import type { StoredMessage } from "../taskStateStore";
 import { readAllTasks, writeTask } from "../taskStore";
 
 import { extractTextFromLexical } from "../../utils/lexical";
+import { extractMessagesFromEvent } from "../../utils/streamMessageExtractor";
 import type { Task } from "../../utils/tasks.types";
+import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 export { activePtys } from "./taskSpawn";
 
-async function spawnHandover(
+export async function spawnHandover(
   req: IncomingMessage,
   res: ServerResponse,
   task: Task,
@@ -39,6 +43,17 @@ async function spawnHandover(
 
   let lineBuf = "";
   let latestClaudeSessionId: string | undefined;
+  const pendingMessages: StoredMessage[] = [];
+
+  function flushPendingMessages() {
+    if (pendingMessages.length === 0) {
+      return;
+    }
+    const toFlush = pendingMessages.splice(0);
+    appendMessages(task.repo, task.id, toFlush).catch((err: unknown) => {
+      console.error("[taskHandover] Failed to flush messages:", err);
+    });
+  }
 
   ptyProcess.onData((data) => {
     const cleaned = stripAnsi(data).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -70,7 +85,9 @@ async function spawnHandover(
             await writeTask(updated, prevStatus);
             broadcastTaskEvent("task:updated", updated);
             task = updated;
-          })();
+          })().catch((err: unknown) => {
+            console.error("[taskHandover] Failed to update task on init:", err);
+          });
         }
       }
       if (parsed["type"] === "result") {
@@ -78,6 +95,19 @@ async function spawnHandover(
         if (typeof sid === "string") {
           latestClaudeSessionId = sid;
         }
+        // Flush accumulated messages on each result event
+        flushPendingMessages();
+      }
+      // Accumulate messages from assistant/user events
+      const extracted = extractMessagesFromEvent(parsed);
+      for (const m of extracted) {
+        pendingMessages.push({
+          id: randomUUID(),
+          role: m.role,
+          content: m.content,
+          toolName: m.toolName,
+          timestamp: new Date().toISOString(),
+        });
       }
       res.write(`${t}\n`);
     }
@@ -94,25 +124,45 @@ async function spawnHandover(
           if (typeof sid === "string") {
             latestClaudeSessionId = sid;
           }
+          const extracted = extractMessagesFromEvent(parsed);
+          for (const m of extracted) {
+            pendingMessages.push({
+              id: randomUUID(),
+              role: m.role,
+              content: m.content,
+              toolName: m.toolName,
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
         res.write(`${t}\n`);
       } catch {
         /* skip malformed */
       }
     }
+    // Final flush of any remaining messages
+    flushPendingMessages();
     void (async () => {
       const prevStatus = task.status;
+      const newSessionId = latestClaudeSessionId ?? task.claudeSessionId;
+      if (newSessionId) {
+        await appendClaudeSessionId(task.repo, task.id, newSessionId);
+      }
       const updated: Task = {
         ...task,
         status: "Review",
-        claudeSessionId: latestClaudeSessionId ?? task.claudeSessionId,
+        claudeSessionId: newSessionId,
       };
       delete updated.sessionId;
       await writeTask(updated, prevStatus);
       broadcastTaskEvent("task:updated", updated);
       res.write('{"type":"done"}\n');
       res.end();
-    })();
+    })().catch((err: unknown) => {
+      console.error("[taskHandover] Failed to update task on exit:", err);
+      res.write('{"type":"done"}\n');
+      res.end();
+    });
   });
 
   req.on("close", () => {
@@ -152,7 +202,27 @@ export async function handleHandover(
     res.end();
     return;
   }
-  await spawnHandover(req, res, task, specText, task.claudeSessionId);
+  // Move to "In Progress" immediately so the board updates without waiting for Claude
+  const prevStatus = task.status;
+  const inProgressTask: Task = { ...task, status: "In Progress" };
+  await writeTask(inProgressTask, prevStatus);
+  broadcastTaskEvent("task:updated", inProgressTask);
+  // Record the initial user message (spec text) as the first stored message
+  await appendMessages(task.repo, task.id, [
+    {
+      id: randomUUID(),
+      role: "user",
+      content: specText,
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+  await spawnHandover(
+    req,
+    res,
+    inProgressTask,
+    specText,
+    inProgressTask.claudeSessionId,
+  );
 }
 
 export async function handleRecall(

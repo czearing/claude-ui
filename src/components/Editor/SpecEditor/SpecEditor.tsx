@@ -4,16 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { PaperPlaneTilt, Robot, X } from "@phosphor-icons/react";
 
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-import { useHandoverTask, useUpdateTask } from "@/hooks/useTasks";
+import { useUpdateTask } from "@/hooks/useTasks";
 import styles from "./SpecEditor.module.css";
 import type { SpecEditorProps } from "./SpecEditor.types";
 import { LexicalEditor } from "../LexicalEditor";
 
-export function SpecEditor({ repo, task, onClose, inline }: SpecEditorProps) {
+export function SpecEditor({
+  repo,
+  task,
+  onClose,
+  onHandover,
+  inline,
+}: SpecEditorProps) {
   const { mutate: updateTask, mutateAsync: updateTaskAsync } =
     useUpdateTask(repo);
-  const { mutate: handoverTask, isPending: isHandingOver } =
-    useHandoverTask(repo);
+  const [isHandingOver, setIsHandingOver] = useState(false);
 
   const [spec, setSpec] = useState(task?.spec ?? "");
   const [title, setTitle] = useState(task?.title ?? "");
@@ -61,6 +66,7 @@ export function SpecEditor({ repo, task, onClose, inline }: SpecEditorProps) {
   };
 
   const handleHandover = async () => {
+    setIsHandingOver(true);
     // flush immediately, awaiting the PATCH so handover POST reads latest spec
     cancelSpecSave();
     cancelTitleSave();
@@ -73,7 +79,9 @@ export function SpecEditor({ repo, task, onClose, inline }: SpecEditorProps) {
     } catch {
       // spec save failed — proceed with handover using existing saved data
     }
-    handoverTask(task.id, { onSuccess: onClose });
+    onHandover?.(task.id);
+    onClose();
+    setIsHandingOver(false);
   };
 
   return (

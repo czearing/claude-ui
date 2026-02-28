@@ -7,16 +7,11 @@ import { SpecEditor } from "./SpecEditor";
 
 const mockUpdateTask = jest.fn();
 const mockUpdateTaskAsync = jest.fn().mockResolvedValue(undefined);
-const mockHandoverTask = jest.fn();
 
 jest.mock("@/hooks/useTasks", () => ({
   useUpdateTask: () => ({
     mutate: mockUpdateTask,
     mutateAsync: mockUpdateTaskAsync,
-  }),
-  useHandoverTask: () => ({
-    mutate: mockHandoverTask,
-    isPending: false,
   }),
 }));
 
@@ -73,7 +68,6 @@ const reviewTask: Task = {
 describe("SpecEditor", () => {
   beforeEach(() => {
     mockUpdateTask.mockClear();
-    mockHandoverTask.mockClear();
     mockUpdateTaskAsync.mockClear();
   });
 
@@ -181,8 +175,17 @@ describe("SpecEditor", () => {
     expect(mockUpdateTask).not.toHaveBeenCalled();
   });
 
-  it("handover flushes latest spec via updateTaskAsync before handing off", async () => {
-    render(<SpecEditor repo="repo-1" task={backlogTask} onClose={jest.fn()} />);
+  it("handover flushes latest spec via updateTaskAsync then calls onHandover and onClose", async () => {
+    const onHandover = jest.fn();
+    const onClose = jest.fn();
+    render(
+      <SpecEditor
+        repo="repo-1"
+        task={backlogTask}
+        onClose={onClose}
+        onHandover={onHandover}
+      />,
+    );
     await userEvent.click(screen.getByTestId("editor-change-trigger"));
     mockUpdateTask.mockClear();
 
@@ -193,6 +196,7 @@ describe("SpecEditor", () => {
     expect(mockUpdateTaskAsync).toHaveBeenCalledWith(
       expect.objectContaining({ id: "task-1", spec: "updated spec content" }),
     );
-    expect(mockHandoverTask).toHaveBeenCalledWith("task-1", expect.any(Object));
+    expect(onHandover).toHaveBeenCalledWith("task-1");
+    expect(onClose).toHaveBeenCalled();
   });
 });

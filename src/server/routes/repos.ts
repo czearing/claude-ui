@@ -1,17 +1,17 @@
 import { broadcastTaskEvent } from "../boardBroadcast";
 import { readRepos, writeRepos } from "../repoStore";
 import type { Repo } from "../repoStore";
+import { parseStringBody } from "../utils/routeUtils";
 
 import { readBody } from "../../utils/readBody";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { parse } from "node:url";
 
 export async function handleRepoRoutes(
   req: IncomingMessage,
   res: ServerResponse,
-  parsedUrl: ReturnType<typeof parse>,
+  parsedUrl: URL,
 ): Promise<boolean> {
   // GET /api/repos
   if (req.method === "GET" && parsedUrl.pathname === "/api/repos") {
@@ -24,8 +24,8 @@ export async function handleRepoRoutes(
   // POST /api/repos
   if (req.method === "POST" && parsedUrl.pathname === "/api/repos") {
     const body = await readBody(req);
-    const name = typeof body["name"] === "string" ? body["name"].trim() : "";
-    const path = typeof body["path"] === "string" ? body["path"].trim() : "";
+    const name = parseStringBody(body, "name", { trim: true });
+    const path = parseStringBody(body, "path", { trim: true });
     if (!name || !path) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "name and path are required" }));

@@ -87,7 +87,11 @@ describe("useCreateRepo", () => {
 
 describe("useDeleteRepo", () => {
   it("sends DELETE to /api/repos/:id", async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(undefined),
+    });
     const { result } = renderHook(() => useDeleteRepo(), { wrapper });
     result.current.mutate("repo-1");
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
