@@ -24,15 +24,21 @@ export function useChatStream(
 
     const ac = new AbortController();
 
-    function handleEvent(event: Record<string, unknown>) {
-      for (const action of parseStreamEvent(event)) {
-        if (action.op === "status") {
-          onStatusRef.current(action.status);
-        } else if (action.op === "addMessages") {
-          setMessages((prev) => [...prev, ...action.messages]);
-        } else if (action.op === "sessionId") {
-          setSessionId(action.id);
+    function handleChunk(events: Record<string, unknown>[]) {
+      const newMessages: Message[] = [];
+      for (const event of events) {
+        for (const action of parseStreamEvent(event)) {
+          if (action.op === "status") {
+            onStatusRef.current(action.status);
+          } else if (action.op === "addMessages") {
+            newMessages.push(...action.messages);
+          } else if (action.op === "sessionId") {
+            setSessionId(action.id);
+          }
         }
+      }
+      if (newMessages.length > 0) {
+        setMessages((prev) => [...prev, ...newMessages]);
       }
     }
 
@@ -52,7 +58,7 @@ export function useChatStream(
       if (ac.signal.aborted || !res.body) {
         return;
       }
-      await readNdjsonStream(res, ac.signal, handleEvent);
+      await readNdjsonStream(res, ac.signal, handleChunk);
     }
 
     void run();

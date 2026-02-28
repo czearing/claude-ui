@@ -1,11 +1,19 @@
-import { activePtys, buildArgs, spawnClaude, stripAnsi } from "./taskSpawn";
+import {
+  activePtys,
+  buildArgs,
+  buildInteractiveArgs,
+  spawnClaude,
+  stripAnsi,
+} from "./taskSpawn";
 import { broadcastTaskEvent } from "../boardBroadcast";
 import { readRepos } from "../repoStore";
 import { appendClaudeSessionId, appendMessages } from "../taskStateStore";
 import type { StoredMessage } from "../taskStateStore";
-import { readAllTasks, writeTask } from "../taskStore";
+import { findTaskById, writeTask } from "../taskStore";
+import { parseStringBody } from "../utils/routeUtils";
 
 import { extractTextFromLexical } from "../../utils/lexical";
+import { readBody } from "../../utils/readBody";
 import { extractMessagesFromEvent } from "../../utils/streamMessageExtractor";
 import type { Task } from "../../utils/tasks.types";
 import { randomUUID } from "node:crypto";
@@ -19,14 +27,24 @@ export async function spawnHandover(
   task: Task,
   specText: string,
   resumeId: string | undefined,
+  interactive = true,
 ): Promise<void> {
   const repos = await readRepos();
   const repo = repos.find((r) => r.name === task.repo);
   const cwd = repo?.path ?? process.cwd();
 
+  // interactive=true: no -p flag so Claude pauses on AskUserQuestion.
+  //   The spec is written to PTY stdin immediately after spawn.
+  // interactive=false: -p flag for reliable batch-mode execution.
+  //   Used by handleChat where --resume in interactive mode is unreliable
+  //   on Windows because Claude renders the previous session TUI before
+  //   emitting system:init, creating a deadlock.
+  const ptyArgs = interactive
+    ? buildInteractiveArgs(resumeId)
+    : buildArgs(resumeId, specText);
   let ptyProcess;
   try {
-    ptyProcess = spawnClaude(buildArgs(resumeId, specText), cwd);
+    ptyProcess = spawnClaude(ptyArgs, cwd);
   } catch (err) {
     res.writeHead(500, { "Content-Type": "application/x-ndjson" });
     res.write(`${JSON.stringify({ type: "error", error: String(err) })}\n`);
@@ -44,6 +62,17 @@ export async function spawnHandover(
   let lineBuf = "";
   let latestClaudeSessionId: string | undefined;
   const pendingMessages: StoredMessage[] = [];
+
+
+  // Flatten newlines so the spec is delivered as a single stdin message.
+  const stdinSpec = specText.replace(/\r?\n/g, " ").trim();
+
+  // In interactive mode, write the spec to PTY stdin immediately.
+  // PTY stdin is buffered so the message sits in the kernel buffer until
+  // Claude reads it. In batch mode (-p) the spec is already in the CLI args.
+  if (interactive && stdinSpec) {
+    ptyProcess.write(`${stdinSpec}\r`);
+  }
 
   function flushPendingMessages() {
     if (pendingMessages.length === 0) {
@@ -95,7 +124,14 @@ export async function spawnHandover(
         if (typeof sid === "string") {
           latestClaudeSessionId = sid;
         }
-        // Flush accumulated messages on each result event
+      }
+      // Flush after assistant/user events so partial history is visible
+      // to clients that poll while the task is in progress. Also flush on result.
+      if (
+        parsed["type"] === "assistant" ||
+        parsed["type"] === "user" ||
+        parsed["type"] === "result"
+      ) {
         flushPendingMessages();
       }
       // Accumulate messages from assistant/user events
@@ -106,6 +142,7 @@ export async function spawnHandover(
           role: m.role,
           content: m.content,
           toolName: m.toolName,
+          options: m.options,
           timestamp: new Date().toISOString(),
         });
       }
@@ -183,9 +220,7 @@ export async function handleHandover(
   res: ServerResponse,
   taskId: string,
 ): Promise<void> {
-  const task = await readAllTasks().then((ts) =>
-    ts.find((t) => t.id === taskId),
-  );
+  const task = await findTaskById(taskId);
   if (!task) {
     res.writeHead(404);
     res.end();
@@ -230,9 +265,7 @@ export async function handleRecall(
   res: ServerResponse,
   taskId: string,
 ): Promise<void> {
-  const task = await readAllTasks().then((ts) =>
-    ts.find((t) => t.id === taskId),
-  );
+  const task = await findTaskById(taskId);
   if (!task) {
     res.writeHead(404);
     res.end();
@@ -245,4 +278,28 @@ export async function handleRecall(
   }
   const specText = extractTextFromLexical(task.spec).trim() || task.title;
   await spawnHandover(req, res, task, specText, task.claudeSessionId);
+}
+
+/**
+ * Write a user's AskUserQuestion answer directly to the active PTY stdin.
+ * Called by the frontend ChoicePrompt when the task is currently running.
+ */
+export async function handleTaskAnswer(
+  req: IncomingMessage,
+  res: ServerResponse,
+  taskId: string,
+): Promise<void> {
+  const body = await readBody(req);
+  const answer = parseStringBody(body, "answer");
+
+  const ptyProcess = activePtys.get(taskId);
+  if (!ptyProcess) {
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "No active task process" }));
+    return;
+  }
+
+  ptyProcess.write(`${answer}\r`);
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ ok: true }));
 }

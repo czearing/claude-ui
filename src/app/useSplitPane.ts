@@ -33,9 +33,12 @@ export function useSplitPane() {
   const leftRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
   const widthRef = useRef(DEFAULT_LEFT_WIDTH);
+  // Cache the stored width so openPane() doesn't hit localStorage every time.
+  const storedWidthRef = useRef<number | null>(null);
 
   function openPane() {
-    const w = readStoredWidth();
+    storedWidthRef.current ??= readStoredWidth();
+    const w = storedWidthRef.current;
     widthRef.current = w;
     setLeftWidth(w);
   }
@@ -66,6 +69,7 @@ export function useSplitPane() {
       contentEl.removeAttribute("data-resizing");
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      storedWidthRef.current = widthRef.current;
       setLeftWidth(widthRef.current);
       storeWidth(widthRef.current);
       document.removeEventListener("mousemove", onMove);

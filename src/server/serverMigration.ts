@@ -1,9 +1,8 @@
 import { readRepos, writeRepos } from "./repoStore";
-import { setTaskState } from "./taskStateStore";
+import { migrateStateFiles, setTaskState } from "./taskStateStore";
 import {
   clearTaskCache,
   ensureStatusDirs,
-
   readTask,
   SPECS_DIR,
   STATUS_FOLDER,
@@ -111,6 +110,11 @@ export async function migrateAllRepos(): Promise<void> {
   await ensureStatusDirs("claude-code-ui");
   await migrateRepoTasks(repoIdToName);
   await migrateFrontmatterTasks();
+
+  // Migrate legacy state-file field shapes once at startup so the read
+  // path (getTaskState) never needs to write.
+  const repoNames = [...new Set([...repos.map((r) => r.name), "claude-code-ui"])];
+  await Promise.all(repoNames.map((name) => migrateStateFiles(name)));
 }
 
 /**

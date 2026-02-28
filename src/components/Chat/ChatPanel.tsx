@@ -36,8 +36,16 @@ function getStatusInfo(
 }
 
 export function ChatPanel({ task, onClose }: ChatPanelProps) {
-  const { messages, status, ready, taskRunning, error, sendMessage, retry } =
-    useChatSession(task);
+  const {
+    messages,
+    status,
+    ready,
+    taskRunning,
+    error,
+    sendMessage,
+    sendAnswer,
+    retry,
+  } = useChatSession(task);
   const [inputValue, setInputValue] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -48,7 +56,7 @@ export function ChatPanel({ task, onClose }: ChatPanelProps) {
   const { dot, label } = getStatusInfo(task, status, busy);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages]);
 
   function handleSend() {
@@ -108,7 +116,12 @@ export function ChatPanel({ task, onClose }: ChatPanelProps) {
           </div>
         ) : (
           <>
-            <ChatMessages messages={messages} onSendMessage={sendMessage} />
+            <ChatMessages
+              messages={messages}
+              onSendMessage={sendMessage}
+              onAnswerQuestion={sendAnswer}
+              taskRunning={taskRunning}
+            />
             {taskRunning && (
               <div
                 className={styles.thinkingBubble}

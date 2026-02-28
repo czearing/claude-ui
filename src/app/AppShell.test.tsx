@@ -83,12 +83,6 @@ const backlogTask: Task = {
   repo: "repo-1",
 };
 
-const _inProgressTask: Task = {
-  ...backlogTask,
-  id: "t-2",
-  status: "In Progress",
-};
-
 beforeEach(() => {
   mockCreateMutate.mockClear();
   capturedBoardOnSelect = undefined;
@@ -96,6 +90,8 @@ beforeEach(() => {
   capturedBacklogOnSelect = undefined;
   capturedBacklogOnNewTask = undefined;
   mockUseTasks.mockReturnValue({ data: [backlogTask] });
+  // Reset URL to base path so URL-restore tests start clean
+  window.history.replaceState({}, "", "/");
 });
 
 describe("AppShell", () => {
@@ -212,6 +208,25 @@ describe("AppShell", () => {
     render(<AppShell repo="repo-1" view="Tasks" />);
     act(() => capturedBacklogOnNewTask?.());
     expect(screen.queryByTestId("spec-editor")).not.toBeInTheDocument();
+  });
+
+  it("restores chat panel from URL chatTask param on mount", () => {
+    const sessionTask: Task = {
+      ...backlogTask,
+      id: "t-url",
+      status: "In Progress",
+      sessionId: "ses-url",
+    };
+    mockUseTasks.mockReturnValue({ data: [sessionTask] });
+    window.history.replaceState({}, "", "?chatTask=t-url");
+
+    render(<AppShell repo="repo-1" view="Board" />);
+
+    expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-panel")).toHaveAttribute(
+      "data-chat-task",
+      "t-url",
+    );
   });
 
   it("chat panel disappears after Escape is pressed", () => {

@@ -7,11 +7,12 @@ import {
   getTaskState,
 } from "../taskStateStore";
 import type { StoredMessage, TaskStateEntry } from "../taskStateStore";
-import { readAllTasks, writeTask } from "../taskStore";
+import { findTaskById, writeTask } from "../taskStore";
 import { parseStringBody } from "../utils/routeUtils";
 
 import { encodeCwdToProjectDir } from "../../utils/captureClaudeSessionId";
 import { readBody } from "../../utils/readBody";
+import { extractMessagesFromEvent } from "../../utils/streamMessageExtractor";
 import type { Task } from "../../utils/tasks.types";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -24,6 +25,7 @@ type HistoryMessage = {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
   toolName?: string;
+  options?: { label: string; description?: string }[];
 };
 
 let _histCounter = 0;
@@ -44,62 +46,14 @@ function parseJsonl(raw: string): HistoryMessage[] {
     } catch {
       continue;
     }
-    const type = entry["type"] as string | undefined;
-    if (type === "assistant") {
-      const msg = entry["message"] as
-        | { content?: { type: string; text?: string; name?: string }[] }
-        | undefined;
-      for (const block of msg?.content ?? []) {
-        if (block.type === "text" && block.text) {
-          result.push({
-            id: nextHistId(),
-            role: "assistant",
-            content: block.text,
-          });
-        } else if (block.type === "tool_use") {
-          result.push({
-            id: nextHistId(),
-            role: "tool",
-            content: "",
-            toolName: block.name ?? "tool",
-          });
-        }
-      }
-    } else if (type === "user") {
-      const msg = entry["message"] as
-        | {
-            content?: {
-              type: string;
-              tool_use_id?: string;
-              content?: unknown;
-              text?: string;
-            }[];
-          }
-        | undefined;
-      for (const block of msg?.content ?? []) {
-        if (block.type === "tool_result") {
-          const rawContent = block.content as
-            | string
-            | { type: string; text: string }[]
-            | undefined;
-          const text =
-            typeof rawContent === "string"
-              ? rawContent
-              : Array.isArray(rawContent)
-                ? rawContent
-                    .filter((c) => c.type === "text")
-                    .map((c) => c.text)
-                    .join("")
-                : "";
-          result.push({ id: nextHistId(), role: "system", content: text });
-        } else if (block.type === "text" && block.text) {
-          result.push({
-            id: nextHistId(),
-            role: "user",
-            content: block.text,
-          });
-        }
-      }
+    for (const m of extractMessagesFromEvent(entry)) {
+      result.push({
+        id: nextHistId(),
+        role: m.role,
+        content: m.content,
+        toolName: m.toolName,
+        options: m.options,
+      });
     }
   }
   return result;
@@ -187,8 +141,7 @@ export async function handleGetHistory(
   res: ServerResponse,
   taskId: string,
 ): Promise<void> {
-  const tasks = await readAllTasks();
-  const task = tasks.find((t) => t.id === taskId);
+  const task = await findTaskById(taskId);
   if (!task) {
     res.writeHead(404);
     res.end();
@@ -205,6 +158,7 @@ export async function handleGetHistory(
         role: m.role,
         content: m.content,
         toolName: m.toolName,
+        options: m.options,
       }),
     );
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -223,8 +177,7 @@ export async function handleChat(
   res: ServerResponse,
   taskId: string,
 ): Promise<void> {
-  const tasks = await readAllTasks();
-  const task = tasks.find((t) => t.id === taskId);
+  const task = await findTaskById(taskId);
   if (!task) {
     res.writeHead(404);
     res.end();
@@ -255,5 +208,6 @@ export async function handleChat(
     activeTask,
     message,
     activeTask.claudeSessionId,
+    false, // use -p (batch) mode — interactive mode with --resume is unreliable on Windows
   );
 }

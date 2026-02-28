@@ -6,7 +6,6 @@ import {
   getAllTaskStates,
   getTaskState,
   setTaskState,
-  clearAllTaskStateCache,
 } from "./taskStateStore";
 import {
   clearTaskCache,
@@ -31,7 +30,6 @@ import {
   mkdir,
   readdir,
   readFile,
-  rename,
   stat,
   unlink,
   writeFile,
@@ -48,7 +46,6 @@ const mockMkdir = mkdir as jest.MockedFunction<typeof mkdir>;
 const mockUnlink = unlink as jest.MockedFunction<typeof unlink>;
 const mockReaddir = readdir as jest.MockedFunction<typeof readdir>;
 const mockStat = stat as jest.MockedFunction<typeof stat>;
-const _mockRename = rename as jest.MockedFunction<typeof rename>;
 const mockParseTaskFile = parseTaskFile as jest.MockedFunction<
   typeof parseTaskFile
 >;
@@ -67,9 +64,6 @@ const mockSetTaskState = setTaskState as jest.MockedFunction<
 const mockDeleteTaskState = deleteTaskState as jest.MockedFunction<
   typeof deleteTaskState
 >;
-const _mockClearAllTaskStateCache =
-  clearAllTaskStateCache as jest.MockedFunction<typeof clearAllTaskStateCache>;
-
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: "fix-login-bug",

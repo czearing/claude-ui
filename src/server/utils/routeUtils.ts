@@ -9,6 +9,8 @@ export function parseStringBody(
 ): string {
   const { trim = false, fallback = "" } = opts;
   const val = body[key];
-  if (typeof val !== "string") {return fallback;}
+  if (typeof val !== "string") {
+    return fallback;
+  }
   return trim ? val.trim() : val;
 }

@@ -1,4 +1,4 @@
-import { deleteTaskState, getTaskState, setTaskState } from "./taskStateStore";
+import { deleteTaskState, patchTaskState } from "./taskStateStore";
 import {
   repoCache,
   SPECS_DIR,
@@ -69,14 +69,12 @@ export async function writeTask(
 
   await writeFile(targetPath, serializeTaskFile(task), "utf8");
 
-  // Persist state to sidecar, preserving append-only fields
-  const currentState = await getTaskState(task.repo, task.id);
-  await setTaskState(task.repo, task.id, {
+  // Persist mutable task fields to sidecar; patchTaskState preserves
+  // append-only fields (claudeSessionIds, messages) without a pre-read.
+  await patchTaskState(task.repo, task.id, {
     sessionId: task.sessionId,
     archivedAt: task.archivedAt,
     title: task.title,
-    claudeSessionIds: currentState.claudeSessionIds,
-    messages: currentState.messages,
   });
 
   const cached = repoCache.get(task.repo);

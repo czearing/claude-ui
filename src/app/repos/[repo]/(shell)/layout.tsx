@@ -7,6 +7,7 @@ export default async function Layout({
   children: React.ReactNode;
   params: Promise<{ repo: string }>;
 }) {
-  const { repo } = await params;
+  const { repo: rawRepo } = await params;
+  const repo = decodeURIComponent(rawRepo);
   return <RepoShell repo={repo}>{children}</RepoShell>;
 }

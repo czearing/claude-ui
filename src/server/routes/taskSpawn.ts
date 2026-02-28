@@ -61,3 +61,20 @@ export function buildArgs(
   args.push("-p", specText);
   return args;
 }
+
+/**
+ * Build args for interactive mode (no -p flag). The initial prompt is written
+ * to PTY stdin after the init event so Claude can pause on AskUserQuestion.
+ */
+export function buildInteractiveArgs(resumeId?: string): string[] {
+  const args: string[] = [
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--dangerously-skip-permissions",
+  ];
+  if (resumeId) {
+    args.push("--resume", resumeId);
+  }
+  return args;
+}

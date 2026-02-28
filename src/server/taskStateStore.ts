@@ -9,6 +9,7 @@ export interface StoredMessage {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
   toolName?: string;
+  options?: { label: string; description?: string }[];
   timestamp: string;
 }
 
@@ -118,12 +119,70 @@ export async function getTaskState(
   }
 
   if (needsWrite) {
+    // Update the in-memory cache so subsequent reads within this server
+    // lifetime see the migrated shape. Disk persistence happens via the
+    // startup migration pass (migrateStateFiles) or the next natural write.
     data[id] = migrated as TaskStateEntry;
-    await writeStateFile(repo, data);
     return migrated as TaskStateEntry;
   }
 
   return entry;
+}
+
+/**
+ * One-time startup migration: scan every entry in a repo's state file and
+ * apply any pending field-shape migrations, then persist once.  Should be
+ * called from the server startup sequence so the read path never has to write.
+ */
+export async function migrateStateFiles(repo: string): Promise<void> {
+  const data = await readStateFile(repo);
+  type LegacyEntry = TaskStateEntry & {
+    claudeSessionId?: string;
+    userMessages?: string[];
+  };
+  let changed = false;
+
+  for (const [id, entry] of Object.entries(data)) {
+    const raw = entry as LegacyEntry;
+    const migrated: LegacyEntry = { ...raw };
+    let needsWrite = false;
+
+    if (
+      raw.claudeSessionId &&
+      (!raw.claudeSessionIds || raw.claudeSessionIds.length === 0)
+    ) {
+      migrated.claudeSessionIds = [raw.claudeSessionId];
+      delete migrated.claudeSessionId;
+      needsWrite = true;
+    }
+
+    if (
+      raw.userMessages &&
+      raw.userMessages.length > 0 &&
+      (!raw.messages || raw.messages.length === 0)
+    ) {
+      migrated.messages = raw.userMessages.map((text) => ({
+        id: randomUUID(),
+        role: "user" as const,
+        content: text,
+        timestamp: new Date(0).toISOString(),
+      }));
+      delete migrated.userMessages;
+      needsWrite = true;
+    } else if (raw.userMessages) {
+      delete migrated.userMessages;
+      needsWrite = true;
+    }
+
+    if (needsWrite) {
+      data[id] = migrated as TaskStateEntry;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await writeStateFile(repo, data);
+  }
 }
 
 export function getLatestSessionId(state: TaskStateEntry): string | undefined {
@@ -169,6 +228,49 @@ export async function setTaskState(
       return;
     }
     data[id] = entry;
+    await writeStateFile(repo, data);
+  });
+}
+
+/**
+ * Update only sessionId / archivedAt / title for a task, leaving
+ * claudeSessionIds and messages untouched.  Avoids the extra getTaskState()
+ * read that setTaskState() would otherwise require.
+ */
+export async function patchTaskState(
+  repo: string,
+  id: string,
+  patch: { sessionId?: string; archivedAt?: string; title?: string },
+): Promise<void> {
+  return enqueueWrite(repo, async () => {
+    const data = await readStateFile(repo);
+    const existing = data[id] ?? {};
+    const updated: TaskStateEntry = { ...existing };
+
+    if (patch.sessionId !== undefined) {
+      updated.sessionId = patch.sessionId;
+    } else {
+      delete updated.sessionId;
+    }
+    if (patch.archivedAt !== undefined) {
+      updated.archivedAt = patch.archivedAt;
+    } else {
+      delete updated.archivedAt;
+    }
+    if (patch.title !== undefined) {
+      updated.title = patch.title;
+    } else {
+      delete updated.title;
+    }
+
+    if (Object.keys(updated).length === 0) {
+      if (data[id]) {
+        delete data[id];
+        await writeStateFile(repo, data);
+      }
+      return;
+    }
+    data[id] = updated;
     await writeStateFile(repo, data);
   });
 }

@@ -16,6 +16,7 @@ export function useChatSession(task: Task): {
   taskRunning: boolean;
   error: string | null;
   sendMessage: (text: string) => void;
+  sendAnswer: (answer: string) => void;
   retry: () => void;
 } {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,13 +37,19 @@ export function useChatSession(task: Task): {
     status === "thinking" ||
     status === "typing";
 
-  function handleEvent(event: Record<string, unknown>) {
-    for (const action of parseStreamEvent(event)) {
-      if (action.op === "status") {
-        setStatus(action.status);
-      } else if (action.op === "addMessages") {
-        setMessages((prev) => [...prev, ...action.messages]);
+  function handleChunk(events: Record<string, unknown>[]) {
+    const newMessages: Message[] = [];
+    for (const event of events) {
+      for (const action of parseStreamEvent(event)) {
+        if (action.op === "status") {
+          setStatus(action.status);
+        } else if (action.op === "addMessages") {
+          newMessages.push(...action.messages);
+        }
       }
+    }
+    if (newMessages.length > 0) {
+      setMessages((prev) => [...prev, ...newMessages]);
     }
   }
 
@@ -163,14 +170,14 @@ export function useChatSession(task: Task): {
 
           // Track whether we received an "idle" done event
           let streamEndedWithIdle = false;
-          const wrappedHandleEvent = (event: Record<string, unknown>) => {
-            handleEvent(event);
-            if (event.type === "done") {
+          const wrappedHandleChunk = (events: Record<string, unknown>[]) => {
+            handleChunk(events);
+            if (events.some((e) => e.type === "done")) {
               streamEndedWithIdle = true;
             }
           };
 
-          await readNdjsonStream(res, ac.signal, wrappedHandleEvent);
+          await readNdjsonStream(res, ac.signal, wrappedHandleChunk);
 
           if (ac.signal.aborted) {
             return;
@@ -206,6 +213,26 @@ export function useChatSession(task: Task): {
       } else {
         setStatus("idle");
         setReady(true);
+
+        // Task is running in the background (In Progress, no session yet).
+        // Poll history so incremental output becomes visible.
+        if (task.status === "In Progress") {
+          const poll = async () => {
+            if (ac.signal.aborted) {
+              return;
+            }
+            const history = await fetchHistory(taskId, ac.signal);
+            if (!ac.signal.aborted && history && history.length > 0) {
+              setMessages(history);
+            }
+          };
+          const intervalId = setInterval(() => {
+            void poll();
+          }, 2000);
+          ac.signal.addEventListener("abort", () => clearInterval(intervalId), {
+            once: true,
+          });
+        }
       }
     }
 
@@ -295,14 +322,14 @@ export function useChatSession(task: Task): {
       }
 
       let streamEndedWithIdle = false;
-      const wrappedHandleEvent = (event: Record<string, unknown>) => {
-        handleEvent(event);
-        if (event.type === "done") {
+      const wrappedHandleChunk = (events: Record<string, unknown>[]) => {
+        handleChunk(events);
+        if (events.some((e) => e.type === "done")) {
           streamEndedWithIdle = true;
         }
       };
 
-      await readNdjsonStream(res, ac.signal, wrappedHandleEvent);
+      await readNdjsonStream(res, ac.signal, wrappedHandleChunk);
 
       if (!ac.signal.aborted) {
         if (!streamEndedWithIdle) {
@@ -319,9 +346,45 @@ export function useChatSession(task: Task): {
     void stream();
   }
 
+  /**
+   * Write an AskUserQuestion answer directly to the active PTY stdin.
+   * Only called when the task is currently running (interactive mode).
+   * Falls back to sendMessage if no active PTY is found (e.g. task finished).
+   */
+  function sendAnswer(answer: string) {
+    const taskId = taskIdRef.current;
+    void fetch(`/api/tasks/${taskId}/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer }),
+    }).then((res) => {
+      if (res.ok) {
+        // PTY received the answer — show it as a local user message.
+        setMessages((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), role: "user", content: answer },
+        ]);
+      } else {
+        // No active PTY (task already finished) — fall back to chat.
+        sendMessage(answer);
+      }
+    }).catch(() => {
+      sendMessage(answer);
+    });
+  }
+
   function retry() {
     setRetryKey((k) => k + 1);
   }
 
-  return { messages, status, ready, taskRunning, error, sendMessage, retry };
+  return {
+    messages,
+    status,
+    ready,
+    taskRunning,
+    error,
+    sendMessage,
+    sendAnswer,
+    retry,
+  };
 }

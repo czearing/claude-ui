@@ -1,10 +1,10 @@
 // Shared stream message extraction — no browser APIs, safe for server and client.
 
-export interface ExtractedMessage {
+interface ExtractedMessage {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
   toolName?: string;
-  options?: string[];
+  options?: { label: string; description?: string }[];
 }
 
 const TOOL_RESULT_MAX_CHARS = 4096;
@@ -44,13 +44,21 @@ export function extractMessagesFromEvent(
         messages.push({ role: "assistant", content: block.text });
       } else if (block.type === "tool_use") {
         if (block.name === "AskUserQuestion") {
+          // Real AskUserQuestion format:
+          // { questions: [{ question, header, multiSelect, options: [{ label, description }] }] }
           const input = block.input as
-            | { question?: string; options?: string[] }
+            | {
+                questions?: {
+                  question?: string;
+                  options?: { label: string; description?: string }[];
+                }[];
+              }
             | undefined;
+          const q = input?.questions?.[0];
           messages.push({
             role: "assistant",
-            content: input?.question ?? "",
-            options: input?.options,
+            content: q?.question ?? "",
+            options: q?.options,
           });
         } else {
           messages.push({
@@ -84,7 +92,7 @@ export function extractMessagesFromEvent(
           | undefined;
         let text = raw != null ? extractToolResultText(raw) : "";
         if (text.length > TOOL_RESULT_MAX_CHARS) {
-          text = `${text.slice(0, TOOL_RESULT_MAX_CHARS)  }…[truncated]`;
+          text = `${text.slice(0, TOOL_RESULT_MAX_CHARS)}…[truncated]`;
         }
         messages.push({ role: "system", content: text });
       } else if (block.type === "text" && block.text) {

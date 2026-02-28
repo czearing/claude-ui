@@ -1,15 +1,10 @@
 import type { ClaudeStatus, Message } from "./useChatStream.types";
-import {
-  extractMessagesFromEvent,
-  extractToolResultText,
-} from "../utils/streamMessageExtractor";
-
-export { extractToolResultText };
+import { extractMessagesFromEvent } from "../utils/streamMessageExtractor";
 
 export async function readNdjsonStream(
   response: Response,
   signal: AbortSignal,
-  onEvent: (event: Record<string, unknown>) => void,
+  onChunk: (events: Record<string, unknown>[]) => void,
 ): Promise<void> {
   if (!response.body) {
     return;
@@ -32,23 +27,25 @@ export async function readNdjsonStream(
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
+    const events: Record<string, unknown>[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) {
         continue;
       }
-      let event: Record<string, unknown>;
       try {
-        event = JSON.parse(trimmed) as Record<string, unknown>;
+        events.push(JSON.parse(trimmed) as Record<string, unknown>);
       } catch {
         continue;
       }
-      onEvent(event);
+    }
+    if (events.length > 0) {
+      onChunk(events);
     }
   }
 }
 
-export type StreamAction =
+type StreamAction =
   | { op: "status"; status: ClaudeStatus }
   | { op: "addMessages"; messages: Message[] }
   | { op: "sessionId"; id: string };
@@ -75,6 +72,7 @@ export function parseStreamEvent(
       role: m.role,
       content: m.content,
       toolName: m.toolName,
+      options: m.options,
     }));
     const actions: StreamAction[] = [{ op: "status", status: "typing" }];
     if (messages.length > 0) {
@@ -90,6 +88,7 @@ export function parseStreamEvent(
       role: m.role,
       content: m.content,
       toolName: m.toolName,
+      options: m.options,
     }));
     const actions: StreamAction[] = [{ op: "status", status: "thinking" }];
     if (messages.length > 0) {

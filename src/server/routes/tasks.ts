@@ -1,5 +1,10 @@
 import { handleGetHistory, handleChat } from "./taskChat";
-import { handleHandover, handleRecall, activePtys } from "./taskHandover";
+import {
+  handleHandover,
+  handleRecall,
+  handleTaskAnswer,
+  activePtys,
+} from "./taskHandover";
 import { broadcastTaskEvent } from "../boardBroadcast";
 import {
   deleteTaskFile,
@@ -102,6 +107,20 @@ export async function handleTaskRoutes(
   ) {
     const id = parsedUrl.pathname.slice("/api/tasks/".length, -"/chat".length);
     await handleChat(req, res, id);
+    return true;
+  }
+
+  // POST /api/tasks/:id/answer — write AskUserQuestion answer to active PTY stdin
+  if (
+    req.method === "POST" &&
+    parsedUrl.pathname?.startsWith("/api/tasks/") &&
+    parsedUrl.pathname.endsWith("/answer")
+  ) {
+    const id = parsedUrl.pathname.slice(
+      "/api/tasks/".length,
+      -"/answer".length,
+    );
+    await handleTaskAnswer(req, res, id);
     return true;
   }
 

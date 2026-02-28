@@ -24,11 +24,19 @@ export async function readTask(id: string, repo: string): Promise<Task | null> {
       const folderStatus = FOLDER_STATUS[folder];
       const task = parseTaskFile(raw, repo, id, folderStatus);
       const state = await getTaskState(repo, id);
-      if (state.sessionId) {task.sessionId = state.sessionId;}
-      if (state.archivedAt) {task.archivedAt = state.archivedAt;}
+      if (state.sessionId) {
+        task.sessionId = state.sessionId;
+      }
+      if (state.archivedAt) {
+        task.archivedAt = state.archivedAt;
+      }
       const latestSid = getLatestSessionId(state);
-      if (latestSid) {task.claudeSessionId = latestSid;}
-      if (state.title) {task.title = state.title;}
+      if (latestSid) {
+        task.claudeSessionId = latestSid;
+      }
+      if (state.title) {
+        task.title = state.title;
+      }
       return task;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -71,11 +79,19 @@ export async function readTasksForRepo(repo: string): Promise<Task[]> {
             const raw = await readFile(filePath, "utf8");
             const task = parseTaskFile(raw, repo, fileId, folderStatus);
             const state = states[fileId];
-            if (state?.sessionId) {task.sessionId = state.sessionId;}
-            if (state?.archivedAt) {task.archivedAt = state.archivedAt;}
+            if (state?.sessionId) {
+              task.sessionId = state.sessionId;
+            }
+            if (state?.archivedAt) {
+              task.archivedAt = state.archivedAt;
+            }
             const latestSid = state ? getLatestSessionId(state) : undefined;
-            if (latestSid) {task.claudeSessionId = latestSid;}
-            if (state?.title) {task.title = state.title;}
+            if (latestSid) {
+              task.claudeSessionId = latestSid;
+            }
+            if (state?.title) {
+              task.title = state.title;
+            }
             return task;
           } catch (err) {
             if ((err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -94,6 +110,21 @@ export async function readTasksForRepo(repo: string): Promise<Task[]> {
 
   repoCache.set(repo, tasks);
   return tasks;
+}
+
+/**
+ * Find a single task by ID without scanning all repos.
+ * Searches the warm in-memory cache first; falls back to a full scan only
+ * when the cache is cold (first request after server start).
+ */
+export async function findTaskById(id: string): Promise<Task | null> {
+  for (const tasks of repoCache.values()) {
+    const found = tasks.find((t) => t.id === id);
+    if (found) { return found; }
+  }
+  // Cache cold — warm it with a full scan then return
+  const all = await readAllTasks();
+  return all.find((t) => t.id === id) ?? null;
 }
 
 export async function readAllTasks(): Promise<Task[]> {

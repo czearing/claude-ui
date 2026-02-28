@@ -8,6 +8,11 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 interface ChatMessagesProps {
   messages: Message[];
   onSendMessage?: (message: string) => void;
+  // Called instead of onSendMessage when the task is running and the user
+  // answers an AskUserQuestion — writes directly to PTY stdin so Claude
+  // pauses and waits rather than auto-rejecting.
+  onAnswerQuestion?: (answer: string) => void;
+  taskRunning?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,14 +90,21 @@ function groupMessages(messages: Message[]): GroupedItem[] {
 export function ChatMessages({
   messages,
   onSendMessage = () => {},
+  onAnswerQuestion,
+  taskRunning = false,
 }: ChatMessagesProps) {
-  const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
+  const [answeredValues, setAnsweredValues] = useState<Map<string, string>>(
+    new Map(),
+  );
 
   if (messages.length === 0) {
+    if (taskRunning) {
+      return null;
+    }
     return (
       <div className={styles.empty}>
         <span className={styles.emptyText}>
-          No messages yet — ask Claude anything about this task.
+          Send a task to get started.
         </span>
       </div>
     );
@@ -102,7 +114,7 @@ export function ChatMessages({
 
   return (
     <div className={styles.list}>
-      {grouped.map((item) => {
+      {grouped.map((item, idx) => {
         if (item.kind === "tool-pair") {
           return (
             <ToolResultCard
@@ -128,6 +140,17 @@ export function ChatMessages({
         const { msg } = item;
 
         if (msg.role === "system") {
+          // If the previous grouped item was a ChoicePrompt, this system message
+          // is its tool_result (the answer). Skip rendering it — the chip inside
+          // ChoicePrompt already shows the chosen value.
+          const prev = grouped[idx - 1];
+          if (
+            prev?.kind === "message" &&
+            prev.msg.role === "assistant" &&
+            prev.msg.options?.length
+          ) {
+            return null;
+          }
           return (
             <div key={msg.id} className={styles.systemCard}>
               <pre className={styles.systemPre}>{msg.content}</pre>
@@ -137,16 +160,44 @@ export function ChatMessages({
 
         if (msg.role === "assistant") {
           if (msg.options?.length) {
+            // Derive answered state from either a user click OR a subsequent
+            // system message (tool_result already in history from terminal).
+            // Only treat the next system message as a real answer if its
+            // content matches one of the known option labels. The PTY
+            // auto-rejection message ("Answer questions?") will not match any
+            // label and is therefore ignored.
+            const nextItem = grouped[idx + 1];
+            const nextSystemContent =
+              nextItem?.kind === "message" &&
+              nextItem.msg.role === "system"
+                ? nextItem.msg.content
+                : null;
+            const contextAnswer =
+              nextSystemContent !== null &&
+              msg.options?.some((opt) => opt.label === nextSystemContent)
+                ? nextSystemContent
+                : null;
+            const answeredValue =
+              answeredValues.get(msg.id) ?? contextAnswer;
             return (
               <ChoicePrompt
                 key={msg.id}
                 messageId={msg.id}
                 question={msg.content}
                 options={msg.options}
-                answered={answeredIds.has(msg.id)}
+                answeredValue={answeredValue}
                 onAnswer={(value) => {
-                  setAnsweredIds((prev) => new Set([...prev, msg.id]));
-                  onSendMessage(value);
+                  setAnsweredValues(
+                    (prev) => new Map(prev).set(msg.id, value),
+                  );
+                  // When task is running, write the answer to PTY stdin so
+                  // Claude receives it directly. When not running, spawn a
+                  // new session via the chat endpoint.
+                  if (taskRunning && onAnswerQuestion) {
+                    onAnswerQuestion(value);
+                  } else {
+                    onSendMessage(value);
+                  }
                 }}
               />
             );

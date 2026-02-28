@@ -6,6 +6,6 @@ export default async function Page({
 }: {
   params: Promise<{ repo: string }>;
 }) {
-  const { repo } = await params;
-  redirect(`/repos/${repo}/board`);
+  const { repo: rawRepo } = await params;
+  redirect(`/repos/${encodeURIComponent(decodeURIComponent(rawRepo))}/board`);
 }

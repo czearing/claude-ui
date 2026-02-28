@@ -48,6 +48,19 @@
   cursor: not-allowed;
 }
 
+.optionWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.optionDescription {
+  margin: 0 0 0 1.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
 .answeredChip {
   display: inline-flex;
   align-items: center;

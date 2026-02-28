@@ -51,6 +51,7 @@ export function AppShell({
   const { contentRef, leftRef, leftWidth, openPane, handleDividerMouseDown } =
     useSplitPane();
   const paneInitRef = useRef<string | null>(null);
+  const chatPaneInitRef = useRef<string | null>(null);
   const startBackgroundHandover = useBackgroundHandover();
 
   const boardTasks = tasks.filter((t) => t.status !== "Backlog");
@@ -65,6 +66,19 @@ export function AppShell({
   // rightTask drives the split-pane width and divider: show chat when visible, otherwise spec.
   const rightTask = chatPanelVisible ? chatTask : (selectedTask ?? null);
 
+  // On mount, restore chatTaskId from URL ?chatTask= param (e.g. after page reload).
+  // We read window.location.search directly rather than useSearchParams to avoid
+  // making AppShell reactive to URL changes, which would cause Next.js soft-nav
+  // events to briefly unmount ChatPanel and abort active streams.
+  useEffect(() => {
+    const chatTask = new URLSearchParams(window.location.search).get(
+      "chatTask",
+    );
+    if (chatTask) {
+      setChatTaskId(chatTask);
+    }
+  }, []);
+
   useEffect(() => {
     if (
       !initialTaskId ||
@@ -76,6 +90,15 @@ export function AppShell({
     paneInitRef.current = initialTaskId;
     openPane();
   }, [initialTaskId, selectedTask, openPane]);
+
+  // Restore split-pane open when chatTaskId is populated from URL on mount.
+  useEffect(() => {
+    if (!chatTaskId || !chatTask || chatPaneInitRef.current === chatTaskId) {
+      return;
+    }
+    chatPaneInitRef.current = chatTaskId;
+    openPane();
+  }, [chatTaskId, chatTask, openPane]);
 
   useEffect(() => {
     if (!rightTask) {
@@ -105,6 +128,11 @@ export function AppShell({
       // Board view: open ChatPanel on the right
       setChatTaskId(taskId);
       openPane();
+      window.history.replaceState(
+        null,
+        "",
+        `/repos/${encodeURIComponent(repo)}/board?chatTask=${encodeURIComponent(taskId)}`,
+      );
     } else {
       // Tasks view: kick off Claude in background, no panel
       startBackgroundHandover(taskId);
@@ -115,6 +143,11 @@ export function AppShell({
     if (currentView === "Board") {
       setChatTaskId(task.id);
       openPane();
+      window.history.replaceState(
+        null,
+        "",
+        `/repos/${encodeURIComponent(repo)}/board?chatTask=${encodeURIComponent(task.id)}`,
+      );
       return;
     }
     openPane();
@@ -145,6 +178,11 @@ export function AppShell({
     // session just because the user pressed Escape on a SpecEditor in Tasks view.
     if (chatPanelVisible) {
       setChatTaskId(null);
+      window.history.replaceState(
+        null,
+        "",
+        `/repos/${encodeURIComponent(repo)}/board`,
+      );
     }
   }
 
